@@ -94,6 +94,61 @@ function getTrendMaxScore() {
   if (scoreTrend.value.length === 0) return 100;
   return Math.max(...scoreTrend.value.map(t => t.score), 100);
 }
+
+function getGameMissSources(game) {
+  if (!game || !game.missSources) {
+    return { timeout: 0, early: 0, late: 0 };
+  }
+  return game.missSources;
+}
+
+function getGameCaughtStats(game) {
+  if (!game || !game.caughtLocations || game.caughtLocations.length === 0) {
+    return {
+      locations: { topLeft: 0, topRight: 0, bottomLeft: 0, bottomRight: 0, center: 0, other: 0 },
+      sources: { vision: 0, collision: 0, laser: 0, other: 0 }
+    };
+  }
+
+  const locationBuckets = { topLeft: 0, topRight: 0, bottomLeft: 0, bottomRight: 0, center: 0, other: 0 };
+  const sourceStats = { vision: 0, collision: 0, laser: 0, other: 0 };
+
+  game.caughtLocations.forEach(loc => {
+    const x = loc.x || 375;
+    const y = loc.y || 667;
+    if (x < 250 && y < 445) locationBuckets.topLeft++;
+    else if (x >= 500 && y < 445) locationBuckets.topRight++;
+    else if (x < 250 && y >= 890) locationBuckets.bottomLeft++;
+    else if (x >= 500 && y >= 890) locationBuckets.bottomRight++;
+    else if (x >= 250 && x < 500 && y >= 445 && y < 890) locationBuckets.center++;
+    else locationBuckets.other++;
+
+    if (loc.source && sourceStats[loc.source] !== undefined) {
+      sourceStats[loc.source]++;
+    } else {
+      sourceStats.other++;
+    }
+  });
+
+  return { locations: locationBuckets, sources: sourceStats };
+}
+
+function getGameStationScores(game) {
+  if (!game || !game.stations) return [];
+  let cumulative = 0;
+  return game.stations.map((s, idx) => ({
+    name: s.name,
+    score: s.score,
+    cumulative: (cumulative += s.score),
+    index: idx + 1
+  }));
+}
+
+function getGameMaxStationScore(game) {
+  const scores = getGameStationScores(game);
+  if (scores.length === 0) return 100;
+  return Math.max(...scores.map(s => Math.abs(s.score)), 100);
+}
 function showGamePrompt(text, color = '#fff') {
  promptText.value = text;
  promptColor.value = color;
