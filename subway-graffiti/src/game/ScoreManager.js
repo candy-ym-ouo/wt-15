@@ -122,14 +122,15 @@ class ScoreManager {
   endGame() {
     this.gamesPlayed++
     this.totalScore += this.currentScore
-    if (this.currentScore > this.highScore) {
+    const isNewHigh = this.currentScore > this.highScore && this.currentScore > 0
+    if (isNewHigh) {
       this.highScore = this.currentScore
     }
     this.checkUnlocks()
     this.save()
     return {
       score: this.currentScore,
-      isNewHigh: this.currentScore >= this.highScore && this.currentScore > 0
+      isNewHigh
     }
   }
 
