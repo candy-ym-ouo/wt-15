@@ -225,6 +225,7 @@ export class GraffitiGame {
     const currentRadius = target.currentRadius || target.radius
     let result = 'miss'
     let color = 0xff0000
+    let missSource = 'late'
     const perfectRadius = target.perfectRadius || GAME_CONFIG.graffiti.perfectRadius
 
     if (currentRadius <= perfectRadius) {
@@ -237,11 +238,12 @@ export class GraffitiGame {
       this.showPrompt(this.getFeedbackText('good'), color)
     } else {
       result = 'miss'
+      missSource = 'early'
       color = 0xff4444
       this.showPrompt(this.getFeedbackText('miss'), color)
     }
 
-    const points = scoreManager.addScore(result)
+    const points = scoreManager.addScore(result, result === 'miss' ? { source: missSource } : {})
     audioManager.playSFX(result)
     const particleConfig = scoreManager.getSkinParticles()
     const count = result === 'perfect' ? particleConfig.count.perfect : particleConfig.count.good
@@ -436,7 +438,7 @@ export class GraffitiGame {
     this.targets.forEach(target => {
       target.currentRadius = (target.currentRadius || target.radius) - target.shrinkSpeed * delta
       if (target.currentRadius <= 0) {
-        scoreManager.addScore('miss')
+        scoreManager.addScore('miss', { source: 'timeout' })
         audioManager.playSFX('miss')
         this.showPrompt(this.getFeedbackText('miss'), 0xff4444)
         this.callbacks.onScoreUpdate(GAME_CONFIG.graffiti.missScore, 'miss')

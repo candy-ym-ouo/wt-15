@@ -619,7 +619,7 @@ export class PatrolAvoid {
       const dist = Math.sqrt(dx * dx + dy * dy)
 
       if (dist < 40) {
-        this.onCaught()
+        this.onCaught('collision', { x: this.player.x, y: this.player.y })
         return
       }
 
@@ -631,7 +631,7 @@ export class PatrolAvoid {
 
         const effectiveSpread = guard.isFlashing ? guard.visionSpread * 2 : guard.visionSpread / 2
         if (Math.abs(angleDiff) < effectiveSpread) {
-          this.onCaught()
+          this.onCaught('vision', { x: this.player.x, y: this.player.y })
           return
         }
       }
@@ -641,12 +641,12 @@ export class PatrolAvoid {
       if (beam.progress >= beam.warningDuration && beam.progress < beam.totalDuration) {
         if (beam.isHorizontal) {
           if (Math.abs(this.player.y - beam.y) < beam.width / 2 + 15) {
-            this.onCaught()
+            this.onCaught('laser', { x: this.player.x, y: this.player.y })
             return
           }
         } else {
           if (Math.abs(this.player.x - beam.x) < beam.width / 2 + 15) {
-            this.onCaught()
+            this.onCaught('laser', { x: this.player.x, y: this.player.y })
             return
           }
         }
@@ -654,13 +654,17 @@ export class PatrolAvoid {
     }
   }
 
-  onCaught() {
+  onCaught(source = 'vision', location = null) {
     this.isCaught = true
     this.isRunning = false
 
     audioManager.playSFX('caught')
     this.showPrompt(this.getFeedbackText('caught'), 0xff4444)
-    scoreManager.addScore('caught')
+    const stationId = this.station ? this.station.id : null
+    scoreManager.addScore('caught', {
+      location: location ? { ...location, stationId } : null,
+      source
+    })
     this.callbacks.onScoreUpdate(-GAME_CONFIG.patrol.caughtPenalty, 'caught')
 
     let flashAlpha = 0

@@ -196,6 +196,7 @@ export class GameEngine {
     this.currentDifficultyParams = this.computeDifficultyParams()
     const stationScoreMultiplier = (station.graffiti && station.graffiti.scoreMultiplier) || 1
     scoreManager.setScoreMultiplier(this.currentDifficultyParams.scoreMultiplier * stationScoreMultiplier)
+    scoreManager.startStation(station)
     this._startNextPhase()
   }
 
@@ -239,6 +240,8 @@ export class GameEngine {
   }
 
   _onPhaseComplete() {
+    const phase = this.phaseOrder[this.currentPhase]
+    scoreManager.endPhase(phase)
     this.currentPhase++
     setTimeout(() => {
       this._startNextPhase()
@@ -247,6 +250,7 @@ export class GameEngine {
 
   _onStationComplete() {
     this.stationsCompleted++
+    scoreManager.endStation()
 
     const stationScore = scoreManager.currentScore - (this.stationStartScore || 0)
     const isNewStationHigh = scoreManager.setStationScore(this.currentStation.id, stationScore)

@@ -19,6 +19,14 @@ const stationResult = ref(null);
 const selectedDifficulty = ref('normal');
 const stats = reactive(scoreManager.getStats());
 const promptAnimation = ref('bounce');
+const gameHistory = ref([]);
+const selectedGameIndex = ref(0);
+const selectedGame = computed(() => gameHistory.value[selectedGameIndex.value] || null);
+const scoreTrend = ref([]);
+const missSourceStats = ref({ timeout: 0, early: 0, late: 0 });
+const caughtStats = ref({ locations: {}, sources: {} });
+const statsTab = ref('overview');
+
 const currentPromptConfig = computed(() => scoreManager.getSkinPrompt());
 const skins = computed(() => {
  return GAME_CONFIG.skins.map(skin => ({
@@ -39,6 +47,52 @@ const nextUnlockScore = computed(() => {
 });
 function refreshStats() {
  Object.assign(stats, scoreManager.getStats());
+ gameHistory.value = scoreManager.getGameHistory();
+ scoreTrend.value = scoreManager.getScoreTrend(10);
+ missSourceStats.value = scoreManager.getMissSourceStats();
+ caughtStats.value = scoreManager.getCaughtLocationStats();
+ if (gameHistory.value.length > 0 && selectedGameIndex.value >= gameHistory.value.length) {
+   selectedGameIndex.value = 0;
+ }
+}
+
+function formatTime(timestamp) {
+  const d = new Date(timestamp);
+  return `${d.getMonth() + 1}/${d.getDate()} ${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
+}
+
+function getDifficultyName(diff) {
+  return diff === 'hard' ? '困难' : '普通';
+}
+
+function getMissSourceName(source) {
+  const names = { timeout: '超时未点击', early: '点击过早', late: '点击过晚' };
+  return names[source] || source;
+}
+
+function getCaughtSourceName(source) {
+  const names = { vision: '视野被发现', collision: '碰撞保安', laser: '激光触发', other: '其他' };
+  return names[source] || source;
+}
+
+function getCaughtLocationName(loc) {
+  const names = { topLeft: '左上', topRight: '右上', bottomLeft: '左下', bottomRight: '右下', center: '中央', other: '其他' };
+  return names[loc] || loc;
+}
+
+function selectStatsTab(tab) {
+  statsTab.value = tab;
+  audioManager.playSFX('click');
+}
+
+function selectGame(idx) {
+  selectedGameIndex.value = idx;
+  audioManager.playSFX('click');
+}
+
+function getTrendMaxScore() {
+  if (scoreTrend.value.length === 0) return 100;
+  return Math.max(...scoreTrend.value.map(t => t.score), 100);
 }
 function showGamePrompt(text, color = '#fff') {
  promptText.value = text;
@@ -389,47 +443,304 @@ onUnmounted(() => {
         </div>
       </div>
 
-      <div v-if="currentState === GameState.STATS" class="screen">
+      <div v-if="currentState === GameState.STATS" class="screen stats-screen">
         <div class="screen-title" style="font-size: 32px;">游戏统计</div>
         <div class="screen-subtitle">YOUR PROGRESS</div>
 
         <div class="screen-content">
-          <div style="background: rgba(255,255,255,0.05); border-radius: 16px; padding: 20px;">
-            <div class="stat-row">
-              <span class="stat-label">🎮 游戏场次</span>
-              <span class="stat-value">{{ stats.gamesPlayed }}</span>
+          <div class="stats-tabs">
+            <button
+              class="stats-tab"
+              :class="{ active: statsTab === 'overview' }"
+              @click="selectStatsTab('overview')"
+            >
+              📊 总览
+            </button>
+            <button
+              class="stats-tab"
+              :class="{ active: statsTab === 'history' }"
+              @click="selectStatsTab('history')"
+            >
+              🎮 单局明细
+            </button>
+            <button
+              class="stats-tab"
+              :class="{ active: statsTab === 'analysis' }"
+              @click="selectStatsTab('analysis')"
+            >
+              🔍 分析
+            </button>
+          </div>
+
+          <div v-if="statsTab === 'overview'">
+            <div style="background: rgba(255,255,255,0.05); border-radius: 16px; padding: 20px;">
+              <div class="stat-row">
+                <span class="stat-label">🎮 游戏场次</span>
+                <span class="stat-value">{{ stats.gamesPlayed }}</span>
+              </div>
+              <div class="stat-row">
+                <span class="stat-label">🏆 最高分</span>
+                <span class="stat-value">{{ stats.highScore.toLocaleString() }}</span>
+              </div>
+              <div class="stat-row">
+                <span class="stat-label">🎨 累计得分</span>
+                <span class="stat-value">{{ stats.totalScore.toLocaleString() }}</span>
+              </div>
+              <div class="stat-row">
+                <span class="stat-label">🔥 最大连击</span>
+                <span class="stat-value">{{ stats.maxCombo }}</span>
+              </div>
+              <div class="stat-row">
+                <span class="stat-label">✨ Perfect 次数</span>
+                <span class="stat-value" style="color: #2ecc71;">{{ stats.perfectCount }}</span>
+              </div>
+              <div class="stat-row">
+                <span class="stat-label">👍 Good 次数</span>
+                <span class="stat-value" style="color: #f39c12;">{{ stats.goodCount }}</span>
+              </div>
+              <div class="stat-row">
+                <span class="stat-label">❌ Miss 次数</span>
+                <span class="stat-value" style="color: #ff4444;">{{ stats.missCount }}</span>
+              </div>
+              <div class="stat-row">
+                <span class="stat-label">🚨 被抓次数</span>
+                <span class="stat-value" style="color: #e74c3c;">{{ stats.caughtCount }}</span>
+              </div>
+              <div class="stat-row">
+                <span class="stat-label">🎯 命中率</span>
+                <span class="stat-value">{{ stats.accuracy }}%</span>
+              </div>
             </div>
-            <div class="stat-row">
-              <span class="stat-label">🏆 最高分</span>
-              <span class="stat-value">{{ stats.highScore.toLocaleString() }}</span>
+
+            <div style="background: rgba(255,255,255,0.05); border-radius: 16px; padding: 20px; margin-top: 16px;">
+              <div style="font-size: 16px; font-weight: bold; margin-bottom: 16px;">📈 历史得分趋势 (最近10局)</div>
+              <div v-if="scoreTrend.length > 0" class="trend-chart">
+                <div class="trend-bars">
+                  <div
+                    v-for="(t, idx) in scoreTrend"
+                    :key="idx"
+                    class="trend-bar-wrapper"
+                  >
+                    <div
+                      class="trend-bar"
+                      :style="{
+                        height: (t.score / getTrendMaxScore() * 100) + '%',
+                        background: t.difficulty === 'hard'
+                          ? 'linear-gradient(to top, #e94560, #f39c12)'
+                          : 'linear-gradient(to top, #3498db, #2ecc71)'
+                      }"
+                    >
+                      <div class="trend-bar-value">{{ t.score }}</div>
+                    </div>
+                    <div class="trend-bar-label">{{ formatTime(t.timestamp).slice(0, -3) }}</div>
+                  </div>
+                </div>
+              </div>
+              <div v-else style="text-align: center; padding: 40px; opacity: 0.5;">
+                暂无历史数据
+              </div>
             </div>
-            <div class="stat-row">
-              <span class="stat-label">🎨 累计得分</span>
-              <span class="stat-value">{{ stats.totalScore.toLocaleString() }}</span>
+          </div>
+
+          <div v-if="statsTab === 'history'">
+            <div v-if="gameHistory.length > 0">
+              <div style="margin-bottom: 12px; font-size: 14px; opacity: 0.7;">选择一局查看明细</div>
+              <div class="game-history-list">
+                <div
+                  v-for="(game, idx) in gameHistory"
+                  :key="game.id"
+                  class="game-history-item"
+                  :class="{ selected: idx === selectedGameIndex }"
+                  @click="selectGame(idx)"
+                >
+                  <div class="game-history-score" :class="{ 'new-high': game.isNewHigh }">
+                    {{ game.score.toLocaleString() }}
+                  </div>
+                  <div class="game-history-info">
+                    <div class="game-history-time">{{ formatTime(game.timestamp) }}</div>
+                    <div class="game-history-meta">
+                      <span :class="game.difficulty === 'hard' ? 'diff-hard' : 'diff-normal'">
+                        {{ getDifficultyName(game.difficulty) }}
+                      </span>
+                      <span>{{ game.stations?.length || 0 }} 站</span>
+                      <span>{{ game.maxCombo || 0 }} 连击</span>
+                    </div>
+                  </div>
+                  <div v-if="game.isNewHigh" class="new-high-badge">🏆</div>
+                </div>
+              </div>
+
+              <div v-if="selectedGame" style="margin-top: 16px;">
+                <div style="background: rgba(255,255,255,0.05); border-radius: 16px; padding: 20px;">
+                  <div style="font-size: 16px; font-weight: bold; margin-bottom: 16px;">
+                    📋 单局得分拆分
+                  </div>
+
+                  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px;">
+                    <div class="phase-card graffiti-phase">
+                      <div class="phase-card-title">🎨 涂鸦阶段</div>
+                      <div class="phase-card-score">
+                        {{ (selectedGame.phaseBreakdown?.graffiti?.score || 0).toLocaleString() }}
+                      </div>
+                      <div class="phase-card-stats">
+                        <span style="color: #2ecc71;">Perfect {{ selectedGame.phaseBreakdown?.graffiti?.perfect || 0 }}</span>
+                        <span style="color: #f39c12;">Good {{ selectedGame.phaseBreakdown?.graffiti?.good || 0 }}</span>
+                        <span style="color: #ff4444;">Miss {{ selectedGame.phaseBreakdown?.graffiti?.miss || 0 }}</span>
+                      </div>
+                    </div>
+                    <div class="phase-card patrol-phase">
+                      <div class="phase-card-title">👮 巡逻阶段</div>
+                      <div class="phase-card-score">
+                        {{ (selectedGame.phaseBreakdown?.patrol?.score || 0).toLocaleString() }}
+                      </div>
+                      <div class="phase-card-stats">
+                        <span style="color: #e74c3c;">被抓 {{ selectedGame.phaseBreakdown?.patrol?.caught || 0 }}</span>
+                        <span style="color: #3498db;">最大P连击 {{ selectedGame.maxPerfectStreak || 0 }}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div v-if="selectedGame.stations && selectedGame.stations.length > 0" style="margin-top: 16px;">
+                    <div style="font-size: 14px; font-weight: bold; margin-bottom: 12px; opacity: 0.8;">
+                      🚇 各站点得分
+                    </div>
+                    <div class="station-breakdown">
+                      <div
+                        v-for="(station, sIdx) in selectedGame.stations"
+                        :key="sIdx"
+                        class="station-breakdown-item"
+                      >
+                        <div class="station-breakdown-header">
+                          <span class="station-name">{{ station.name }}</span>
+                          <span class="station-total">+{{ station.score.toLocaleString() }}</span>
+                        </div>
+                        <div class="station-breakdown-bars">
+                          <div class="station-bar-row">
+                            <span class="station-bar-label">涂鸦</span>
+                            <div class="station-bar-track">
+                              <div
+                                class="station-bar graffiti-bar"
+                                :style="{ width: Math.max(4, Math.abs(station.graffiti?.score || 0) / Math.max(1, station.score) * 100) + '%' }"
+                              ></div>
+                            </div>
+                            <span class="station-bar-value">{{ (station.graffiti?.score || 0).toLocaleString() }}</span>
+                          </div>
+                          <div class="station-bar-row">
+                            <span class="station-bar-label">巡逻</span>
+                            <div class="station-bar-track">
+                              <div
+                                class="station-bar patrol-bar"
+                                :style="{ width: Math.max(4, Math.abs(station.patrol?.score || 0) / Math.max(1, station.score) * 100) + '%' }"
+                              ></div>
+                            </div>
+                            <span class="station-bar-value">{{ (station.patrol?.score || 0).toLocaleString() }}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
-            <div class="stat-row">
-              <span class="stat-label">🔥 最大连击</span>
-              <span class="stat-value">{{ stats.maxCombo }}</span>
+            <div v-else style="text-align: center; padding: 60px 20px; opacity: 0.5;">
+              <div style="font-size: 48px; margin-bottom: 16px;">🎮</div>
+              <div>暂无游戏记录</div>
+              <div style="font-size: 14px; margin-top: 8px;">完成一局游戏后可查看单局明细</div>
             </div>
-            <div class="stat-row">
-              <span class="stat-label">✨ Perfect 次数</span>
-              <span class="stat-value" style="color: #2ecc71;">{{ stats.perfectCount }}</span>
+          </div>
+
+          <div v-if="statsTab === 'analysis'">
+            <div style="background: rgba(255,255,255,0.05); border-radius: 16px; padding: 20px; margin-bottom: 16px;">
+              <div style="font-size: 16px; font-weight: bold; margin-bottom: 16px;">❌ 失误来源分析</div>
+              <div v-if="(missSourceStats.timeout + missSourceStats.early + missSourceStats.late) > 0">
+                <div class="miss-source-list">
+                  <div
+                    v-for="(count, source) in missSourceStats"
+                    :key="source"
+                    class="miss-source-item"
+                  >
+                    <div class="miss-source-header">
+                      <span class="miss-source-name">{{ getMissSourceName(source) }}</span>
+                      <span class="miss-source-count">{{ count }} 次</span>
+                    </div>
+                    <div class="miss-source-bar-track">
+                      <div
+                        class="miss-source-bar"
+                        :class="source"
+                        :style="{
+                          width: (count / Math.max(1, missSourceStats.timeout + missSourceStats.early + missSourceStats.late) * 100) + '%'
+                        }"
+                      ></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div v-else style="text-align: center; padding: 20px; opacity: 0.5;">
+                暂无失误数据
+              </div>
             </div>
-            <div class="stat-row">
-              <span class="stat-label">👍 Good 次数</span>
-              <span class="stat-value" style="color: #f39c12;">{{ stats.goodCount }}</span>
+
+            <div style="background: rgba(255,255,255,0.05); border-radius: 16px; padding: 20px; margin-bottom: 16px;">
+              <div style="font-size: 16px; font-weight: bold; margin-bottom: 16px;">👮 被抓来源分析</div>
+              <div v-if="Object.values(caughtStats.sources || {}).reduce((a, b) => a + b, 0) > 0">
+                <div class="miss-source-list">
+                  <div
+                    v-for="(count, source) in caughtStats.sources"
+                    :key="source"
+                    class="miss-source-item"
+                  >
+                    <div class="miss-source-header">
+                      <span class="miss-source-name">{{ getCaughtSourceName(source) }}</span>
+                      <span class="miss-source-count">{{ count }} 次</span>
+                    </div>
+                    <div class="miss-source-bar-track">
+                      <div
+                        class="miss-source-bar caught-source"
+                        :style="{
+                          width: (count / Math.max(1, Object.values(caughtStats.sources).reduce((a, b) => a + b, 0)) * 100) + '%'
+                        }"
+                      ></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div v-else style="text-align: center; padding: 20px; opacity: 0.5;">
+                暂无被抓数据
+              </div>
             </div>
-            <div class="stat-row">
-              <span class="stat-label">❌ Miss 次数</span>
-              <span class="stat-value" style="color: #ff4444;">{{ stats.missCount }}</span>
-            </div>
-            <div class="stat-row">
-              <span class="stat-label">🚨 被抓次数</span>
-              <span class="stat-value" style="color: #e74c3c;">{{ stats.caughtCount }}</span>
-            </div>
-            <div class="stat-row">
-              <span class="stat-label">🎯 命中率</span>
-              <span class="stat-value">{{ stats.accuracy }}%</span>
+
+            <div style="background: rgba(255,255,255,0.05); border-radius: 16px; padding: 20px;">
+              <div style="font-size: 16px; font-weight: bold; margin-bottom: 16px;">📍 被抓位置分布</div>
+              <div v-if="Object.values(caughtStats.locations || {}).reduce((a, b) => a + b, 0) > 0">
+                <div class="location-grid">
+                  <div class="location-cell" :class="{ active: caughtStats.locations.topLeft > 0 }">
+                    <div class="location-count">{{ caughtStats.locations.topLeft || 0 }}</div>
+                    <div class="location-name">左上</div>
+                  </div>
+                  <div class="location-cell" :class="{ active: caughtStats.locations.topRight > 0 }">
+                    <div class="location-count">{{ caughtStats.locations.topRight || 0 }}</div>
+                    <div class="location-name">右上</div>
+                  </div>
+                  <div class="location-cell center-cell" :class="{ active: caughtStats.locations.center > 0 }">
+                    <div class="location-count">{{ caughtStats.locations.center || 0 }}</div>
+                    <div class="location-name">中央</div>
+                  </div>
+                  <div class="location-cell" :class="{ active: caughtStats.locations.bottomLeft > 0 }">
+                    <div class="location-count">{{ caughtStats.locations.bottomLeft || 0 }}</div>
+                    <div class="location-name">左下</div>
+                  </div>
+                  <div class="location-cell" :class="{ active: caughtStats.locations.bottomRight > 0 }">
+                    <div class="location-count">{{ caughtStats.locations.bottomRight || 0 }}</div>
+                    <div class="location-name">右下</div>
+                  </div>
+                </div>
+                <div style="margin-top: 12px; text-align: center; font-size: 12px; opacity: 0.6;">
+                  其他区域: {{ caughtStats.locations.other || 0 }} 次
+                </div>
+              </div>
+              <div v-else style="text-align: center; padding: 20px; opacity: 0.5;">
+                暂无位置数据
+              </div>
             </div>
           </div>
 

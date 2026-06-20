@@ -437,3 +437,389 @@ canvas {
 .buttons-row .btn {
   flex: 1;
 }
+
+.stats-screen {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.stats-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 6px;
+  border-radius: 12px;
+}
+
+.stats-tab {
+  flex: 1;
+  padding: 10px 8px;
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.stats-tab.active {
+  background: linear-gradient(135deg, #e94560, #533483);
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(233, 69, 96, 0.3);
+}
+
+.trend-chart {
+  width: 100%;
+}
+
+.trend-bars {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 6px;
+  height: 180px;
+  padding: 10px 0;
+}
+
+.trend-bar-wrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 100%;
+}
+
+.trend-bar {
+  width: 100%;
+  min-height: 4px;
+  border-radius: 4px 4px 0 0;
+  position: relative;
+  transition: all 0.3s ease;
+  margin-top: auto;
+}
+
+.trend-bar-value {
+  position: absolute;
+  top: -18px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 10px;
+  font-weight: bold;
+  white-space: nowrap;
+  opacity: 0.8;
+}
+
+.trend-bar-label {
+  margin-top: 8px;
+  font-size: 10px;
+  opacity: 0.5;
+}
+
+.game-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 240px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.game-history-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 2px solid transparent;
+}
+
+.game-history-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.game-history-item.selected {
+  border-color: #e94560;
+  background: rgba(233, 69, 96, 0.1);
+}
+
+.game-history-score {
+  font-size: 22px;
+  font-weight: 900;
+  color: #e94560;
+  min-width: 80px;
+}
+
+.game-history-score.new-high {
+  color: #f39c12;
+  text-shadow: 0 0 10px rgba(243, 156, 18, 0.5);
+}
+
+.game-history-info {
+  flex: 1;
+}
+
+.game-history-time {
+  font-size: 13px;
+  opacity: 0.8;
+  margin-bottom: 4px;
+}
+
+.game-history-meta {
+  display: flex;
+  gap: 10px;
+  font-size: 11px;
+  opacity: 0.6;
+}
+
+.game-history-meta .diff-hard {
+  color: #e94560;
+  font-weight: bold;
+}
+
+.game-history-meta .diff-normal {
+  color: #3498db;
+  font-weight: bold;
+}
+
+.new-high-badge {
+  font-size: 20px;
+}
+
+.phase-card {
+  padding: 16px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.phase-card.graffiti-phase {
+  border: 2px solid rgba(46, 204, 113, 0.3);
+  background: linear-gradient(135deg, rgba(46, 204, 113, 0.08), rgba(52, 152, 219, 0.05));
+}
+
+.phase-card.patrol-phase {
+  border: 2px solid rgba(52, 152, 219, 0.3);
+  background: linear-gradient(135deg, rgba(52, 152, 219, 0.08), rgba(155, 89, 182, 0.05));
+}
+
+.phase-card-title {
+  font-size: 13px;
+  opacity: 0.7;
+  margin-bottom: 6px;
+}
+
+.phase-card-score {
+  font-size: 28px;
+  font-weight: 900;
+  margin-bottom: 8px;
+  color: #fff;
+}
+
+.phase-card-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 11px;
+}
+
+.station-breakdown {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.station-breakdown-item {
+  background: rgba(0, 0, 0, 0.2);
+  padding: 12px;
+  border-radius: 10px;
+}
+
+.station-breakdown-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.station-name {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.station-total {
+  font-size: 16px;
+  font-weight: bold;
+  color: #2ecc71;
+}
+
+.station-breakdown-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.station-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.station-bar-label {
+  width: 32px;
+  opacity: 0.6;
+}
+
+.station-bar-track {
+  flex: 1;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.station-bar {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.5s ease;
+}
+
+.graffiti-bar {
+  background: linear-gradient(90deg, #2ecc71, #1abc9c);
+}
+
+.patrol-bar {
+  background: linear-gradient(90deg, #3498db, #9b59b6);
+}
+
+.station-bar-value {
+  width: 50px;
+  text-align: right;
+  opacity: 0.8;
+  font-weight: 600;
+}
+
+.miss-source-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.miss-source-item {
+  background: rgba(0, 0, 0, 0.2);
+  padding: 12px;
+  border-radius: 10px;
+}
+
+.miss-source-header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  font-size: 13px;
+}
+
+.miss-source-name {
+  opacity: 0.8;
+}
+
+.miss-source-count {
+  font-weight: bold;
+  color: #e94560;
+}
+
+.miss-source-bar-track {
+  height: 10px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 5px;
+  overflow: hidden;
+}
+
+.miss-source-bar {
+  height: 100%;
+  border-radius: 5px;
+  transition: width 0.5s ease;
+}
+
+.miss-source-bar.timeout {
+  background: linear-gradient(90deg, #e74c3c, #c0392b);
+}
+
+.miss-source-bar.early {
+  background: linear-gradient(90deg, #f39c12, #e67e22);
+}
+
+.miss-source-bar.late {
+  background: linear-gradient(90deg, #9b59b6, #8e44ad);
+}
+
+.miss-source-bar.caught-source {
+  background: linear-gradient(90deg, #e94560, #c0392b);
+}
+
+.location-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.location-cell {
+  background: rgba(255, 255, 255, 0.05);
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 16px 8px;
+  text-align: center;
+  transition: all 0.3s ease;
+}
+
+.location-cell.active {
+  border-color: #e94560;
+  background: rgba(233, 69, 96, 0.1);
+}
+
+.location-cell.center-cell {
+  grid-column: 2;
+  grid-row: 1 / 3;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.location-count {
+  font-size: 24px;
+  font-weight: 900;
+  color: #e94560;
+  margin-bottom: 4px;
+}
+
+.location-cell:not(.active) .location-count {
+  opacity: 0.4;
+}
+
+.location-name {
+  font-size: 12px;
+  opacity: 0.6;
+}
+
+@media (max-width: 480px) {
+  .screen {
+    padding: 24px 20px;
+  }
+
+  .trend-bars {
+    height: 140px;
+  }
+
+  .trend-bar-value {
+    font-size: 9px;
+  }
+
+  .phase-card-score {
+    font-size: 22px;
+  }
+}
