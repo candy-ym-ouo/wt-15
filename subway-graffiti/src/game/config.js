@@ -45,6 +45,29 @@ export const GAME_CONFIG = {
     masterVolume: 0.7,
     sfxVolume: 0.8,
     musicVolume: 0.4
+  },
+
+  difficulty: {
+    normal: {
+      name: '普通',
+      shrinkSpeedMultiplier: 1,
+      patrolRangeMultiplier: 1,
+      scoreMultiplier: 1
+    },
+    hard: {
+      name: '困难',
+      baseShrinkSpeedMultiplier: 1.3,
+      basePatrolRangeMultiplier: 1.2,
+      baseScoreMultiplier: 1.5,
+      shrinkSpeedPerStation: 0.15,
+      patrolRangePerStation: 0.1,
+      scorePerStation: 0.2,
+      maxShrinkSpeedMultiplier: 2.5,
+      maxPatrolRangeMultiplier: 2,
+      maxScoreMultiplier: 3,
+      extraGuardSpeed: 30,
+      extraGuardPerStation: 10
+    }
   }
 }
 

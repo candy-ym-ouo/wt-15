@@ -17,7 +17,12 @@ export class GraffitiGame {
     this.isRunning = false
     this.wall = null
     this.graffitiMarks = []
+    this.shrinkSpeedMultiplier = 1
     this.setup()
+  }
+
+  setDifficulty(shrinkSpeedMultiplier) {
+    this.shrinkSpeedMultiplier = shrinkSpeedMultiplier || 1
   }
 
   setup() {
@@ -122,7 +127,7 @@ export class GraffitiGame {
     target.x = x
     target.y = y
     target.radius = GAME_CONFIG.graffiti.targetRadius
-    target.shrinkSpeed = GAME_CONFIG.graffiti.shrinkSpeed * (0.8 + Math.random() * 0.4)
+    target.shrinkSpeed = GAME_CONFIG.graffiti.shrinkSpeed * this.shrinkSpeedMultiplier * (0.8 + Math.random() * 0.4)
 
     const colorStr = scoreManager.getSkinColor()
     const colorNum = parseInt(colorStr.replace('#', '0x'))

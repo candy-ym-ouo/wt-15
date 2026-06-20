@@ -19,7 +19,14 @@ export class PatrolAvoid {
     this.isCaught = false
     this.safeZones = []
     this.laserTimer = 0
+    this.patrolRangeMultiplier = 1
+    this.extraGuardSpeed = 0
     this.setup()
+  }
+
+  setDifficulty(patrolRangeMultiplier, extraGuardSpeed) {
+    this.patrolRangeMultiplier = patrolRangeMultiplier || 1
+    this.extraGuardSpeed = extraGuardSpeed || 0
   }
 
   setup() {
@@ -219,10 +226,10 @@ export class PatrolAvoid {
 
     guard.addChild(body, hat, badge)
 
-    guard.speed = GAME_CONFIG.patrol.guardSpeed * (0.8 + Math.random() * 0.4)
+    guard.speed = (GAME_CONFIG.patrol.guardSpeed + this.extraGuardSpeed) * (0.8 + Math.random() * 0.4)
     guard.angle = Math.random() * Math.PI * 2
     guard.visionAngle = Math.random() * Math.PI * 2
-    guard.visionRange = GAME_CONFIG.patrol.flashRadius
+    guard.visionRange = GAME_CONFIG.patrol.flashRadius * this.patrolRangeMultiplier
     guard.visionSpread = Math.PI / 3
     guard.changeTimer = 1 + Math.random() * 2
 

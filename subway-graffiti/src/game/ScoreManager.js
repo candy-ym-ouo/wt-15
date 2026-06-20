@@ -17,6 +17,8 @@ class ScoreManager {
     this.unlockedSkins = ['default']
     this.selectedSkin = 'default'
     this.unlockedStations = ['s1-1', 's2-1']
+    this.difficulty = 'normal'
+    this.scoreMultiplier = 1
     this.load()
   }
 
@@ -63,9 +65,15 @@ class ScoreManager {
     }
   }
 
-  resetGame() {
+  resetGame(difficulty = 'normal', scoreMultiplier = 1) {
     this.currentScore = 0
     this.combo = 0
+    this.difficulty = difficulty
+    this.scoreMultiplier = scoreMultiplier
+  }
+
+  setScoreMultiplier(multiplier) {
+    this.scoreMultiplier = multiplier
   }
 
   addScore(type) {
@@ -95,6 +103,10 @@ class ScoreManager {
 
     if (this.combo > 1 && points > 0) {
       points = Math.floor(points * (1 + this.combo * 0.1))
+    }
+
+    if (points > 0 && this.scoreMultiplier > 1) {
+      points = Math.floor(points * this.scoreMultiplier)
     }
 
     this.currentScore += points

@@ -28,8 +28,45 @@ export class GameEngine {
     this.stationsCompleted = 0
     this.phaseOrder = ['graffiti', 'patrol']
     this.currentPhase = 0
+    this.difficulty = 'normal'
+    this.currentDifficultyParams = null
 
     this._onResize = this._onResize.bind(this)
+  }
+
+  computeDifficultyParams() {
+    const diffConfig = GAME_CONFIG.difficulty
+    if (this.difficulty === 'normal') {
+      return {
+        shrinkSpeedMultiplier: diffConfig.normal.shrinkSpeedMultiplier,
+        patrolRangeMultiplier: diffConfig.normal.patrolRangeMultiplier,
+        scoreMultiplier: diffConfig.normal.scoreMultiplier,
+        extraGuardSpeed: 0
+      }
+    }
+
+    const hard = diffConfig.hard
+    const progress = this.stationsCompleted
+    const shrinkSpeedMultiplier = Math.min(
+      hard.baseShrinkSpeedMultiplier + hard.shrinkSpeedPerStation * progress,
+      hard.maxShrinkSpeedMultiplier
+    )
+    const patrolRangeMultiplier = Math.min(
+      hard.basePatrolRangeMultiplier + hard.patrolRangePerStation * progress,
+      hard.maxPatrolRangeMultiplier
+    )
+    const scoreMultiplier = Math.min(
+      hard.baseScoreMultiplier + hard.scorePerStation * progress,
+      hard.maxScoreMultiplier
+    )
+    const extraGuardSpeed = hard.extraGuardSpeed + hard.extraGuardPerStation * progress
+
+    return {
+      shrinkSpeedMultiplier,
+      patrolRangeMultiplier,
+      scoreMultiplier,
+      extraGuardSpeed
+    }
   }
 
   async init() {
@@ -115,12 +152,14 @@ export class GameEngine {
     this.canvas.style.height = `${GAME_CONFIG.height * scale}px`
   }
 
-  startNewGame() {
+  startNewGame(difficulty = 'normal') {
     audioManager.init()
     audioManager.resume()
     audioManager.startMusic()
-    scoreManager.resetGame()
+    this.difficulty = difficulty
     this.stationsCompleted = 0
+    this.currentDifficultyParams = this.computeDifficultyParams()
+    scoreManager.resetGame(difficulty, this.currentDifficultyParams.scoreMultiplier)
     this.showMap()
   }
 
@@ -153,6 +192,8 @@ export class GameEngine {
     this.currentStation = station
     this.currentLine = line
     this.currentPhase = 0
+    this.currentDifficultyParams = this.computeDifficultyParams()
+    scoreManager.setScoreMultiplier(this.currentDifficultyParams.scoreMultiplier)
     this._startNextPhase()
   }
 
@@ -170,9 +211,14 @@ export class GameEngine {
 
       if (phase === 'graffiti') {
         this.state = GameState.GRAFFITI
+        this.graffitiGame.setDifficulty(this.currentDifficultyParams.shrinkSpeedMultiplier)
         this.graffitiGame.start()
       } else if (phase === 'patrol') {
         this.state = GameState.PATROL
+        this.patrolGame.setDifficulty(
+          this.currentDifficultyParams.patrolRangeMultiplier,
+          this.currentDifficultyParams.extraGuardSpeed
+        )
         this.patrolGame.start()
       }
 
@@ -180,7 +226,10 @@ export class GameEngine {
         station: this.currentStation,
         line: this.currentLine,
         phase: this.currentPhase + 1,
-        totalPhases: this.phaseOrder.length
+        totalPhases: this.phaseOrder.length,
+        difficulty: this.difficulty,
+        difficultyParams: this.currentDifficultyParams,
+        stationsCompleted: this.stationsCompleted
       })
     }, 400)
   }
@@ -197,7 +246,9 @@ export class GameEngine {
     this.state = GameState.STATION_COMPLETE
     this.callbacks.onStateChange(this.state, {
       station: this.currentStation,
-      stationsCompleted: this.stationsCompleted
+      stationsCompleted: this.stationsCompleted,
+      difficulty: this.difficulty,
+      nextDifficultyParams: this.difficulty === 'hard' ? this.computeDifficultyParams() : null
     })
   }
 

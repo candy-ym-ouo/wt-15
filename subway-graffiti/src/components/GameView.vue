@@ -16,6 +16,7 @@ const showPrompt = ref(false);
 const audioEnabled = ref(true);
 const gameResult = ref(null);
 const stationResult = ref(null);
+const selectedDifficulty = ref('normal');
 const stats = reactive(scoreManager.getStats());
 const skins = computed(() => {
  return GAME_CONFIG.skins.map(skin => ({
@@ -76,7 +77,7 @@ function onTick() {
  score.value = scoreManager.currentScore;
  combo.value = scoreManager.combo;
 }
-function startGame() {
+function startGame(difficulty = 'normal') {
   if (!engine) {
     console.warn('Game engine not ready yet');
     return;
@@ -85,9 +86,17 @@ function startGame() {
   audioManager.resume();
   score.value = 0;
   combo.value = 0;
-  scoreManager.resetGame();
+  selectedDifficulty.value = difficulty;
+  const diffConfig = GAME_CONFIG.difficulty[difficulty];
+  const initialMultiplier = difficulty === 'hard' ? diffConfig.baseScoreMultiplier : diffConfig.scoreMultiplier;
+  scoreManager.resetGame(difficulty, initialMultiplier);
   audioManager.playSFX('click');
-  engine.startNewGame();
+  engine.startNewGame(difficulty);
+}
+
+function selectDifficulty(diff) {
+  selectedDifficulty.value = diff;
+  audioManager.playSFX('click');
 }
 function selectSkin(id) {
  if (scoreManager.selectSkin(id)) {
@@ -165,6 +174,9 @@ onUnmounted(() => {
           <div class="hud-value" style="font-size: 16px; color: #fff;">
             阶段 {{ phaseInfo.phase }}/{{ phaseInfo.totalPhases }}
           </div>
+          <div v-if="phaseInfo.difficulty === 'hard'" style="font-size: 12px; color: #e94560; font-weight: bold; margin-top: 2px;">
+            🔥 困难 x{{ phaseInfo.difficultyParams?.scoreMultiplier?.toFixed(1) || '1.5' }}
+          </div>
         </div>
         <div class="hud-item" style="text-align: right;">
           <div class="hud-label">最高</div>
@@ -215,6 +227,46 @@ onUnmounted(() => {
           </div>
 
           <button class="btn btn-primary" style="width: 100%;" @click="startGame">
+            🚇 开始巡游
+          </button>
+
+          <div class="buttons-row">
+            <button class="btn btn-secondary" @click="showSkinsScreen">
+              👕 皮肤
+            </button>
+            <button class="btn btn-secondary" @click="showStatsScreen">
+              📊 统计
+            </button>
+          </div>
+
+          <div style="background: rgba(255,255,255,0.05); border-radius: 12px; padding: 12px; margin-bottom: 24px;">
+            <div style="text-align: center; opacity: 0.7; font-size: 14px; margin-bottom: 12px;">选择难度</div>
+            <div style="display: flex; gap: 10px;">
+              <button
+                class="btn"
+                :class="selectedDifficulty === 'normal' ? 'btn-primary' : 'btn-outline'"
+                style="flex: 1;"
+                @click="selectDifficulty('normal')"
+              >
+                😊 普通
+              </button>
+              <button
+                class="btn"
+                :class="selectedDifficulty === 'hard' ? 'btn-primary' : 'btn-outline'"
+                style="flex: 1; border-color: #e94560;"
+                @click="selectDifficulty('hard')"
+              >
+                🔥 困难
+              </button>
+            </div>
+            <div v-if="selectedDifficulty === 'hard'" style="margin-top: 12px; font-size: 12px; opacity: 0.7; line-height: 1.6;">
+              <div>• 缩圈速度提升，每站 +15%（最高 2.5x）</div>
+              <div>• 巡逻范围扩大，每站 +10%（最高 2x）</div>
+              <div>• 奖励倍率提升，每站 +0.2（最高 3x）</div>
+            </div>
+          </div>
+
+          <button class="btn btn-primary" style="width: 100%;" @click="startGame(selectedDifficulty)">
             🚇 开始巡游
           </button>
 
@@ -330,6 +382,18 @@ onUnmounted(() => {
 
           <div style="text-align: center; margin: 20px 0; opacity: 0.7;">
             已完成 {{ stationResult?.stationsCompleted || 0 }} 个站点
+          </div>
+
+          <div v-if="stationResult?.difficulty === 'hard' && stationResult?.nextDifficultyParams" style="background: rgba(233, 69, 96, 0.1); border: 1px solid rgba(233, 69, 96, 0.3); border-radius: 12px; padding: 16px; margin-bottom: 20px;">
+            <div style="text-align: center; font-weight: bold; color: #e94560; margin-bottom: 10px;">🔥 下一站难度提升</div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 13px;">
+              <div style="opacity: 0.7;">缩圈速度</div>
+              <div style="text-align: right;">x{{ stationResult.nextDifficultyParams.shrinkSpeedMultiplier.toFixed(2) }}</div>
+              <div style="opacity: 0.7;">巡逻范围</div>
+              <div style="text-align: right;">x{{ stationResult.nextDifficultyParams.patrolRangeMultiplier.toFixed(2) }}</div>
+              <div style="opacity: 0.7;">奖励倍率</div>
+              <div style="text-align: right; color: #2ecc71;">x{{ stationResult.nextDifficultyParams.scoreMultiplier.toFixed(1) }}</div>
+            </div>
           </div>
 
           <button class="btn btn-primary" style="width: 100%;" @click="continueAfterStation">
