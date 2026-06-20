@@ -174,6 +174,36 @@ class ScoreManager {
     return skin ? skin.name : '街头蓝'
   }
 
+  getSkinSetName() {
+    const skin = GAME_CONFIG.skins.find(s => s.id === this.selectedSkin)
+    return skin ? skin.setName : '街头套装'
+  }
+
+  getSkinDescription() {
+    const skin = GAME_CONFIG.skins.find(s => s.id === this.selectedSkin)
+    return skin ? skin.description : '经典蓝色系，清新自然'
+  }
+
+  getSkinEffects() {
+    const skin = GAME_CONFIG.skins.find(s => s.id === this.selectedSkin)
+    return skin ? skin.effects : GAME_CONFIG.skins[0].effects
+  }
+
+  getSkinParticles() {
+    const effects = this.getSkinEffects()
+    return effects.particles
+  }
+
+  getSkinPrompt() {
+    const effects = this.getSkinEffects()
+    return effects.prompt
+  }
+
+  getSkinAudio() {
+    const effects = this.getSkinEffects()
+    return effects.audio
+  }
+
   getStats() {
     return {
       highScore: this.highScore,

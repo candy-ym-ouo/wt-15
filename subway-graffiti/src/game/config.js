@@ -33,12 +33,198 @@ export const GAME_CONFIG = {
   },
 
   skins: [
-    { id: 'default', name: '街头蓝', color: '#3498db', unlockScore: 0 },
-    { id: 'fire', name: '烈焰红', color: '#e74c3c', unlockScore: 2000 },
-    { id: 'neon', name: '霓虹绿', color: '#2ecc71', unlockScore: 5000 },
-    { id: 'royal', name: '皇家紫', color: '#9b59b6', unlockScore: 10000 },
-    { id: 'gold', name: '黄金色', color: '#f1c40f', unlockScore: 20000 },
-    { id: 'cosmic', name: '宇宙粉', color: '#e84393', unlockScore: 50000 }
+    {
+      id: 'default',
+      name: '街头蓝',
+      color: '#3498db',
+      unlockScore: 0,
+      setName: '街头套装',
+      description: '经典蓝色系，清新自然',
+      effects: {
+        particles: {
+        shapes: ['circle', 'star'],
+        colors: ['#3498db', '#2980b9', '#1abc9c'],
+        gravity: 500,
+        spread: 400,
+        count: { perfect: 20, good: 10 },
+        trail: false
+        },
+        prompt: {
+          fontFamily: 'Arial',
+          fontWeight: '900',
+          fontSize: 64,
+          animation: 'bounce',
+          glowColor: 'rgba(52, 152, 219, 0.6)',
+          textShake: false
+        },
+        audio: {
+          perfect: { type: 'sine', baseFreq: 880, harmonic: 1320, duration: 0.1 },
+          good: { type: 'sine', baseFreq: 660, duration: 0.12 },
+          miss: { type: 'sawtooth', baseFreq: 200, duration: 0.2 },
+          combo: { type: 'triangle', baseFreq: 440, duration: 0.08 }
+        }
+      }
+    },
+    {
+      id: 'fire',
+      name: '烈焰红',
+      color: '#e74c3c',
+      unlockScore: 2000,
+      setName: '烈焰套装',
+      description: '炽热火焰，激情四射',
+      effects: {
+        particles: {
+          shapes: ['star', 'circle'],
+          colors: ['#e74c3c', '#f39c12', '#e67e22', '#d35400'],
+          gravity: 300,
+          spread: 500,
+          count: { perfect: 30, good: 15 },
+          trail: true
+        },
+        prompt: {
+          fontFamily: 'Arial Black',
+          fontWeight: '900',
+          fontSize: 72,
+          animation: 'shake',
+          glowColor: 'rgba(231, 76, 60, 0.8)',
+          textShake: true
+        },
+        audio: {
+          perfect: { type: 'sawtooth', baseFreq: 920, harmonic: 1380, duration: 0.12 },
+          good: { type: 'sawtooth', baseFreq: 690, duration: 0.14 },
+          miss: { type: 'sawtooth', baseFreq: 180, duration: 0.25 },
+          combo: { type: 'sawtooth', baseFreq: 480, duration: 0.1 }
+        }
+      }
+    },
+    {
+      id: 'neon',
+      name: '霓虹绿',
+      color: '#2ecc71',
+      unlockScore: 5000,
+      setName: '霓虹套装',
+      description: '赛博朋克，电子脉冲',
+      effects: {
+        particles: {
+          shapes: ['circle', 'circle'],
+          colors: ['#2ecc71', '#00ff88', '#00ffcc', '#00ffff'],
+          gravity: 0,
+          spread: 600,
+          count: { perfect: 25, good: 12 },
+          trail: true
+        },
+        prompt: {
+          fontFamily: 'Courier New',
+          fontWeight: '900',
+          fontSize: 68,
+          animation: 'pulse',
+          glowColor: 'rgba(46, 204, 113, 0.8)',
+          textShake: false
+        },
+        audio: {
+          perfect: { type: 'square', baseFreq: 960, harmonic: 1440, duration: 0.08 },
+          good: { type: 'square', baseFreq: 720, duration: 0.1 },
+          miss: { type: 'square', baseFreq: 220, duration: 0.18 },
+          combo: { type: 'square', baseFreq: 520, duration: 0.06 }
+        }
+      }
+    },
+    {
+      id: 'royal',
+      name: '皇家紫',
+      color: '#9b59b6',
+      unlockScore: 10000,
+      setName: '皇家套装',
+      description: '高贵典雅，皇室风范',
+      effects: {
+        particles: {
+          shapes: ['heart', 'star'],
+          colors: ['#9b59b6', '#8e44ad', '#e84393', '#ffd700'],
+          gravity: 400,
+          spread: 350,
+          count: { perfect: 22, good: 11 },
+          trail: false
+        },
+        prompt: {
+          fontFamily: 'Georgia',
+          fontWeight: '900',
+          fontSize: 66,
+          animation: 'float',
+          glowColor: 'rgba(155, 89, 182, 0.7)',
+          textShake: false
+        },
+        audio: {
+          perfect: { type: 'triangle', baseFreq: 1000, harmonic: 1500, duration: 0.15 },
+          good: { type: 'triangle', baseFreq: 750, duration: 0.16 },
+          miss: { type: 'triangle', baseFreq: 190, duration: 0.22 },
+          combo: { type: 'triangle', baseFreq: 500, duration: 0.12 }
+        }
+      }
+    },
+    {
+      id: 'gold',
+      name: '黄金色',
+      color: '#f1c40f',
+      unlockScore: 20000,
+      setName: '黄金套装',
+      description: '奢华黄金，璀璨夺目',
+      effects: {
+        particles: {
+          shapes: ['star', 'diamond'],
+          colors: ['#f1c40f', '#f39c12', '#e67e22', '#ffffff'],
+          gravity: 200,
+          spread: 450,
+          count: { perfect: 35, good: 18 },
+          trail: true
+        },
+        prompt: {
+          fontFamily: 'Arial',
+          fontWeight: '900',
+          fontSize: 76,
+          animation: 'sparkle',
+          glowColor: 'rgba(241, 196, 15, 0.9)',
+          textShake: false
+        },
+        audio: {
+          perfect: { type: 'sine', baseFreq: 1040, harmonic: 1560, duration: 0.1 },
+          good: { type: 'sine', baseFreq: 780, duration: 0.12 },
+          miss: { type: 'sine', baseFreq: 210, duration: 0.2 },
+          combo: { type: 'sine', baseFreq: 560, duration: 0.09 }
+        }
+      }
+    },
+    {
+      id: 'cosmic',
+      name: '宇宙粉',
+      color: '#e84393',
+      unlockScore: 50000,
+      setName: '宇宙套装',
+      description: '梦幻宇宙，星光闪耀',
+      effects: {
+        particles: {
+          shapes: ['star', 'circle', 'heart'],
+          colors: ['#e84393', '#9b59b6', '#3498db', '#2ecc71', '#ffffff'],
+          gravity: 100,
+          spread: 550,
+          count: { perfect: 40, good: 20 },
+          trail: true
+        },
+        prompt: {
+          fontFamily: 'Arial',
+          fontWeight: '900',
+          fontSize: 80,
+          animation: 'rainbow',
+          glowColor: 'rgba(232, 67, 147, 0.8)',
+          textShake: false
+        },
+        audio: {
+          perfect: { type: 'sine', baseFreq: 1100, harmonic: 1650, duration: 0.12 },
+          good: { type: 'sine', baseFreq: 825, duration: 0.14 },
+          miss: { type: 'sine', baseFreq: 230, duration: 0.2 },
+          combo: { type: 'sine', baseFreq: 600, duration: 0.1 }
+        }
+      }
+    }
   ],
 
   audio: {

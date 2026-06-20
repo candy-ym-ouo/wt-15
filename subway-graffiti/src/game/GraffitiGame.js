@@ -121,8 +121,15 @@ export class GraffitiGame {
   }
 
   showPrompt(text, color = 0xffffff) {
+    const promptConfig = scoreManager.getSkinPrompt()
     this.promptText.text = text
     this.promptText.style.fill = color
+    this.promptText.style.fontFamily = promptConfig.fontFamily
+    this.promptText.style.fontWeight = promptConfig.fontWeight
+    this.promptText.style.fontSize = promptConfig.fontSize
+    this.promptText.style.dropShadow = true
+    this.promptText.style.dropShadowColor = promptConfig.glowColor
+    this.promptText.style.dropShadowBlur = 15
     this.promptText.alpha = 1
     this.promptText.scale.set(1.5)
 
@@ -131,7 +138,22 @@ export class GraffitiGame {
       const elapsed = (performance.now() - startTime) / 1000
       if (elapsed < 0.5) {
         const p = elapsed / 0.5
-        this.promptText.scale.set(1.5 - p * 0.5)
+        let scaleX = 1.5 - p * 0.5
+        let scaleY = 1.5 - p * 0.5
+
+        if (promptConfig.textShake) {
+          const shake = Math.sin(elapsed * 30) * 0.05
+          scaleX += shake
+          scaleY -= shake * 0.5
+        }
+
+        if (promptConfig.animation === 'pulse') {
+          const pulse = 1 + Math.sin(elapsed * 15) * 0.1
+          scaleX *= pulse
+          scaleY *= pulse
+        }
+
+        this.promptText.scale.set(scaleX, scaleY)
       } else if (elapsed < 1) {
         this.promptText.alpha = 1 - (elapsed - 0.5) * 2
       } else {
@@ -221,7 +243,9 @@ export class GraffitiGame {
 
     const points = scoreManager.addScore(result)
     audioManager.playSFX(result)
-    this.createParticles(target.x, target.y, color, result === 'perfect' ? 20 : 10)
+    const particleConfig = scoreManager.getSkinParticles()
+    const count = result === 'perfect' ? particleConfig.count.perfect : particleConfig.count.good
+    this.createParticles(target.x, target.y, result === 'miss' ? color : null, count)
 
     if (result !== 'miss') {
       this.createGraffitiMark(target.x, target.y)
@@ -235,34 +259,69 @@ export class GraffitiGame {
     this.removeTarget(target)
   }
 
-  createParticles(x, y, color, count) {
+  createParticles(x, y, overrideColor, count) {
+    const particleConfig = scoreManager.getSkinParticles()
+    const { shapes, colors, gravity, spread, trail } = particleConfig
+
     for (let i = 0; i < count; i++) {
       const particle = new PIXI.Graphics()
-      particle.beginFill(color)
-      const size = 4 + Math.random() * 6
-      particle.drawCircle(0, 0, size)
+      const colorStr = overrideColor ? '#' + overrideColor.toString(16).padStart(6, '0') : colors[Math.floor(Math.random() * colors.length)]
+      const colorNum = parseInt(colorStr.replace('#', '0x'))
+      particle.beginFill(colorNum)
+
+      const shape = shapes[Math.floor(Math.random() * shapes.length)]
+      const size = 4 + Math.random() * 8
+
+      switch (shape) {
+        case 'star':
+          this.drawStar(particle, 0, 0, 5, size, size / 2)
+          break
+        case 'heart':
+          this.drawHeart(particle, 0, 0, size)
+          break
+        case 'diamond':
+          this.drawDiamond(particle, 0, 0, size)
+          break
+        case 'circle':
+        default:
+          particle.drawCircle(0, 0, size)
+          break
+      }
       particle.endFill()
 
       particle.x = x
       particle.y = y
-      particle.vx = (Math.random() - 0.5) * 400
-      particle.vy = (Math.random() - 0.5) * 400
+      particle.vx = (Math.random() - 0.5) * spread
+      particle.vy = (Math.random() - 0.5) * spread
       particle.life = 0.6 + Math.random() * 0.4
       particle.maxLife = particle.life
+      particle.gravity = gravity
+      particle.hasTrail = trail && Math.random() > 0.5
+      particle.trailPoints = []
 
       this.particles.push(particle)
       this.container.addChild(particle)
     }
   }
 
+  drawDiamond(g, cx, cy, size) {
+    g.moveTo(cx, cy - size)
+    g.lineTo(cx + size * 0.6, cy)
+    g.lineTo(cx, cy + size)
+    g.lineTo(cx - size * 0.6, cy)
+    g.lineTo(cx, cy - size)
+  }
+
   createGraffitiMark(x, y) {
-    const colorStr = scoreManager.getSkinColor()
+    const particleConfig = scoreManager.getSkinParticles()
+    const colors = particleConfig.colors
+    const colorStr = colors[Math.floor(Math.random() * colors.length)]
     const colorNum = parseInt(colorStr.replace('#', '0x'))
 
     const mark = new PIXI.Graphics()
     mark.beginFill(colorNum, 0.7)
 
-    const shapes = ['star', 'circle', 'heart', 'tag']
+    const shapes = [...particleConfig.shapes, 'tag']
     const shape = shapes[Math.floor(Math.random() * shapes.length)]
 
     switch (shape) {
@@ -275,7 +334,11 @@ export class GraffitiGame {
       case 'heart':
         this.drawHeart(mark, 0, 0, 20)
         break
+      case 'diamond':
+        this.drawDiamond(mark, 0, 0, 25)
+        break
       case 'tag':
+      default:
         mark.drawRoundedRect(-30, -15, 60, 30, 8)
         break
     }
@@ -398,9 +461,24 @@ export class GraffitiGame {
         p.destroy()
         return false
       }
+
+      if (p.hasTrail) {
+        p.trailPoints.push({ x: p.x, y: p.y, alpha: p.alpha })
+        if (p.trailPoints.length > 5) {
+          p.trailPoints.shift()
+        }
+        p.clear()
+        p.trailPoints.forEach((tp, idx) => {
+          const alpha = (idx / p.trailPoints.length) * 0.5
+          p.beginFill(p.fill?.color || 0xffffff, alpha)
+          p.drawCircle(tp.x - p.x, tp.y - p.y, 3 + idx)
+          p.endFill()
+        })
+      }
+
       p.x += p.vx * delta
       p.y += p.vy * delta
-      p.vy += 500 * delta
+      p.vy += (p.gravity !== undefined ? p.gravity : 500) * delta
       p.alpha = p.life / p.maxLife
       return true
     })

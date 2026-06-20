@@ -1,4 +1,4 @@
-<script setup>import { ref, onMounted, onUnmounted, computed, reactive } from 'vue';
+<script setup>import { ref, onMounted, onUnmounted, computed, reactive, watch } from 'vue';
 import { GameEngine, GameState } from '@/game/GameEngine.js';
 import { scoreManager } from '@/game/ScoreManager.js';
 import { GAME_CONFIG } from '@/game/config.js';
@@ -18,6 +18,8 @@ const gameResult = ref(null);
 const stationResult = ref(null);
 const selectedDifficulty = ref('normal');
 const stats = reactive(scoreManager.getStats());
+const promptAnimation = ref('bounce');
+const currentPromptConfig = computed(() => scoreManager.getSkinPrompt());
 const skins = computed(() => {
  return GAME_CONFIG.skins.map(skin => ({
  ...skin,
@@ -41,6 +43,7 @@ function refreshStats() {
 function showGamePrompt(text, color = '#fff') {
  promptText.value = text;
  promptColor.value = color;
+ promptAnimation.value = currentPromptConfig.value.animation;
  showPrompt.value = true;
  setTimeout(() => { showPrompt.value = false; }, 800);
 }
@@ -142,6 +145,40 @@ function backFromSubscreen() {
  audioManager.playSFX('click');
  currentState.value = GameState.MENU;
 }
+
+function getAnimationName(animation) {
+ const names = {
+ bounce: '弹跳',
+ shake: '抖动',
+ pulse: '脉冲',
+ float: '飘浮',
+ sparkle: '闪耀',
+ rainbow: '彩虹'
+ };
+ return names[animation] || animation;
+}
+
+function getShapeNames(shapes) {
+ const names = {
+ circle: '圆形',
+ star: '星形',
+ heart: '心形',
+ diamond: '菱形'
+ };
+ if (!shapes) return '-';
+ const uniqueShapes = [...new Set(shapes)];
+ return uniqueShapes.map(s => names[s] || s).join('、');
+}
+
+function getWaveTypeName(type) {
+ const names = {
+ sine: '正弦波',
+ sawtooth: '锯齿波',
+ square: '方波',
+ triangle: '三角波'
+ };
+ return names[type] || type;
+}
 onMounted(async () => {
  if (!canvasRef.value)
  return;
@@ -189,7 +226,18 @@ onUnmounted(() => {
       </div>
 
       <transition name="prompt">
-        <div v-if="showPrompt" class="prompt-text" :style="{ color: promptColor }">
+        <div
+          v-if="showPrompt"
+          class="prompt-text"
+          :class="`prompt-${promptAnimation}`"
+          :style="{
+            color: promptColor,
+            fontFamily: currentPromptConfig.fontFamily,
+            fontWeight: currentPromptConfig.fontWeight,
+            fontSize: currentPromptConfig.fontSize + 'px',
+            textShadow: `0 0 20px ${currentPromptConfig.glowColor}, 0 0 40px ${currentPromptConfig.glowColor}`
+          }"
+        >
           {{ promptText }}
         </div>
       </transition>
@@ -285,8 +333,46 @@ onUnmounted(() => {
               :class="{ selected: skin.selected, locked: !skin.unlocked }"
               @click="selectSkin(skin.id)"
             >
-              <div class="skin-preview" :style="{ background: skin.color, boxShadow: skin.selected ? `0 0 20px ${skin.color}` : 'none' }"></div>
+              <div class="skin-preview" :style="{ background: skin.color, boxShadow: skin.selected ? `0 0 20px ${skin.color}` : 'none' }">
+                <div v-if="skin.selected" style="font-size: 24px;">✓</div>
+              </div>
               <div class="skin-name">{{ skin.name }}</div>
+              <div v-if="!skin.unlocked" class="skin-unlock-score">{{ skin.unlockScore.toLocaleString() }} 分</div>
+            </div>
+          </div>
+
+          <div v-if="skins.find(s => s.selected)" class="skin-details">
+            <div class="skin-set-name">{{ skins.find(s => s.selected)?.setName }}</div>
+            <div class="skin-description">{{ skins.find(s => s.selected)?.description }}</div>
+
+            <div class="skin-effects">
+              <div class="effect-tag">
+                <span class="effect-icon">✨</span>
+                <span class="effect-label">粒子特效</span>
+              </div>
+              <div class="effect-tag">
+                <span class="effect-icon">💬</span>
+                <span class="effect-label">得分提示</span>
+              </div>
+              <div class="effect-tag">
+                <span class="effect-icon">🎵</span>
+                <span class="effect-label">独特音色</span>
+              </div>
+            </div>
+
+            <div class="skin-effect-details">
+              <div class="effect-detail-row">
+                <span class="effect-detail-label">动画效果</span>
+                <span class="effect-detail-value">{{ getAnimationName(skins.find(s => s.selected)?.effects?.prompt?.animation) }}</span>
+              </div>
+              <div class="effect-detail-row">
+                <span class="effect-detail-label">粒子形状</span>
+                <span class="effect-detail-value">{{ getShapeNames(skins.find(s => s.selected)?.effects?.particles?.shapes) }}</span>
+              </div>
+              <div class="effect-detail-row">
+                <span class="effect-detail-label">音色类型</span>
+                <span class="effect-detail-value">{{ getWaveTypeName(skins.find(s => s.selected)?.effects?.audio?.perfect?.type) }}</span>
+              </div>
             </div>
           </div>
 

@@ -1,4 +1,5 @@
 import { GAME_CONFIG } from './config.js'
+import { scoreManager } from './ScoreManager.js'
 
 class AudioManager {
   constructor() {
@@ -56,17 +57,27 @@ class AudioManager {
   playSFX(type) {
     if (!this.enabled || !this.ctx) return
 
+    const audioConfig = scoreManager.getSkinAudio()
+
     switch (type) {
-      case 'perfect':
-        this.playTone(880, 0.1, 'sine', 0.4)
-        setTimeout(() => this.playTone(1320, 0.15, 'sine', 0.3), 80)
+      case 'perfect': {
+        const config = audioConfig.perfect
+        this.playTone(config.baseFreq, config.duration, config.type, 0.4)
+        if (config.harmonic) {
+          setTimeout(() => this.playTone(config.harmonic, config.duration * 1.5, config.type, 0.3), 80)
+        }
         break
-      case 'good':
-        this.playTone(660, 0.12, 'sine', 0.3)
+      }
+      case 'good': {
+        const config = audioConfig.good
+        this.playTone(config.baseFreq, config.duration, config.type, 0.3)
         break
-      case 'miss':
-        this.playTone(200, 0.2, 'sawtooth', 0.2)
+      }
+      case 'miss': {
+        const config = audioConfig.miss
+        this.playTone(config.baseFreq, config.duration, config.type, 0.2)
         break
+      }
       case 'caught':
         this.playTone(150, 0.3, 'sawtooth', 0.4)
         setTimeout(() => this.playTone(100, 0.4, 'sawtooth', 0.3), 150)
@@ -83,9 +94,11 @@ class AudioManager {
         this.playTone(392, 0.1, 'sine', 0.3)
         setTimeout(() => this.playTone(523, 0.15, 'sine', 0.25), 80)
         break
-      case 'combo':
-        this.playTone(440, 0.08, 'triangle', 0.25)
+      case 'combo': {
+        const config = audioConfig.combo
+        this.playTone(config.baseFreq, config.duration, config.type, 0.25)
         break
+      }
     }
   }
 
