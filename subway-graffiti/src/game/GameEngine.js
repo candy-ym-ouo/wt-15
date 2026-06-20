@@ -192,6 +192,7 @@ export class GameEngine {
     this.currentStation = station
     this.currentLine = line
     this.currentPhase = 0
+    this.stationStartScore = scoreManager.currentScore
     this.currentDifficultyParams = this.computeDifficultyParams()
     const stationScoreMultiplier = (station.graffiti && station.graffiti.scoreMultiplier) || 1
     scoreManager.setScoreMultiplier(this.currentDifficultyParams.scoreMultiplier * stationScoreMultiplier)
@@ -247,7 +248,7 @@ export class GameEngine {
   _onStationComplete() {
     this.stationsCompleted++
 
-    const stationScore = scoreManager.currentScore
+    const stationScore = scoreManager.currentScore - (this.stationStartScore || 0)
     const isNewStationHigh = scoreManager.setStationScore(this.currentStation.id, stationScore)
     const newUnlocks = scoreManager.checkStationUnlocks()
     scoreManager.save()
