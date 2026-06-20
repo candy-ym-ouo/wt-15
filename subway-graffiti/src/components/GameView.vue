@@ -226,19 +226,6 @@ onUnmounted(() => {
             </div>
           </div>
 
-          <button class="btn btn-primary" style="width: 100%;" @click="startGame">
-            🚇 开始巡游
-          </button>
-
-          <div class="buttons-row">
-            <button class="btn btn-secondary" @click="showSkinsScreen">
-              👕 皮肤
-            </button>
-            <button class="btn btn-secondary" @click="showStatsScreen">
-              📊 统计
-            </button>
-          </div>
-
           <div style="background: rgba(255,255,255,0.05); border-radius: 12px; padding: 12px; margin-bottom: 24px;">
             <div style="text-align: center; opacity: 0.7; font-size: 14px; margin-bottom: 12px;">选择难度</div>
             <div style="display: flex; gap: 10px;">
@@ -429,7 +416,7 @@ onUnmounted(() => {
             </div>
           </div>
 
-          <button class="btn btn-primary" style="width: 100%; margin-top: 24px;" @click="startGame">
+          <button class="btn btn-primary" style="width: 100%; margin-top: 24px;" @click="startGame(selectedDifficulty)">
             🔄 再来一次
           </button>
 
