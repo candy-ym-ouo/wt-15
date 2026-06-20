@@ -7,6 +7,15 @@ export const GAME_CONFIG = {
   warningColor: 0xf39c12,
   successColor: 0x2ecc71,
 
+  comboMilestones: [
+    { combo: 10, bonusScore: 200, name: '初露锋芒', tier: 1, color: '#3498db' },
+    { combo: 20, bonusScore: 500, name: '渐入佳境', tier: 2, color: '#2ecc71' },
+    { combo: 30, bonusScore: 1000, name: '行云流水', tier: 3, color: '#f39c12' },
+    { combo: 50, bonusScore: 2500, name: '炉火纯青', tier: 4, color: '#e74c3c' },
+    { combo: 75, bonusScore: 5000, name: '登峰造极', tier: 5, color: '#9b59b6' },
+    { combo: 100, bonusScore: 10000, name: '封神之作', tier: 6, color: '#f1c40f' }
+  ],
+
   graffiti: {
     targetRadius: 50,
     perfectRadius: 20,
@@ -68,7 +77,19 @@ export const GAME_CONFIG = {
           perfect: { type: 'sine', baseFreq: 880, harmonic: 1320, duration: 0.1 },
           good: { type: 'sine', baseFreq: 660, duration: 0.12 },
           miss: { type: 'sawtooth', baseFreq: 200, duration: 0.2 },
-          combo: { type: 'triangle', baseFreq: 440, duration: 0.08 }
+          combo: { type: 'triangle', baseFreq: 440, duration: 0.08 },
+          milestone: { type: 'sine', baseFreq: 523, duration: 0.15 }
+        },
+        milestone: {
+          particles: {
+            shapes: ['star', 'circle', 'heart'],
+            colors: ['#3498db', '#2980b9', '#1abc9c', '#ffffff'],
+            gravity: 200,
+            spread: 800,
+            count: { 1: 40, 2: 60, 3: 80, 4: 120, 5: 160, 6: 250 },
+            trail: true
+          },
+          screenShake: { 1: 5, 2: 8, 3: 12, 4: 18, 5: 25, 6: 35 }
         }
       }
     },
@@ -100,7 +121,19 @@ export const GAME_CONFIG = {
           perfect: { type: 'sawtooth', baseFreq: 920, harmonic: 1380, duration: 0.12 },
           good: { type: 'sawtooth', baseFreq: 690, duration: 0.14 },
           miss: { type: 'sawtooth', baseFreq: 180, duration: 0.25 },
-          combo: { type: 'sawtooth', baseFreq: 480, duration: 0.1 }
+          combo: { type: 'sawtooth', baseFreq: 480, duration: 0.1 },
+          milestone: { type: 'sawtooth', baseFreq: 440, duration: 0.18 }
+        },
+        milestone: {
+          particles: {
+            shapes: ['star', 'circle', 'diamond'],
+            colors: ['#e74c3c', '#f39c12', '#e67e22', '#d35400', '#ffffff'],
+            gravity: 100,
+            spread: 900,
+            count: { 1: 50, 2: 75, 3: 100, 4: 150, 5: 200, 6: 300 },
+            trail: true
+          },
+          screenShake: { 1: 8, 2: 12, 3: 18, 4: 25, 5: 35, 6: 45 }
         }
       }
     },
@@ -132,7 +165,19 @@ export const GAME_CONFIG = {
           perfect: { type: 'square', baseFreq: 960, harmonic: 1440, duration: 0.08 },
           good: { type: 'square', baseFreq: 720, duration: 0.1 },
           miss: { type: 'square', baseFreq: 220, duration: 0.18 },
-          combo: { type: 'square', baseFreq: 520, duration: 0.06 }
+          combo: { type: 'square', baseFreq: 520, duration: 0.06 },
+          milestone: { type: 'square', baseFreq: 494, duration: 0.12 }
+        },
+        milestone: {
+          particles: {
+            shapes: ['circle', 'circle', 'diamond'],
+            colors: ['#2ecc71', '#00ff88', '#00ffcc', '#00ffff', '#ffffff'],
+            gravity: 0,
+            spread: 1000,
+            count: { 1: 45, 2: 70, 3: 95, 4: 140, 5: 190, 6: 280 },
+            trail: true
+          },
+          screenShake: { 1: 6, 2: 10, 3: 15, 4: 22, 5: 30, 6: 40 }
         }
       }
     },
@@ -164,7 +209,19 @@ export const GAME_CONFIG = {
           perfect: { type: 'triangle', baseFreq: 1000, harmonic: 1500, duration: 0.15 },
           good: { type: 'triangle', baseFreq: 750, duration: 0.16 },
           miss: { type: 'triangle', baseFreq: 190, duration: 0.22 },
-          combo: { type: 'triangle', baseFreq: 500, duration: 0.12 }
+          combo: { type: 'triangle', baseFreq: 500, duration: 0.12 },
+          milestone: { type: 'triangle', baseFreq: 466, duration: 0.18 }
+        },
+        milestone: {
+          particles: {
+            shapes: ['heart', 'star', 'diamond'],
+            colors: ['#9b59b6', '#8e44ad', '#e84393', '#ffd700', '#ffffff'],
+            gravity: 150,
+            spread: 700,
+            count: { 1: 42, 2: 65, 3: 90, 4: 130, 5: 180, 6: 260 },
+            trail: false
+          },
+          screenShake: { 1: 5, 2: 9, 3: 14, 4: 20, 5: 28, 6: 38 }
         }
       }
     },
@@ -196,7 +253,19 @@ export const GAME_CONFIG = {
           perfect: { type: 'sine', baseFreq: 1040, harmonic: 1560, duration: 0.1 },
           good: { type: 'sine', baseFreq: 780, duration: 0.12 },
           miss: { type: 'sine', baseFreq: 210, duration: 0.2 },
-          combo: { type: 'sine', baseFreq: 560, duration: 0.09 }
+          combo: { type: 'sine', baseFreq: 560, duration: 0.09 },
+          milestone: { type: 'sine', baseFreq: 554, duration: 0.14 }
+        },
+        milestone: {
+          particles: {
+            shapes: ['star', 'diamond', 'circle'],
+            colors: ['#f1c40f', '#f39c12', '#e67e22', '#ffffff', '#ffd700'],
+            gravity: 80,
+            spread: 850,
+            count: { 1: 55, 2: 85, 3: 115, 4: 170, 5: 230, 6: 350 },
+            trail: true
+          },
+          screenShake: { 1: 7, 2: 11, 3: 16, 4: 24, 5: 33, 6: 42 }
         }
       }
     },
@@ -228,7 +297,19 @@ export const GAME_CONFIG = {
           perfect: { type: 'sine', baseFreq: 1100, harmonic: 1650, duration: 0.12 },
           good: { type: 'sine', baseFreq: 825, duration: 0.14 },
           miss: { type: 'sine', baseFreq: 230, duration: 0.2 },
-          combo: { type: 'sine', baseFreq: 600, duration: 0.1 }
+          combo: { type: 'sine', baseFreq: 600, duration: 0.1 },
+          milestone: { type: 'sine', baseFreq: 587, duration: 0.16 }
+        },
+        milestone: {
+          particles: {
+            shapes: ['star', 'circle', 'heart', 'diamond'],
+            colors: ['#e84393', '#9b59b6', '#3498db', '#2ecc71', '#ffffff', '#f1c40f'],
+            gravity: 50,
+            spread: 1100,
+            count: { 1: 60, 2: 90, 3: 120, 4: 180, 5: 250, 6: 400 },
+            trail: true
+          },
+          screenShake: { 1: 10, 2: 15, 3: 20, 4: 30, 5: 40, 6: 50 }
         }
       }
     }

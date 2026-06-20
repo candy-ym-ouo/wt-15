@@ -54,7 +54,7 @@ class AudioManager {
     osc.stop(this.ctx.currentTime + duration)
   }
 
-  playSFX(type) {
+  playSFX(type, details = {}) {
     if (!this.enabled || !this.ctx) return
 
     const audioConfig = scoreManager.getSkinAudio()
@@ -97,6 +97,23 @@ class AudioManager {
       case 'combo': {
         const config = audioConfig.combo
         this.playTone(config.baseFreq, config.duration, config.type, 0.25)
+        break
+      }
+      case 'milestone': {
+        const config = scoreManager.getSkinAudioMilestone()
+        const tier = details?.tier || 1
+        const baseFreq = config.baseFreq
+        const notes = [0, 4, 7, 12]
+        notes.forEach((interval, i) => {
+          const freq = baseFreq * Math.pow(2, interval / 12)
+          setTimeout(() => this.playTone(freq, config.duration * (1 + tier * 0.1), config.type, 0.35 + tier * 0.05), i * 80)
+        })
+        if (tier >= 3) {
+          setTimeout(() => {
+            const highFreq = baseFreq * Math.pow(2, 19 / 12)
+            this.playTone(highFreq, config.duration * 1.5, config.type, 0.4)
+          }, 400)
+        }
         break
       }
     }

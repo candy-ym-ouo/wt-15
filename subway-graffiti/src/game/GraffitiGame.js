@@ -18,6 +18,10 @@ export class GraffitiGame {
     this.wall = null
     this.graffitiMarks = []
     this.shrinkSpeedMultiplier = 1
+    this.shakeTime = 0
+    this.shakeIntensity = 0
+    this.shockwaves = []
+    this.milestoneParticles = []
     this.setup()
   }
 
@@ -251,7 +255,14 @@ export class GraffitiGame {
 
     if (result !== 'miss') {
       this.createGraffitiMark(target.x, target.y)
-      if (scoreManager.combo > 0 && scoreManager.combo % 5 === 0) {
+
+      const milestone = scoreManager.checkComboMilestone()
+      if (milestone) {
+        const bonusPoints = scoreManager.applyMilestoneBonus(milestone)
+        audioManager.playSFX('milestone', { tier: milestone.tier })
+        this.triggerMilestoneEffect(milestone, bonusPoints, target.x, target.y)
+        this.callbacks.onMilestone(milestone, bonusPoints)
+      } else if (scoreManager.combo > 0 && scoreManager.combo % 5 === 0) {
         audioManager.playSFX('combo')
         this.showPrompt(`${scoreManager.combo} COMBO!`, 0xf39c12)
       }
@@ -397,6 +408,143 @@ export class GraffitiGame {
     g.bezierCurveTo(x + size, y - size * 0.3, x, y - size * 0.3, x, y + size * 0.3)
   }
 
+  triggerMilestoneEffect(milestone, bonusPoints, x, y) {
+    const centerX = x || GAME_CONFIG.width / 2
+    const centerY = y || GAME_CONFIG.height / 2
+    const milestoneConfig = scoreManager.getSkinMilestone()
+    const particleCount = milestoneConfig.particles.count[milestone.tier] || 50
+
+    this.createMilestoneParticles(centerX, centerY, milestone, particleCount, milestoneConfig.particles)
+
+    this.createShockwave(centerX, centerY, milestone.tier, milestone.color)
+
+    const shakeIntensity = milestoneConfig.screenShake[milestone.tier] || 10
+    this.triggerShake(shakeIntensity, 0.5 + milestone.tier * 0.1)
+
+    const promptText = `✨ ${milestone.name} ✨\n+${bonusPoints}`
+    this.showMilestonePrompt(promptText, milestone.color, milestone.tier)
+  }
+
+  createMilestoneParticles(x, y, milestone, count, config) {
+    const { shapes, colors, gravity, spread, trail } = config
+
+    for (let i = 0; i < count; i++) {
+      const particle = new PIXI.Graphics()
+      const colorStr = colors[Math.floor(Math.random() * colors.length)]
+      const colorNum = parseInt(colorStr.replace('#', '0x'))
+      particle.beginFill(colorNum)
+
+      const shape = shapes[Math.floor(Math.random() * shapes.length)]
+      const size = 6 + Math.random() * 14
+
+      switch (shape) {
+        case 'star':
+          this.drawStar(particle, 0, 0, 5, size, size / 2)
+          break
+        case 'heart':
+          this.drawHeart(particle, 0, 0, size)
+          break
+        case 'diamond':
+          this.drawDiamond(particle, 0, 0, size)
+          break
+        case 'circle':
+        default:
+          particle.drawCircle(0, 0, size)
+          break
+      }
+      particle.endFill()
+
+      const angle = (Math.PI * 2 * i) / count + Math.random() * 0.5
+      const speed = spread * (0.5 + Math.random() * 0.8)
+      particle.x = x
+      particle.y = y
+      particle.vx = Math.cos(angle) * speed
+      particle.vy = Math.sin(angle) * speed
+      particle.life = 0.8 + Math.random() * 0.8 + milestone.tier * 0.1
+      particle.maxLife = particle.life
+      particle.gravity = gravity
+      particle.hasTrail = trail && Math.random() > 0.3
+      particle.trailPoints = []
+      particle.rotationSpeed = (Math.random() - 0.5) * 8
+      particle.scaleMultiplier = 0.8 + milestone.tier * 0.15
+
+      this.milestoneParticles.push(particle)
+      this.container.addChild(particle)
+    }
+  }
+
+  createShockwave(x, y, tier, colorStr) {
+    const colorNum = parseInt(colorStr.replace('#', '0x'))
+    const waves = Math.min(1 + Math.floor(tier / 2), 4)
+
+    for (let w = 0; w < waves; w++) {
+      setTimeout(() => {
+        const shockwave = new PIXI.Graphics()
+        shockwave.x = x
+        shockwave.y = y
+        shockwave.radius = 10
+        shockwave.maxRadius = 150 + tier * 80 + w * 50
+        shockwave.life = 0.6 + tier * 0.1
+        shockwave.maxLife = shockwave.life
+        shockwave.color = colorNum
+
+        this.shockwaves.push(shockwave)
+        this.container.addChild(shockwave)
+      }, w * 120)
+    }
+  }
+
+  triggerShake(intensity, duration) {
+    this.shakeIntensity = Math.max(this.shakeIntensity, intensity)
+    this.shakeTime = Math.max(this.shakeTime, duration)
+  }
+
+  showMilestonePrompt(text, colorStr, tier) {
+    const colorNum = parseInt(colorStr.replace('#', '0x'))
+    const promptConfig = scoreManager.getSkinPrompt()
+    this.promptText.text = text
+    this.promptText.style.fill = colorNum
+    this.promptText.style.fontFamily = promptConfig.fontFamily
+    this.promptText.style.fontWeight = promptConfig.fontWeight
+    this.promptText.style.fontSize = promptConfig.fontSize + tier * 8
+    this.promptText.style.dropShadow = true
+    this.promptText.style.dropShadowColor = colorStr
+    this.promptText.style.dropShadowBlur = 25 + tier * 5
+    this.promptText.style.dropShadowDistance = 0
+    this.promptText.alpha = 1
+    this.promptText.scale.set(0.5)
+
+    const startTime = performance.now()
+    const totalDuration = 1.2 + tier * 0.15
+    const animate = () => {
+      const elapsed = (performance.now() - startTime) / 1000
+      if (elapsed < 0.3) {
+        const p = elapsed / 0.3
+        const scale = 0.5 + this.easeOutBack(p) * 1.5
+        this.promptText.scale.set(scale)
+      } else if (elapsed < totalDuration - 0.4) {
+        const t = (elapsed - 0.3) / (totalDuration - 0.7)
+        const wobble = 1 + Math.sin(t * Math.PI * 8) * 0.05 * (1 - t)
+        this.promptText.scale.set(2 * wobble)
+        this.promptText.alpha = 1
+      } else if (elapsed < totalDuration) {
+        const p = (elapsed - (totalDuration - 0.4)) / 0.4
+        this.promptText.alpha = 1 - p
+        this.promptText.scale.set(2 + p * 0.5)
+      } else {
+        return
+      }
+      requestAnimationFrame(animate)
+    }
+    animate()
+  }
+
+  easeOutBack(t) {
+    const c1 = 1.70158
+    const c3 = c1 + 1
+    return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2)
+  }
+
   removeTarget(target) {
     const idx = this.targets.indexOf(target)
     if (idx >= 0) {
@@ -418,6 +566,23 @@ export class GraffitiGame {
       p.destroy()
     })
     this.particles = []
+
+    this.milestoneParticles.forEach(p => {
+      this.container.removeChild(p)
+      p.destroy()
+    })
+    this.milestoneParticles = []
+
+    this.shockwaves.forEach(s => {
+      this.container.removeChild(s)
+      s.destroy()
+    })
+    this.shockwaves = []
+
+    this.shakeTime = 0
+    this.shakeIntensity = 0
+    this.container.x = 0
+    this.container.y = 0
   }
 
   update(delta) {
@@ -484,6 +649,76 @@ export class GraffitiGame {
       p.alpha = p.life / p.maxLife
       return true
     })
+
+    this.milestoneParticles = this.milestoneParticles.filter(p => {
+      p.life -= delta
+      if (p.life <= 0) {
+        this.container.removeChild(p)
+        p.destroy()
+        return false
+      }
+
+      if (p.hasTrail) {
+        p.trailPoints.push({ x: p.x, y: p.y })
+        if (p.trailPoints.length > 8) {
+          p.trailPoints.shift()
+        }
+        p.clear()
+        p.trailPoints.forEach((tp, idx) => {
+          const alpha = (idx / p.trailPoints.length) * 0.6
+          p.beginFill(p.fill?.color || 0xffffff, alpha)
+          p.drawCircle(tp.x - p.x, tp.y - p.y, 2 + idx * 0.8)
+          p.endFill()
+        })
+      }
+
+      p.x += p.vx * delta
+      p.y += p.vy * delta
+      p.vy += (p.gravity !== undefined ? p.gravity : 200) * delta
+      p.vx *= 0.99
+      p.vy *= 0.99
+      p.rotation += (p.rotationSpeed || 0) * delta
+      p.alpha = Math.pow(p.life / p.maxLife, 0.8)
+      const scale = (p.scaleMultiplier || 1) * (0.5 + (p.life / p.maxLife) * 0.5)
+      p.scale.set(scale)
+      return true
+    })
+
+    this.shockwaves = this.shockwaves.filter(s => {
+      s.life -= delta
+      if (s.life <= 0) {
+        this.container.removeChild(s)
+        s.destroy()
+        return false
+      }
+
+      const t = 1 - s.life / s.maxLife
+      s.radius = 10 + t * s.maxRadius
+      const alpha = (1 - t) * 0.8
+
+      s.clear()
+      s.lineStyle(6 + (1 - t) * 8, s.color, alpha)
+      s.drawCircle(0, 0, s.radius)
+      s.lineStyle(3 + (1 - t) * 4, 0xffffff, alpha * 0.5)
+      s.drawCircle(0, 0, s.radius * 0.85)
+
+      return true
+    })
+
+    if (this.shakeTime > 0) {
+      this.shakeTime -= delta
+      if (this.shakeTime <= 0) {
+        this.shakeTime = 0
+        this.shakeIntensity = 0
+        this.container.x = 0
+        this.container.y = 0
+      } else {
+        const decay = this.shakeTime / 0.5
+        const intensity = this.shakeIntensity * decay
+        this.container.x = (Math.random() - 0.5) * intensity * 2
+        this.container.y = (Math.random() - 0.5) * intensity * 2
+      }
+    }
 
     if (this.gameTime >= this.duration) {
       this.isRunning = false

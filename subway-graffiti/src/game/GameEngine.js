@@ -95,7 +95,8 @@ export class GameEngine {
 
     this.graffitiGame = new GraffitiGame(this.app, {
       onScoreUpdate: (points, type) => this._onScoreUpdate(points, type),
-      onComplete: () => this._onPhaseComplete()
+      onComplete: () => this._onPhaseComplete(),
+      onMilestone: (milestone, bonusPoints) => this._onMilestone(milestone, bonusPoints)
     })
 
     this.patrolGame = new PatrolAvoid(this.app, {
@@ -283,6 +284,12 @@ export class GameEngine {
   _onScoreUpdate(points, type) {
     if (this.callbacks.onScoreUpdate) {
       this.callbacks.onScoreUpdate(points, type)
+    }
+  }
+
+  _onMilestone(milestone, bonusPoints) {
+    if (this.callbacks.onMilestone) {
+      this.callbacks.onMilestone(milestone, bonusPoints)
     }
   }
 

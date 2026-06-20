@@ -19,6 +19,9 @@ const stationResult = ref(null);
 const selectedDifficulty = ref('normal');
 const stats = reactive(scoreManager.getStats());
 const promptAnimation = ref('bounce');
+const showMilestone = ref(false);
+const currentMilestone = ref(null);
+const milestoneBonus = ref(0);
 const gameHistory = ref([]);
 const selectedGameIndex = ref(0);
 const selectedGame = computed(() => gameHistory.value[selectedGameIndex.value] || null);
@@ -189,6 +192,16 @@ function onTick() {
  score.value = scoreManager.currentScore;
  combo.value = scoreManager.combo;
 }
+function onMilestone(milestone, bonusPoints) {
+ currentMilestone.value = milestone;
+ milestoneBonus.value = bonusPoints;
+ score.value = scoreManager.currentScore;
+ combo.value = scoreManager.combo;
+ showMilestone.value = true;
+ setTimeout(() => {
+   showMilestone.value = false;
+ }, 1500 + milestone.tier * 200);
+}
 function startGame(difficulty = 'normal') {
   if (!engine) {
     console.warn('Game engine not ready yet');
@@ -294,7 +307,8 @@ onMounted(async () => {
  engine = new GameEngine(canvasRef.value, {
  onScoreUpdate,
  onStateChange,
- onTick
+ onTick,
+ onMilestone
  });
  await engine.init();
 });
@@ -333,6 +347,22 @@ onUnmounted(() => {
       <div v-if="combo > 1 && (currentState === GameState.GRAFFITI || currentState === GameState.PATROL)" class="combo-display">
         {{ combo }} COMBO
       </div>
+
+      <transition name="milestone">
+        <div v-if="showMilestone && currentMilestone" class="milestone-overlay" :style="{ '--milestone-color': currentMilestone.color }">
+          <div class="milestone-card" :class="`milestone-tier-${currentMilestone.tier}`">
+            <div class="milestone-tier-badge">
+              <span v-for="i in currentMilestone.tier" :key="i" class="tier-star">★</span>
+            </div>
+            <div class="milestone-title">✨ {{ currentMilestone.name }} ✨</div>
+            <div class="milestone-combo">{{ currentMilestone.combo }} 连击达成!</div>
+            <div class="milestone-bonus">+{{ milestoneBonus.toLocaleString() }}</div>
+          </div>
+          <div class="milestone-rays" :class="`rays-tier-${currentMilestone.tier}`">
+            <div v-for="i in 12" :key="i" class="ray" :style="{ '--ray-index': i }"></div>
+          </div>
+        </div>
+      </transition>
 
       <transition name="prompt">
         <div

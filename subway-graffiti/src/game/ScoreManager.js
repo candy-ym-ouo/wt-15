@@ -75,6 +75,7 @@ class ScoreManager {
   resetGame(difficulty = 'normal', scoreMultiplier = 1) {
     this.currentScore = 0
     this.combo = 0
+    this.achievedMilestones = []
     this.difficulty = difficulty
     this.scoreMultiplier = scoreMultiplier
     this.currentGameData = {
@@ -102,6 +103,42 @@ class ScoreManager {
 
   setScoreMultiplier(multiplier) {
     this.scoreMultiplier = multiplier
+  }
+
+  checkComboMilestone() {
+    const milestone = GAME_CONFIG.comboMilestones.find(m =>
+      m.combo === this.combo && !this.achievedMilestones.includes(m.combo)
+    )
+    if (milestone) {
+      this.achievedMilestones.push(milestone.combo)
+      return milestone
+    }
+    return null
+  }
+
+  applyMilestoneBonus(milestone) {
+    if (!milestone) return 0
+    let bonus = milestone.bonusScore
+    if (this.scoreMultiplier > 1) {
+      bonus = Math.floor(bonus * this.scoreMultiplier)
+    }
+    this.currentScore += bonus
+    if (this.currentGameData) {
+      this.currentGameData.score = this.currentScore
+    }
+    return bonus
+  }
+
+  getSkinMilestone() {
+    const skin = GAME_CONFIG.skins.find(s => s.id === this.selectedSkin)
+    return skin && skin.effects && skin.effects.milestone ? skin.effects.milestone : GAME_CONFIG.skins[0].effects.milestone
+  }
+
+  getSkinAudioMilestone() {
+    const skin = GAME_CONFIG.skins.find(s => s.id === this.selectedSkin)
+    return skin && skin.effects && skin.effects.audio && skin.effects.audio.milestone
+      ? skin.effects.audio.milestone
+      : GAME_CONFIG.skins[0].effects.audio.milestone
   }
 
   addScore(type, details = {}) {
