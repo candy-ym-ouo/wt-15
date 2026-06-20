@@ -24,6 +24,7 @@ export class PatrolAvoid {
     this.riskWarningContainer = null
     this.shieldEffect = null
     this.riskIndicators = []
+    this.lastSafeZone = null
     this.setup()
   }
 
@@ -375,6 +376,7 @@ export class PatrolAvoid {
     this.laserTimer = 3000
     this.station = station || null
     this.riskIndicators = []
+    this.lastSafeZone = null
 
     this.safeZones.forEach(zone => {
       zone.onCooldown = false
@@ -475,40 +477,6 @@ export class PatrolAvoid {
       }
     }
 
-    this.safeZones.forEach(zone => {
-      const shouldBeActive = zone === activeZone
-      if (zone.active !== shouldBeActive) {
-        zone.active = shouldBeActive
-
-        const baseColor = zone.onCooldown ? GAME_CONFIG.patrol.cooldownColor : GAME_CONFIG.successColor
-        const fillAlpha = zone.onCooldown ? 0.08 : (shouldBeActive ? 0.4 : 0.15)
-        const lineAlpha = zone.onCooldown ? 0.3 : (shouldBeActive ? 1 : 0.5)
-
-        zone.outerRing.clear()
-        zone.outerRing.beginFill(baseColor, fillAlpha)
-        zone.outerRing.lineStyle(3, baseColor, lineAlpha)
-        zone.outerRing.drawCircle(0, 0, zone.radius)
-        zone.outerRing.endFill()
-
-        zone.actualZone.clear()
-        if (!zone.onCooldown) {
-          zone.actualZone.lineStyle({
-            width: 2,
-            color: baseColor,
-            alpha: shouldBeActive ? 0.8 : 0.4,
-            dash: [8, 4]
-          })
-          zone.actualZone.drawCircle(0, 0, zone.radius - zone.playerRadius)
-          zone.actualZone.endFill()
-        }
-
-        zone.label.style.fill = zone.onCooldown ? GAME_CONFIG.patrol.cooldownColor : (shouldBeActive ? 0xffffff : GAME_CONFIG.successColor)
-        zone.label.style.fontSize = shouldBeActive ? 16 : 14
-        zone.label.visible = !zone.onCooldown
-        zone.cooldownLabel.visible = zone.onCooldown
-      }
-    })
-
     if (this.player.isSafe !== inSafeZone) {
       const wasSafe = this.player.isSafe
       this.player.isSafe = inSafeZone
@@ -518,14 +486,50 @@ export class PatrolAvoid {
       }
 
       if (inSafeZone) {
+        this.lastSafeZone = activeZone
         audioManager.playTone(523, 0.1, 'sine', 0.2)
-      } else if (wasSafe && activeZone) {
+      } else if (wasSafe && this.lastSafeZone && !this.lastSafeZone.onCooldown) {
         this.activateShield()
-        activeZone.onCooldown = true
-        activeZone.cooldownTimer = activeZone.cooldownDuration
-        activeZone.lastUsedTime = this.gameTime
+        this.lastSafeZone.onCooldown = true
+        this.lastSafeZone.cooldownTimer = this.lastSafeZone.cooldownDuration
+        this.lastSafeZone.lastUsedTime = this.gameTime
+        this.lastSafeZone.active = false
       }
+    } else if (inSafeZone && activeZone) {
+      this.lastSafeZone = activeZone
     }
+
+    this.safeZones.forEach(zone => {
+      const shouldBeActive = zone === activeZone
+      zone.active = shouldBeActive
+
+      const baseColor = zone.onCooldown ? GAME_CONFIG.patrol.cooldownColor : GAME_CONFIG.successColor
+      const fillAlpha = zone.onCooldown ? 0.08 : (shouldBeActive ? 0.4 : 0.15)
+      const lineAlpha = zone.onCooldown ? 0.3 : (shouldBeActive ? 1 : 0.5)
+
+      zone.outerRing.clear()
+      zone.outerRing.beginFill(baseColor, fillAlpha)
+      zone.outerRing.lineStyle(3, baseColor, lineAlpha)
+      zone.outerRing.drawCircle(0, 0, zone.radius)
+      zone.outerRing.endFill()
+
+      zone.actualZone.clear()
+      if (!zone.onCooldown) {
+        zone.actualZone.lineStyle({
+          width: 2,
+          color: baseColor,
+          alpha: shouldBeActive ? 0.8 : 0.4,
+          dash: [8, 4]
+        })
+        zone.actualZone.drawCircle(0, 0, zone.radius - zone.playerRadius)
+        zone.actualZone.endFill()
+      }
+
+      zone.label.style.fill = zone.onCooldown ? GAME_CONFIG.patrol.cooldownColor : (shouldBeActive ? 0xffffff : GAME_CONFIG.successColor)
+      zone.label.style.fontSize = shouldBeActive ? 16 : 14
+      zone.label.visible = !zone.onCooldown
+      zone.cooldownLabel.visible = zone.onCooldown
+    })
 
     return inSafeZone
   }
