@@ -246,12 +246,21 @@ export class GameEngine {
 
   _onStationComplete() {
     this.stationsCompleted++
+
+    const stationScore = scoreManager.currentScore
+    const isNewStationHigh = scoreManager.setStationScore(this.currentStation.id, stationScore)
+    const newUnlocks = scoreManager.checkStationUnlocks()
+    scoreManager.save()
+
     this.state = GameState.STATION_COMPLETE
     this.callbacks.onStateChange(this.state, {
       station: this.currentStation,
       stationsCompleted: this.stationsCompleted,
       difficulty: this.difficulty,
-      nextDifficultyParams: this.difficulty === 'hard' ? this.computeDifficultyParams() : null
+      nextDifficultyParams: this.difficulty === 'hard' ? this.computeDifficultyParams() : null,
+      stationScore,
+      isNewStationHigh,
+      newUnlocks
     })
   }
 

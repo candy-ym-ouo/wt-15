@@ -17,6 +17,7 @@ class ScoreManager {
     this.unlockedSkins = ['default']
     this.selectedSkin = 'default'
     this.unlockedStations = ['s1-1', 's2-1']
+    this.stationScores = {}
     this.difficulty = 'normal'
     this.scoreMultiplier = 1
     this.load()
@@ -38,6 +39,7 @@ class ScoreManager {
         this.unlockedSkins = saved.unlockedSkins || ['default']
         this.selectedSkin = saved.selectedSkin || 'default'
         this.unlockedStations = saved.unlockedStations || ['s1-1', 's2-1']
+        this.stationScores = saved.stationScores || {}
       }
     } catch (e) {
       console.warn('读取存档失败:', e)
@@ -57,7 +59,8 @@ class ScoreManager {
         caughtCount: this.caughtCount,
         unlockedSkins: this.unlockedSkins,
         selectedSkin: this.selectedSkin,
-        unlockedStations: this.unlockedStations
+        unlockedStations: this.unlockedStations,
+        stationScores: this.stationScores
       }
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
     } catch (e) {
@@ -134,6 +137,89 @@ class ScoreManager {
     }
   }
 
+  getStationScore(stationId) {
+    return this.stationScores[stationId] || 0
+  }
+
+  setStationScore(stationId, score) {
+    if (score > (this.stationScores[stationId] || 0)) {
+      this.stationScores[stationId] = score
+      return true
+    }
+    return false
+  }
+
+  isStationUnlocked(station) {
+    if (this.unlockedStations.includes(station.id)) {
+      return true
+    }
+
+    if (!station.unlockCondition || station.unlockCondition.type === 'default') {
+      return station.unlocked === true
+    }
+
+    if (station.unlockCondition.type === 'score') {
+      const prereqScore = this.getStationScore(station.unlockCondition.prerequisite)
+      return prereqScore >= station.unlockCondition.minScore
+    }
+
+    return false
+  }
+
+  getUnlockRequirement(station) {
+    if (!station.unlockCondition || station.unlockCondition.type === 'default') {
+      return null
+    }
+
+    if (station.unlockCondition.type === 'score') {
+      const prereqStation = this._findStationById(station.unlockCondition.prerequisite)
+      const currentScore = this.getStationScore(station.unlockCondition.prerequisite)
+      return {
+        type: 'score',
+        prerequisiteName: prereqStation ? prereqStation.name : station.unlockCondition.prerequisite,
+        minScore: station.unlockCondition.minScore,
+        currentScore: currentScore,
+        progress: Math.min(1, currentScore / station.unlockCondition.minScore)
+      }
+    }
+
+    return null
+  }
+
+  _findStationById(stationId) {
+    for (const line of LINES) {
+      const station = line.stations.find(s => s.id === stationId)
+      if (station) return station
+    }
+    return null
+  }
+
+  getNextStations(currentStationId) {
+    const nextStations = []
+    for (const line of LINES) {
+      for (const station of line.stations) {
+        if (station.unlockCondition && station.unlockCondition.type === 'score' &&
+            station.unlockCondition.prerequisite === currentStationId) {
+          nextStations.push(station)
+        }
+      }
+    }
+    return nextStations
+  }
+
+  checkStationUnlocks() {
+    let newUnlocks = []
+    for (const line of LINES) {
+      for (const station of line.stations) {
+        if (!this.unlockedStations.includes(station.id) && this.isStationUnlocked(station)) {
+          this.unlockedStations.push(station.id)
+          newUnlocks.push(station)
+        }
+      }
+    }
+    return newUnlocks
+  }
+
   checkUnlocks() {
     GAME_CONFIG.skins.forEach(skin => {
       if (!this.unlockedSkins.includes(skin.id) && this.totalScore >= skin.unlockScore) {
@@ -141,19 +227,7 @@ class ScoreManager {
       }
     })
 
-    const totalForStation = GAME_CONFIG.map.unlockScorePerStation
-    const unlockedCount = Math.floor(this.totalScore / totalForStation) + 2
-
-    const allStations = []
-    LINES.forEach(line => {
-      line.stations.forEach(st => allStations.push(st.id))
-    })
-
-    for (let i = 0; i < Math.min(unlockedCount, allStations.length); i++) {
-      if (!this.unlockedStations.includes(allStations[i])) {
-        this.unlockedStations.push(allStations[i])
-      }
-    }
+    this.checkStationUnlocks()
   }
 
   selectSkin(id) {

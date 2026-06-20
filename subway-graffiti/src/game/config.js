@@ -29,7 +29,8 @@ export const GAME_CONFIG = {
 
   map: {
     stationCount: 8,
-    unlockScorePerStation: 1000
+    unlockScorePerStation: 1000,
+    defaultMinScore: 500
   },
 
   skins: [
@@ -264,7 +265,8 @@ export const LINES = [
     color: '#e94560',
     stations: [
       {
-        id: 's1-1', name: '起点站', x: 100, y: 300, unlocked: true,
+        id: 's1-1', name: '起点站', x: 100, y: 300, unlocked: true, isBranch: false,
+        unlockCondition: { type: 'default' },
         graffiti: { shrinkSpeed: 80, spawnInterval: 1600, maxTargets: 3, perfectRadius: 28, targetRadius: 55 },
         patrol: { guardSpeed: 100, flashRadius: 100, spawnInterval: 5500, maxGuards: 2, safeZoneRadius: 100, laserEnabled: false, duration: 18 },
         feedback: {
@@ -277,7 +279,8 @@ export const LINES = [
         }
       },
       {
-        id: 's1-2', name: '老街区', x: 250, y: 200, unlocked: false,
+        id: 's1-2', name: '老街区', x: 250, y: 200, unlocked: false, isBranch: false,
+        unlockCondition: { type: 'score', prerequisite: 's1-1', minScore: 500 },
         graffiti: { shrinkSpeed: 100, spawnInterval: 1400, maxTargets: 3, perfectRadius: 24, targetRadius: 50 },
         patrol: { guardSpeed: 120, flashRadius: 110, spawnInterval: 5000, maxGuards: 2, safeZoneRadius: 90, laserEnabled: false, duration: 19 },
         feedback: {
@@ -290,7 +293,8 @@ export const LINES = [
         }
       },
       {
-        id: 's1-3', name: '商业中心', x: 400, y: 300, unlocked: false,
+        id: 's1-3', name: '商业中心', x: 400, y: 300, unlocked: false, isBranch: false,
+        unlockCondition: { type: 'score', prerequisite: 's1-2', minScore: 800 },
         graffiti: { shrinkSpeed: 150, spawnInterval: 900, maxTargets: 5, perfectRadius: 18, targetRadius: 45 },
         patrol: { guardSpeed: 180, flashRadius: 140, spawnInterval: 3200, maxGuards: 4, safeZoneRadius: 70, laserEnabled: true, duration: 22 },
         feedback: {
@@ -303,7 +307,8 @@ export const LINES = [
         }
       },
       {
-        id: 's1-4', name: '艺术区', x: 550, y: 200, unlocked: false,
+        id: 's1-4', name: '艺术区', x: 550, y: 180, unlocked: false, isBranch: true,
+        unlockCondition: { type: 'score', prerequisite: 's1-3', minScore: 1200 },
         graffiti: { shrinkSpeed: 110, spawnInterval: 1100, maxTargets: 4, perfectRadius: 32, targetRadius: 60 },
         patrol: { guardSpeed: 110, flashRadius: 90, spawnInterval: 5000, maxGuards: 2, safeZoneRadius: 95, laserEnabled: false, duration: 20 },
         feedback: {
@@ -316,7 +321,8 @@ export const LINES = [
         }
       },
       {
-        id: 's1-5', name: '大学城', x: 650, y: 350, unlocked: false,
+        id: 's1-5', name: '大学城', x: 650, y: 350, unlocked: false, isBranch: false,
+        unlockCondition: { type: 'score', prerequisite: 's1-3', minScore: 1000 },
         graffiti: { shrinkSpeed: 130, spawnInterval: 1000, maxTargets: 4, perfectRadius: 22, targetRadius: 48, comboBonus: true },
         patrol: { guardSpeed: 140, flashRadius: 115, spawnInterval: 4000, maxGuards: 3, safeZoneRadius: 85, laserEnabled: false, duration: 21 },
         feedback: {
@@ -329,7 +335,8 @@ export const LINES = [
         }
       },
       {
-        id: 's1-6', name: '科技园', x: 500, y: 450, unlocked: false,
+        id: 's1-6', name: '科技园', x: 500, y: 450, unlocked: false, isBranch: false,
+        unlockCondition: { type: 'score', prerequisite: 's1-5', minScore: 1500 },
         graffiti: { shrinkSpeed: 160, spawnInterval: 850, maxTargets: 5, perfectRadius: 16, targetRadius: 42 },
         patrol: { guardSpeed: 170, flashRadius: 150, spawnInterval: 3000, maxGuards: 4, safeZoneRadius: 65, laserEnabled: true, duration: 23 },
         feedback: {
@@ -342,7 +349,8 @@ export const LINES = [
         }
       },
       {
-        id: 's1-7', name: '河畔公园', x: 300, y: 480, unlocked: false,
+        id: 's1-7', name: '河畔公园', x: 300, y: 520, unlocked: false, isBranch: true,
+        unlockCondition: { type: 'score', prerequisite: 's1-6', minScore: 1200 },
         graffiti: { shrinkSpeed: 90, spawnInterval: 1500, maxTargets: 3, perfectRadius: 26, targetRadius: 52 },
         patrol: { guardSpeed: 90, flashRadius: 85, spawnInterval: 6000, maxGuards: 2, safeZoneRadius: 110, laserEnabled: false, duration: 18 },
         feedback: {
@@ -355,7 +363,8 @@ export const LINES = [
         }
       },
       {
-        id: 's1-8', name: '终点站', x: 150, y: 550, unlocked: false,
+        id: 's1-8', name: '终点站', x: 150, y: 550, unlocked: false, isBranch: false,
+        unlockCondition: { type: 'score', prerequisite: 's1-6', minScore: 2000 },
         graffiti: { shrinkSpeed: 180, spawnInterval: 750, maxTargets: 6, perfectRadius: 14, targetRadius: 40, scoreMultiplier: 1.5 },
         patrol: { guardSpeed: 200, flashRadius: 160, spawnInterval: 2500, maxGuards: 5, safeZoneRadius: 60, laserEnabled: true, duration: 25, scoreMultiplier: 1.5 },
         feedback: {
@@ -375,7 +384,8 @@ export const LINES = [
     color: '#3498db',
     stations: [
       {
-        id: 's2-1', name: '北站', x: 100, y: 700, unlocked: true,
+        id: 's2-1', name: '北站', x: 100, y: 700, unlocked: true, isBranch: false,
+        unlockCondition: { type: 'default' },
         graffiti: { shrinkSpeed: 85, spawnInterval: 1500, maxTargets: 3, perfectRadius: 26, targetRadius: 54 },
         patrol: { guardSpeed: 110, flashRadius: 105, spawnInterval: 5200, maxGuards: 2, safeZoneRadius: 95, laserEnabled: false, duration: 18 },
         feedback: {
@@ -388,7 +398,8 @@ export const LINES = [
         }
       },
       {
-        id: 's2-2', name: '体育馆', x: 250, y: 800, unlocked: false,
+        id: 's2-2', name: '体育馆', x: 250, y: 800, unlocked: false, isBranch: false,
+        unlockCondition: { type: 'score', prerequisite: 's2-1', minScore: 600 },
         graffiti: { shrinkSpeed: 140, spawnInterval: 950, maxTargets: 4, perfectRadius: 20, targetRadius: 46, scoreMultiplier: 1.2 },
         patrol: { guardSpeed: 160, flashRadius: 130, spawnInterval: 3800, maxGuards: 3, safeZoneRadius: 75, laserEnabled: false, duration: 21 },
         feedback: {
@@ -401,7 +412,8 @@ export const LINES = [
         }
       },
       {
-        id: 's2-3', name: '博物馆', x: 400, y: 700, unlocked: false,
+        id: 's2-3', name: '博物馆', x: 400, y: 700, unlocked: false, isBranch: false,
+        unlockCondition: { type: 'score', prerequisite: 's2-2', minScore: 900 },
         graffiti: { shrinkSpeed: 100, spawnInterval: 1300, maxTargets: 3, perfectRadius: 18, targetRadius: 48 },
         patrol: { guardSpeed: 130, flashRadius: 140, spawnInterval: 4500, maxGuards: 3, safeZoneRadius: 80, laserEnabled: true, duration: 20 },
         feedback: {
@@ -414,7 +426,8 @@ export const LINES = [
         }
       },
       {
-        id: 's2-4', name: '音乐厅', x: 550, y: 800, unlocked: false,
+        id: 's2-4', name: '音乐厅', x: 550, y: 780, unlocked: false, isBranch: true,
+        unlockCondition: { type: 'score', prerequisite: 's2-3', minScore: 1000 },
         graffiti: { shrinkSpeed: 120, spawnInterval: 1000, maxTargets: 4, perfectRadius: 24, targetRadius: 50, rhythmMode: true },
         patrol: { guardSpeed: 125, flashRadius: 100, spawnInterval: 4800, maxGuards: 2, safeZoneRadius: 88, laserEnabled: false, duration: 20 },
         feedback: {
@@ -427,7 +440,8 @@ export const LINES = [
         }
       },
       {
-        id: 's2-5', name: '大剧院', x: 650, y: 950, unlocked: false,
+        id: 's2-5', name: '大剧院', x: 650, y: 950, unlocked: false, isBranch: false,
+        unlockCondition: { type: 'score', prerequisite: 's2-3', minScore: 1200 },
         graffiti: { shrinkSpeed: 145, spawnInterval: 900, maxTargets: 4, perfectRadius: 20, targetRadius: 44, scoreMultiplier: 1.3 },
         patrol: { guardSpeed: 165, flashRadius: 135, spawnInterval: 3500, maxGuards: 4, safeZoneRadius: 70, laserEnabled: true, duration: 22 },
         feedback: {
@@ -440,7 +454,8 @@ export const LINES = [
         }
       },
       {
-        id: 's2-6', name: '美术馆', x: 500, y: 1050, unlocked: false,
+        id: 's2-6', name: '美术馆', x: 500, y: 1050, unlocked: false, isBranch: true,
+        unlockCondition: { type: 'score', prerequisite: 's2-5', minScore: 1500 },
         graffiti: { shrinkSpeed: 115, spawnInterval: 1150, maxTargets: 4, perfectRadius: 28, targetRadius: 56, comboBonus: true },
         patrol: { guardSpeed: 115, flashRadius: 95, spawnInterval: 5200, maxGuards: 2, safeZoneRadius: 92, laserEnabled: false, duration: 19 },
         feedback: {
@@ -453,7 +468,8 @@ export const LINES = [
         }
       },
       {
-        id: 's2-7', name: '图书馆', x: 300, y: 1080, unlocked: false,
+        id: 's2-7', name: '图书馆', x: 300, y: 1080, unlocked: false, isBranch: false,
+        unlockCondition: { type: 'score', prerequisite: 's2-5', minScore: 1000 },
         graffiti: { shrinkSpeed: 95, spawnInterval: 1400, maxTargets: 3, perfectRadius: 22, targetRadius: 50 },
         patrol: { guardSpeed: 95, flashRadius: 145, spawnInterval: 5500, maxGuards: 2, safeZoneRadius: 105, laserEnabled: false, duration: 19 },
         feedback: {
@@ -466,7 +482,8 @@ export const LINES = [
         }
       },
       {
-        id: 's2-8', name: '南站', x: 150, y: 1150, unlocked: false,
+        id: 's2-8', name: '南站', x: 150, y: 1150, unlocked: false, isBranch: false,
+        unlockCondition: { type: 'score', prerequisite: 's2-7', minScore: 2500 },
         graffiti: { shrinkSpeed: 190, spawnInterval: 700, maxTargets: 6, perfectRadius: 12, targetRadius: 38, scoreMultiplier: 2 },
         patrol: { guardSpeed: 210, flashRadius: 170, spawnInterval: 2200, maxGuards: 5, safeZoneRadius: 55, laserEnabled: true, duration: 28, scoreMultiplier: 2 },
         feedback: {
