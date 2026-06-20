@@ -98,11 +98,32 @@ export class PatrolAvoid {
     ]
 
     zonePositions.forEach(pos => {
-      const zone = new PIXI.Graphics()
-      zone.beginFill(GAME_CONFIG.successColor, 0.15)
-      zone.lineStyle(3, GAME_CONFIG.successColor, 0.5)
-      zone.drawCircle(pos.x, pos.y, GAME_CONFIG.patrol.safeZoneRadius)
-      zone.endFill()
+      const zone = new PIXI.Container()
+      zone.x = pos.x
+      zone.y = pos.y
+      zone.radius = GAME_CONFIG.patrol.safeZoneRadius
+      zone.playerRadius = 22
+      zone.active = false
+
+      const outerRing = new PIXI.Graphics()
+      outerRing.beginFill(GAME_CONFIG.successColor, 0.15)
+      outerRing.lineStyle(3, GAME_CONFIG.successColor, 0.5)
+      outerRing.drawCircle(0, 0, zone.radius)
+      outerRing.endFill()
+      zone.outerRing = outerRing
+      zone.addChild(outerRing)
+
+      const actualZone = new PIXI.Graphics()
+      actualZone.lineStyle({
+        width: 2,
+        color: GAME_CONFIG.successColor,
+        alpha: 0.4,
+        dash: [8, 4]
+      })
+      actualZone.drawCircle(0, 0, zone.radius - zone.playerRadius)
+      actualZone.endFill()
+      zone.actualZone = actualZone
+      zone.addChild(actualZone)
 
       const pulse = new PIXI.Graphics()
       zone.pulse = pulse
@@ -115,12 +136,9 @@ export class PatrolAvoid {
         fill: GAME_CONFIG.successColor
       })
       label.anchor.set(0.5)
-      label.y = GAME_CONFIG.patrol.safeZoneRadius + 20
+      label.y = zone.radius + 20
+      zone.label = label
       zone.addChild(label)
-
-      zone.x = pos.x
-      zone.y = pos.y
-      zone.radius = GAME_CONFIG.patrol.safeZoneRadius
 
       this.safeZones.push(zone)
       this.container.addChild(zone)
@@ -332,15 +350,54 @@ export class PatrolAvoid {
 
   checkSafeZone() {
     let inSafeZone = false
+    let activeZone = null
+
     for (const zone of this.safeZones) {
       const dx = this.player.x - zone.x
       const dy = this.player.y - zone.y
-      if (Math.sqrt(dx * dx + dy * dy) < zone.radius - 20) {
+      if (Math.sqrt(dx * dx + dy * dy) < zone.radius - zone.playerRadius) {
         inSafeZone = true
+        activeZone = zone
         break
       }
     }
-    this.player.isSafe = inSafeZone
+
+    this.safeZones.forEach(zone => {
+      const shouldBeActive = zone === activeZone
+      if (zone.active !== shouldBeActive) {
+        zone.active = shouldBeActive
+        zone.outerRing.clear()
+        zone.outerRing.beginFill(GAME_CONFIG.successColor, shouldBeActive ? 0.4 : 0.15)
+        zone.outerRing.lineStyle(3, GAME_CONFIG.successColor, shouldBeActive ? 1 : 0.5)
+        zone.outerRing.drawCircle(0, 0, zone.radius)
+        zone.outerRing.endFill()
+
+        zone.actualZone.clear()
+        zone.actualZone.lineStyle({
+          width: 2,
+          color: GAME_CONFIG.successColor,
+          alpha: shouldBeActive ? 0.8 : 0.4,
+          dash: [8, 4]
+        })
+        zone.actualZone.drawCircle(0, 0, zone.radius - zone.playerRadius)
+        zone.actualZone.endFill()
+
+        zone.label.style.fill = shouldBeActive ? 0xffffff : GAME_CONFIG.successColor
+        zone.label.style.fontSize = shouldBeActive ? 16 : 14
+      }
+    })
+
+    if (this.player.isSafe !== inSafeZone) {
+      this.player.isSafe = inSafeZone
+      const body = this.player.getChildAt(0)
+      if (body && body.tint !== undefined) {
+        body.tint = inSafeZone ? 0x00ff88 : 0xffffff
+      }
+      if (inSafeZone) {
+        audioManager.playTone(523, 0.1, 'sine', 0.2)
+      }
+    }
+
     return inSafeZone
   }
 

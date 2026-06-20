@@ -77,12 +77,17 @@ function onTick() {
  combo.value = scoreManager.combo;
 }
 function startGame() {
- audioManager.init();
- audioManager.resume();
- score.value = 0;
- combo.value = 0;
- scoreManager.resetGame();
- engine.startNewGame();
+  if (!engine) {
+    console.warn('Game engine not ready yet');
+    return;
+  }
+  audioManager.init();
+  audioManager.resume();
+  score.value = 0;
+  combo.value = 0;
+  scoreManager.resetGame();
+  audioManager.playSFX('click');
+  engine.startNewGame();
 }
 function selectSkin(id) {
  if (scoreManager.selectSkin(id)) {

@@ -268,16 +268,11 @@ export class MapScene {
 
   refreshStationStatus() {
     this.stationNodes.forEach(node => {
-      const isUnlocked = scoreManager.unlockedStations.includes(node.station.id) ||
-        (node.lineIdx === this.currentLineIndex && node.index <= this.currentStationIndex)
-
-      if (isUnlocked !== node.isUnlocked) {
-        node.isUnlocked = isUnlocked
-        this.container.removeChild(node.container)
-      }
+      this.container.removeChild(node.container)
+      node.container.destroy({ children: true })
     })
-
     this.stationNodes = []
+
     LINES.forEach((line, lineIdx) => {
       line.stations.forEach((station, idx) => {
         const isUnlocked = scoreManager.unlockedStations.includes(station.id) ||

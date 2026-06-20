@@ -219,9 +219,9 @@ export class GameEngine {
   }
 
   _hideAllScenes() {
-    this.mapScene.hide()
-    this.graffitiGame.stop()
-    this.patrolGame.stop()
+    if (this.mapScene) this.mapScene.hide()
+    if (this.graffitiGame) this.graffitiGame.stop()
+    if (this.patrolGame) this.patrolGame.stop()
   }
 
   _fadeTransition(callback, duration = 300) {
@@ -230,17 +230,18 @@ export class GameEngine {
       return
     }
 
+    callback && callback()
+
     const startTime = performance.now()
     const fadeIn = () => {
       const elapsed = performance.now() - startTime
       const progress = Math.min(elapsed / (duration / 2), 1)
-      this.transitionLayer.alpha = this._easeInOut(progress)
+      this.transitionLayer.alpha = this._easeInOut(progress) * 0.6
 
       if (progress < 1) {
         requestAnimationFrame(fadeIn)
       } else {
-        callback && callback()
-        setTimeout(fadeOut, 100)
+        setTimeout(fadeOut, 50)
       }
     }
 
@@ -249,10 +250,12 @@ export class GameEngine {
       const animate = () => {
         const elapsed = performance.now() - startTime2
         const progress = Math.min(elapsed / (duration / 2), 1)
-        this.transitionLayer.alpha = 1 - this._easeInOut(progress)
+        this.transitionLayer.alpha = 0.6 - this._easeInOut(progress) * 0.6
 
         if (progress < 1) {
           requestAnimationFrame(animate)
+        } else {
+          this.transitionLayer.alpha = 0
         }
       }
       animate()
