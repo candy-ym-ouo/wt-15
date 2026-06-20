@@ -100,7 +100,7 @@ export class MapScene {
         const outerRing = new PIXI.Graphics()
         if (station.isBranch) {
           outerRing.lineStyle(3, isUnlocked ? parseInt(line.color.replace('#', '0x')) : 0x333344, 0.8)
-          outerRing.drawStar(0, 0, 6, 30, 20)
+          this.drawStar(outerRing, 0, 0, 6, 30, 20)
         } else {
           outerRing.beginFill(isUnlocked ? parseInt(line.color.replace('#', '0x')) : 0x333344)
           outerRing.drawCircle(0, 0, 28)
@@ -288,7 +288,7 @@ export class MapScene {
 
     const branchDot = new PIXI.Graphics()
     branchDot.lineStyle(2, 0x9b59b6, 1)
-    branchDot.drawStar(legendX + 10, legendY2, 6, 14, 8)
+    this.drawStar(branchDot, legendX + 10, legendY2, 6, 14, 8)
     this.container.addChild(branchDot)
 
     const branchText = new PIXI.Text('支线站点', {
@@ -389,7 +389,7 @@ export class MapScene {
         const outerRing = new PIXI.Graphics()
         if (station.isBranch) {
           outerRing.lineStyle(3, isUnlocked ? parseInt(line.color.replace('#', '0x')) : 0x333344, 0.8)
-          outerRing.drawStar(0, 0, 6, 30, 20)
+          this.drawStar(outerRing, 0, 0, 6, 30, 20)
         } else {
           outerRing.beginFill(isUnlocked ? parseInt(line.color.replace('#', '0x')) : 0x333344)
           outerRing.drawCircle(0, 0, 28)
@@ -624,6 +624,27 @@ export class MapScene {
     }
     stations.sort((a, b) => b.progress - a.progress)
     return stations
+  }
+
+  drawStar(g, cx, cy, spikes, outerRadius, innerRadius) {
+    let rot = Math.PI / 2 * 3
+    let x = cx
+    let y = cy
+    const step = Math.PI / spikes
+
+    g.moveTo(cx, cy - outerRadius)
+    for (let i = 0; i < spikes; i++) {
+      x = cx + Math.cos(rot) * outerRadius
+      y = cy + Math.sin(rot) * outerRadius
+      g.lineTo(x, y)
+      rot += step
+
+      x = cx + Math.cos(rot) * innerRadius
+      y = cy + Math.sin(rot) * innerRadius
+      g.lineTo(x, y)
+      rot += step
+    }
+    g.lineTo(cx, cy - outerRadius)
   }
 
   destroy() {

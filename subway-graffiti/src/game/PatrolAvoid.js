@@ -21,6 +21,9 @@ export class PatrolAvoid {
     this.laserTimer = 0
     this.patrolRangeMultiplier = 1
     this.extraGuardSpeed = 0
+    this.riskWarningContainer = null
+    this.shieldEffect = null
+    this.riskIndicators = []
     this.setup()
   }
 
@@ -116,10 +119,20 @@ export class PatrolAvoid {
     this.promptText.x = GAME_CONFIG.width / 2
     this.promptText.y = GAME_CONFIG.height / 2
     this.container.addChild(this.promptText)
+
+    this.riskWarningContainer = new PIXI.Container()
+    this.container.addChild(this.riskWarningContainer)
+
+    this.dangerFlash = new PIXI.Graphics()
+    this.dangerFlash.beginFill(GAME_CONFIG.patrol.dangerColor, 0)
+    this.dangerFlash.drawRect(0, 0, GAME_CONFIG.width, GAME_CONFIG.height)
+    this.dangerFlash.endFill()
+    this.container.addChild(this.dangerFlash)
   }
 
   createSafeZones() {
     const safeZoneRadius = this.getStationConfig(this.station, 'safeZoneRadius', GAME_CONFIG.patrol.safeZoneRadius)
+    const cooldownDuration = this.getStationConfig(this.station, 'safeZoneCooldown', GAME_CONFIG.patrol.safeZoneCooldown)
 
     const zonePositions = [
       { x: 80, y: 250 },
@@ -135,6 +148,10 @@ export class PatrolAvoid {
       zone.radius = safeZoneRadius
       zone.playerRadius = 22
       zone.active = false
+      zone.onCooldown = false
+      zone.cooldownTimer = 0
+      zone.cooldownDuration = cooldownDuration
+      zone.lastUsedTime = 0
 
       const outerRing = new PIXI.Graphics()
       outerRing.beginFill(GAME_CONFIG.successColor, 0.15)
@@ -156,6 +173,14 @@ export class PatrolAvoid {
       zone.actualZone = actualZone
       zone.addChild(actualZone)
 
+      const cooldownRing = new PIXI.Graphics()
+      zone.cooldownRing = cooldownRing
+      zone.addChild(cooldownRing)
+
+      const cooldownProgress = new PIXI.Graphics()
+      zone.cooldownProgress = cooldownProgress
+      zone.addChild(cooldownProgress)
+
       const pulse = new PIXI.Graphics()
       zone.pulse = pulse
       zone.addChild(pulse)
@@ -170,6 +195,16 @@ export class PatrolAvoid {
       label.y = zone.radius + 20
       zone.label = label
       zone.addChild(label)
+
+      const cooldownLabel = new PIXI.Text('', {
+        fontFamily: 'Arial',
+        fontSize: 20,
+        fontWeight: 'bold',
+        fill: GAME_CONFIG.patrol.cooldownColor
+      })
+      cooldownLabel.anchor.set(0.5)
+      zone.cooldownLabel = cooldownLabel
+      zone.addChild(cooldownLabel)
 
       this.safeZones.push(zone)
       this.container.addChild(zone)
@@ -189,6 +224,12 @@ export class PatrolAvoid {
     if (this.player) {
       this.container.removeChild(this.player)
       this.player.destroy()
+    }
+
+    if (this.shieldEffect) {
+      this.container.removeChild(this.shieldEffect)
+      this.shieldEffect.destroy()
+      this.shieldEffect = null
     }
 
     this.player = new PIXI.Container()
@@ -228,6 +269,13 @@ export class PatrolAvoid {
     this.player.targetX = this.player.x
     this.player.targetY = this.player.y
     this.player.isSafe = false
+    this.player.hasShield = false
+    this.player.shieldTimer = 0
+    this.player.shieldDuration = GAME_CONFIG.patrol.shieldDuration
+
+    this.shieldEffect = new PIXI.Graphics()
+    this.shieldEffect.visible = false
+    this.container.addChild(this.shieldEffect)
 
     this.container.addChild(this.player)
   }
@@ -326,6 +374,17 @@ export class PatrolAvoid {
     this.spawnTimer = 1500
     this.laserTimer = 3000
     this.station = station || null
+    this.riskIndicators = []
+
+    this.safeZones.forEach(zone => {
+      zone.onCooldown = false
+      zone.cooldownTimer = 0
+      zone.lastUsedTime = 0
+      zone.active = false
+      zone.cooldownRing.clear()
+      zone.cooldownProgress.clear()
+      zone.cooldownLabel.text = ''
+    })
 
     this.guards.forEach(g => {
       this.container.removeChild(g)
@@ -405,12 +464,14 @@ export class PatrolAvoid {
     let activeZone = null
 
     for (const zone of this.safeZones) {
-      const dx = this.player.x - zone.x
-      const dy = this.player.y - zone.y
-      if (Math.sqrt(dx * dx + dy * dy) < zone.radius - zone.playerRadius) {
-        inSafeZone = true
-        activeZone = zone
-        break
+      if (!zone.onCooldown) {
+        const dx = this.player.x - zone.x
+        const dy = this.player.y - zone.y
+        if (Math.sqrt(dx * dx + dy * dy) < zone.radius - zone.playerRadius) {
+          inSafeZone = true
+          activeZone = zone
+          break
+        }
       }
     }
 
@@ -418,39 +479,63 @@ export class PatrolAvoid {
       const shouldBeActive = zone === activeZone
       if (zone.active !== shouldBeActive) {
         zone.active = shouldBeActive
+
+        const baseColor = zone.onCooldown ? GAME_CONFIG.patrol.cooldownColor : GAME_CONFIG.successColor
+        const fillAlpha = zone.onCooldown ? 0.08 : (shouldBeActive ? 0.4 : 0.15)
+        const lineAlpha = zone.onCooldown ? 0.3 : (shouldBeActive ? 1 : 0.5)
+
         zone.outerRing.clear()
-        zone.outerRing.beginFill(GAME_CONFIG.successColor, shouldBeActive ? 0.4 : 0.15)
-        zone.outerRing.lineStyle(3, GAME_CONFIG.successColor, shouldBeActive ? 1 : 0.5)
+        zone.outerRing.beginFill(baseColor, fillAlpha)
+        zone.outerRing.lineStyle(3, baseColor, lineAlpha)
         zone.outerRing.drawCircle(0, 0, zone.radius)
         zone.outerRing.endFill()
 
         zone.actualZone.clear()
-        zone.actualZone.lineStyle({
-          width: 2,
-          color: GAME_CONFIG.successColor,
-          alpha: shouldBeActive ? 0.8 : 0.4,
-          dash: [8, 4]
-        })
-        zone.actualZone.drawCircle(0, 0, zone.radius - zone.playerRadius)
-        zone.actualZone.endFill()
+        if (!zone.onCooldown) {
+          zone.actualZone.lineStyle({
+            width: 2,
+            color: baseColor,
+            alpha: shouldBeActive ? 0.8 : 0.4,
+            dash: [8, 4]
+          })
+          zone.actualZone.drawCircle(0, 0, zone.radius - zone.playerRadius)
+          zone.actualZone.endFill()
+        }
 
-        zone.label.style.fill = shouldBeActive ? 0xffffff : GAME_CONFIG.successColor
+        zone.label.style.fill = zone.onCooldown ? GAME_CONFIG.patrol.cooldownColor : (shouldBeActive ? 0xffffff : GAME_CONFIG.successColor)
         zone.label.style.fontSize = shouldBeActive ? 16 : 14
+        zone.label.visible = !zone.onCooldown
+        zone.cooldownLabel.visible = zone.onCooldown
       }
     })
 
     if (this.player.isSafe !== inSafeZone) {
+      const wasSafe = this.player.isSafe
       this.player.isSafe = inSafeZone
       const body = this.player.getChildAt(0)
       if (body && body.tint !== undefined) {
         body.tint = inSafeZone ? 0x00ff88 : 0xffffff
       }
+
       if (inSafeZone) {
         audioManager.playTone(523, 0.1, 'sine', 0.2)
+      } else if (wasSafe && activeZone) {
+        this.activateShield()
+        activeZone.onCooldown = true
+        activeZone.cooldownTimer = activeZone.cooldownDuration
+        activeZone.lastUsedTime = this.gameTime
       }
     }
 
     return inSafeZone
+  }
+
+  activateShield() {
+    this.player.hasShield = true
+    this.player.shieldTimer = this.player.shieldDuration
+    this.shieldEffect.visible = true
+    this.showPrompt('护盾激活!', GAME_CONFIG.patrol.shieldColor)
+    audioManager.playTone(659, 0.15, 'sine', 0.3)
   }
 
   update(delta) {
@@ -478,6 +563,8 @@ export class PatrolAvoid {
     this.updateGuards(delta)
     this.updateLasers(delta)
     this.updateSafeZones(delta)
+    this.updateShield(delta)
+    this.updateRiskWarnings(delta)
     this.checkCollisions()
 
     if (this.gameTime >= this.duration && !this.isCaught) {
@@ -602,16 +689,183 @@ export class PatrolAvoid {
   updateSafeZones(delta) {
     this.safeZones.forEach(zone => {
       zone.pulseTime = (zone.pulseTime || 0) + delta
+
+      if (zone.onCooldown) {
+        zone.cooldownTimer -= delta
+
+        if (zone.cooldownTimer <= 0) {
+          zone.onCooldown = false
+          zone.cooldownTimer = 0
+          zone.cooldownRing.clear()
+          zone.cooldownProgress.clear()
+          zone.cooldownLabel.text = ''
+          zone.active = false
+          audioManager.playTone(440, 0.1, 'sine', 0.2)
+        } else {
+          const cooldownProgress = 1 - (zone.cooldownTimer / zone.cooldownDuration)
+          zone.cooldownRing.clear()
+          zone.cooldownRing.lineStyle(4, GAME_CONFIG.patrol.cooldownColor, 0.3)
+          zone.cooldownRing.drawCircle(0, 0, zone.radius + 5)
+          zone.cooldownRing.endFill()
+
+          zone.cooldownProgress.clear()
+          zone.cooldownProgress.lineStyle(4, GAME_CONFIG.successColor, 0.8)
+          zone.cooldownProgress.arc(0, 0, zone.radius + 5, -Math.PI / 2, -Math.PI / 2 + cooldownProgress * Math.PI * 2)
+          zone.cooldownProgress.endFill()
+
+          zone.cooldownLabel.text = Math.ceil(zone.cooldownTimer).toString()
+        }
+      } else {
+        zone.cooldownRing.clear()
+        zone.cooldownProgress.clear()
+      }
+
+      const baseColor = zone.onCooldown ? GAME_CONFIG.patrol.cooldownColor : GAME_CONFIG.successColor
       const pulse = 1 + Math.sin(zone.pulseTime * 3) * 0.1
       zone.pulse.clear()
-      zone.pulse.lineStyle(2, GAME_CONFIG.successColor, 0.3 + Math.sin(zone.pulseTime * 3) * 0.2)
-      zone.pulse.drawCircle(0, 0, zone.radius * pulse)
-      zone.pulse.endFill()
+      if (!zone.onCooldown) {
+        zone.pulse.lineStyle(2, baseColor, 0.3 + Math.sin(zone.pulseTime * 3) * 0.2)
+        zone.pulse.drawCircle(0, 0, zone.radius * pulse)
+        zone.pulse.endFill()
+      }
     })
+  }
+
+  updateShield(delta) {
+    if (this.player.hasShield) {
+      this.player.shieldTimer -= delta
+
+      if (this.player.shieldTimer <= 0) {
+        this.player.hasShield = false
+        this.shieldEffect.visible = false
+        this.shieldEffect.clear()
+      } else {
+        const shieldProgress = this.player.shieldTimer / this.player.shieldDuration
+        const shieldRadius = 35 + Math.sin(this.gameTime * 10) * 3
+
+        this.shieldEffect.clear()
+        this.shieldEffect.x = this.player.x
+        this.shieldEffect.y = this.player.y
+
+        this.shieldEffect.beginFill(GAME_CONFIG.patrol.shieldColor, 0.15 + shieldProgress * 0.2)
+        this.shieldEffect.lineStyle(3, GAME_CONFIG.patrol.shieldColor, 0.6 + shieldProgress * 0.4)
+        this.shieldEffect.drawCircle(0, 0, shieldRadius)
+        this.shieldEffect.endFill()
+
+        this.shieldEffect.lineStyle(2, GAME_CONFIG.patrol.shieldColor, 0.8)
+        this.shieldEffect.arc(0, 0, shieldRadius + 5, -Math.PI / 2, -Math.PI / 2 + shieldProgress * Math.PI * 2)
+        this.shieldEffect.endFill()
+
+        const body = this.player.getChildAt(0)
+        if (body && body.tint !== undefined) {
+          const flash = Math.sin(this.gameTime * 15) * 0.5 + 0.5
+          body.tint = 0xffffff + Math.floor(flash * 0x3399ff)
+        }
+      }
+    }
+  }
+
+  updateRiskWarnings(delta) {
+    const warningDistance = GAME_CONFIG.patrol.riskWarningDistance
+    let minDistance = Infinity
+    let nearestGuard = null
+
+    this.guards.forEach(guard => {
+      const dx = this.player.x - guard.x
+      const dy = this.player.y - guard.y
+      const dist = Math.sqrt(dx * dx + dy * dy)
+
+      if (dist < minDistance) {
+        minDistance = dist
+        nearestGuard = guard
+      }
+    })
+
+    this.riskWarningContainer.removeChildren()
+
+    if (minDistance < warningDistance && !this.player.isSafe && !this.player.hasShield) {
+      const dangerLevel = 1 - (minDistance / warningDistance)
+
+      this.dangerFlash.clear()
+      this.dangerFlash.beginFill(GAME_CONFIG.patrol.dangerColor, dangerLevel * 0.15)
+      this.dangerFlash.drawRect(0, 0, GAME_CONFIG.width, GAME_CONFIG.height)
+      this.dangerFlash.endFill()
+
+      if (nearestGuard) {
+        const angleToGuard = Math.atan2(nearestGuard.y - this.player.y, nearestGuard.x - this.player.x)
+        const indicatorRadius = 60
+        const indicatorCount = 3 + Math.floor(dangerLevel * 3)
+
+        for (let i = 0; i < indicatorCount; i++) {
+          const indicator = new PIXI.Graphics()
+          const offsetAngle = (i - indicatorCount / 2) * 0.2
+          const dist = indicatorRadius + i * 8 + Math.sin(this.gameTime * 8 + i) * 3
+
+          indicator.x = this.player.x + Math.cos(angleToGuard + offsetAngle) * dist
+          indicator.y = this.player.y + Math.sin(angleToGuard + offsetAngle) * dist
+
+          indicator.beginFill(GAME_CONFIG.patrol.dangerColor, (1 - i * 0.15) * dangerLevel)
+          indicator.drawCircle(0, 0, 4 + (1 - dangerLevel) * 2)
+          indicator.endFill()
+
+          this.riskWarningContainer.addChild(indicator)
+        }
+
+        const edgeMargin = 50
+        const edgeX = Math.max(edgeMargin, Math.min(GAME_CONFIG.width - edgeMargin, nearestGuard.x))
+        const edgeY = Math.max(130, Math.min(GAME_CONFIG.height - edgeMargin, nearestGuard.y))
+
+        const edgeIndicator = new PIXI.Graphics()
+        edgeIndicator.x = edgeX
+        edgeIndicator.y = edgeY
+
+        const pulseSize = 20 + Math.sin(this.gameTime * 10) * 5
+        edgeIndicator.lineStyle(3, GAME_CONFIG.patrol.dangerColor, 0.5 + dangerLevel * 0.5)
+        edgeIndicator.drawCircle(0, 0, pulseSize)
+        edgeIndicator.endFill()
+
+        edgeIndicator.lineStyle(2, GAME_CONFIG.patrol.dangerColor, 0.8)
+        edgeIndicator.moveTo(0, -pulseSize - 10)
+        edgeIndicator.lineTo(0, -pulseSize - 20)
+        edgeIndicator.moveTo(-8, -pulseSize - 15)
+        edgeIndicator.lineTo(0, -pulseSize - 10)
+        edgeIndicator.lineTo(8, -pulseSize - 15)
+        edgeIndicator.endFill()
+
+        const exclamation = new PIXI.Text('!', {
+          fontFamily: 'Arial',
+          fontSize: 24,
+          fontWeight: 'bold',
+          fill: GAME_CONFIG.patrol.dangerColor
+        })
+        exclamation.anchor.set(0.5)
+        exclamation.y = -pulseSize - 35
+        edgeIndicator.addChild(exclamation)
+
+        this.riskWarningContainer.addChild(edgeIndicator)
+      }
+
+      if (dangerLevel > 0.7 && Math.random() < 0.1) {
+        audioManager.playTone(200 + Math.random() * 100, 0.05, 'square', 0.1)
+      }
+    } else {
+      this.dangerFlash.clear()
+      this.dangerFlash.beginFill(GAME_CONFIG.patrol.dangerColor, 0)
+      this.dangerFlash.drawRect(0, 0, GAME_CONFIG.width, GAME_CONFIG.height)
+      this.dangerFlash.endFill()
+    }
   }
 
   checkCollisions() {
     if (this.isCaught || this.checkSafeZone()) return
+
+    if (this.player.hasShield) {
+      this.player.shieldFlashTimer = (this.player.shieldFlashTimer || 0) + 0.016
+      if (Math.sin(this.player.shieldFlashTimer * 20) > 0.9) {
+        audioManager.playTone(880, 0.03, 'sine', 0.05)
+      }
+      return
+    }
 
     for (const guard of this.guards) {
       const dx = this.player.x - guard.x

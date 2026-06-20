@@ -24,7 +24,13 @@ export const GAME_CONFIG = {
     spawnInterval: 4000,
     maxGuards: 3,
     caughtPenalty: 500,
-    safeZoneRadius: 80
+    safeZoneRadius: 80,
+    safeZoneCooldown: 5,
+    shieldDuration: 3,
+    riskWarningDistance: 150,
+    dangerColor: 0xff4444,
+    cooldownColor: 0x7f8c8d,
+    shieldColor: 0x3498db
   },
 
   map: {
