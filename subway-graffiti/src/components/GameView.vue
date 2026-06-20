@@ -356,6 +356,9 @@ onUnmounted(() => {
       <div v-if="currentState === GameState.STATION_COMPLETE" class="screen">
         <div class="screen-title" style="font-size: 36px;">站点完成!</div>
         <div class="screen-subtitle">{{ stationResult?.station?.name || '站点' }}</div>
+        <div v-if="stationResult?.station?.feedback?.complete" style="text-align: center; color: #2ecc71; font-size: 18px; margin-top: 10px; opacity: 0.9;">
+          ✨ {{ stationResult.station.feedback.complete }}
+        </div>
 
         <div class="screen-content">
           <div style="background: linear-gradient(135deg, rgba(46, 204, 113, 0.1), rgba(52, 152, 219, 0.1)); border-radius: 16px; padding: 24px; border: 2px solid rgba(46, 204, 113, 0.3);">

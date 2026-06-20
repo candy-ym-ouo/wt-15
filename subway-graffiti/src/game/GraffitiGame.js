@@ -25,6 +25,29 @@ export class GraffitiGame {
     this.shrinkSpeedMultiplier = shrinkSpeedMultiplier || 1
   }
 
+  getStationConfig(station, key, defaultValue) {
+    if (station && station.graffiti && station.graffiti[key] !== undefined) {
+      return station.graffiti[key]
+    }
+    return GAME_CONFIG.graffiti[key] !== undefined ? GAME_CONFIG.graffiti[key] : defaultValue
+  }
+
+  getFeedbackText(type) {
+    if (this.station && this.station.feedback && this.station.feedback[type]) {
+      const options = this.station.feedback[type]
+      if (Array.isArray(options)) {
+        return options[Math.floor(Math.random() * options.length)]
+      }
+      return options
+    }
+    const defaults = {
+      perfect: 'PERFECT!',
+      good: 'GOOD!',
+      miss: 'MISS'
+    }
+    return defaults[type] || ''
+  }
+
   setup() {
     this.app.stage.addChild(this.container)
 
@@ -76,16 +99,19 @@ export class GraffitiGame {
     this.wall.mask = this.progressMask
   }
 
-  start() {
+  start(station) {
     this.isRunning = true
     this.gameTime = 0
     this.spawnTimer = 0
     this.targets = []
     this.particles = []
+    this.station = station || null
     this.graffitiMarks.forEach(m => this.container.removeChild(m))
     this.graffitiMarks = []
     this.container.visible = true
-    this.showPrompt('开始!', 0xe94560)
+    const startText = (station && station.feedback && station.feedback.start) || '开始!'
+    const color = station ? parseInt((station.color || '#e94560').replace('#', '0x')) : 0xe94560
+    this.showPrompt(startText, color)
   }
 
   stop() {
@@ -117,7 +143,8 @@ export class GraffitiGame {
   }
 
   spawnTarget() {
-    if (this.targets.length >= GAME_CONFIG.graffiti.maxTargets) return
+    const maxTargets = this.getStationConfig(this.station, 'maxTargets', GAME_CONFIG.graffiti.maxTargets)
+    if (this.targets.length >= maxTargets) return
 
     const padding = 100
     const x = padding + Math.random() * (GAME_CONFIG.width - padding * 2)
@@ -126,8 +153,10 @@ export class GraffitiGame {
     const target = new PIXI.Container()
     target.x = x
     target.y = y
-    target.radius = GAME_CONFIG.graffiti.targetRadius
-    target.shrinkSpeed = GAME_CONFIG.graffiti.shrinkSpeed * this.shrinkSpeedMultiplier * (0.8 + Math.random() * 0.4)
+    target.radius = this.getStationConfig(this.station, 'targetRadius', GAME_CONFIG.graffiti.targetRadius)
+    const baseShrinkSpeed = this.getStationConfig(this.station, 'shrinkSpeed', GAME_CONFIG.graffiti.shrinkSpeed)
+    target.shrinkSpeed = baseShrinkSpeed * this.shrinkSpeedMultiplier * (0.8 + Math.random() * 0.4)
+    target.perfectRadius = this.getStationConfig(this.station, 'perfectRadius', GAME_CONFIG.graffiti.perfectRadius)
 
     const colorStr = scoreManager.getSkinColor()
     const colorNum = parseInt(colorStr.replace('#', '0x'))
@@ -140,7 +169,7 @@ export class GraffitiGame {
 
     const perfectRing = new PIXI.Graphics()
     perfectRing.lineStyle(3, GAME_CONFIG.successColor, 0.8)
-    perfectRing.drawCircle(0, 0, GAME_CONFIG.graffiti.perfectRadius)
+    perfectRing.drawCircle(0, 0, target.perfectRadius)
     perfectRing.endFill()
     target.addChild(perfectRing)
 
@@ -174,19 +203,20 @@ export class GraffitiGame {
     const currentRadius = target.currentRadius || target.radius
     let result = 'miss'
     let color = 0xff0000
+    const perfectRadius = target.perfectRadius || GAME_CONFIG.graffiti.perfectRadius
 
-    if (currentRadius <= GAME_CONFIG.graffiti.perfectRadius) {
+    if (currentRadius <= perfectRadius) {
       result = 'perfect'
       color = GAME_CONFIG.successColor
-      this.showPrompt('PERFECT!', color)
-    } else if (currentRadius <= GAME_CONFIG.graffiti.perfectRadius * 2) {
+      this.showPrompt(this.getFeedbackText('perfect'), color)
+    } else if (currentRadius <= perfectRadius * 2) {
       result = 'good'
       color = GAME_CONFIG.warningColor
-      this.showPrompt('GOOD!', color)
+      this.showPrompt(this.getFeedbackText('good'), color)
     } else {
       result = 'miss'
       color = 0xff4444
-      this.showPrompt('MISS', color)
+      this.showPrompt(this.getFeedbackText('miss'), color)
     }
 
     const points = scoreManager.addScore(result)
@@ -334,7 +364,8 @@ export class GraffitiGame {
     const remaining = Math.max(0, this.duration - this.gameTime)
     this.updateTimerBar(remaining / this.duration)
 
-    if (this.spawnTimer >= GAME_CONFIG.graffiti.spawnInterval) {
+    const spawnInterval = this.getStationConfig(this.station, 'spawnInterval', GAME_CONFIG.graffiti.spawnInterval)
+    if (this.spawnTimer >= spawnInterval) {
       this.spawnTimer = 0
       this.spawnTarget()
     }
@@ -344,7 +375,7 @@ export class GraffitiGame {
       if (target.currentRadius <= 0) {
         scoreManager.addScore('miss')
         audioManager.playSFX('miss')
-        this.showPrompt('MISS', 0xff4444)
+        this.showPrompt(this.getFeedbackText('miss'), 0xff4444)
         this.callbacks.onScoreUpdate(GAME_CONFIG.graffiti.missScore, 'miss')
         this.removeTarget(target)
         return

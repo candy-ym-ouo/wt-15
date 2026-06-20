@@ -193,7 +193,8 @@ export class GameEngine {
     this.currentLine = line
     this.currentPhase = 0
     this.currentDifficultyParams = this.computeDifficultyParams()
-    scoreManager.setScoreMultiplier(this.currentDifficultyParams.scoreMultiplier)
+    const stationScoreMultiplier = (station.graffiti && station.graffiti.scoreMultiplier) || 1
+    scoreManager.setScoreMultiplier(this.currentDifficultyParams.scoreMultiplier * stationScoreMultiplier)
     this._startNextPhase()
   }
 
@@ -205,6 +206,7 @@ export class GameEngine {
 
     const phase = this.phaseOrder[this.currentPhase]
     audioManager.playSFX('click')
+    const station = this.currentStation
 
     this._fadeTransition(() => {
       this._hideAllScenes()
@@ -212,14 +214,14 @@ export class GameEngine {
       if (phase === 'graffiti') {
         this.state = GameState.GRAFFITI
         this.graffitiGame.setDifficulty(this.currentDifficultyParams.shrinkSpeedMultiplier)
-        this.graffitiGame.start()
+        this.graffitiGame.start(station)
       } else if (phase === 'patrol') {
         this.state = GameState.PATROL
         this.patrolGame.setDifficulty(
           this.currentDifficultyParams.patrolRangeMultiplier,
           this.currentDifficultyParams.extraGuardSpeed
         )
-        this.patrolGame.start()
+        this.patrolGame.start(station)
       }
 
       this.callbacks.onStateChange(this.state, {
@@ -229,7 +231,8 @@ export class GameEngine {
         totalPhases: this.phaseOrder.length,
         difficulty: this.difficulty,
         difficultyParams: this.currentDifficultyParams,
-        stationsCompleted: this.stationsCompleted
+        stationsCompleted: this.stationsCompleted,
+        feedback: station ? station.feedback : null
       })
     }, 400)
   }

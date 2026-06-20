@@ -29,6 +29,28 @@ export class PatrolAvoid {
     this.extraGuardSpeed = extraGuardSpeed || 0
   }
 
+  getStationConfig(station, key, defaultValue) {
+    if (station && station.patrol && station.patrol[key] !== undefined) {
+      return station.patrol[key]
+    }
+    return GAME_CONFIG.patrol[key] !== undefined ? GAME_CONFIG.patrol[key] : defaultValue
+  }
+
+  getFeedbackText(type) {
+    if (this.station && this.station.feedback && this.station.feedback[type]) {
+      const options = this.station.feedback[type]
+      if (Array.isArray(options)) {
+        return options[Math.floor(Math.random() * options.length)]
+      }
+      return options
+    }
+    const defaults = {
+      caught: '被发现了!',
+      start: '躲避巡逻!'
+    }
+    return defaults[type] || ''
+  }
+
   setup() {
     this.app.stage.addChild(this.container)
 
@@ -97,6 +119,8 @@ export class PatrolAvoid {
   }
 
   createSafeZones() {
+    const safeZoneRadius = this.getStationConfig(this.station, 'safeZoneRadius', GAME_CONFIG.patrol.safeZoneRadius)
+
     const zonePositions = [
       { x: 80, y: 250 },
       { x: GAME_CONFIG.width - 80, y: 250 },
@@ -108,7 +132,7 @@ export class PatrolAvoid {
       const zone = new PIXI.Container()
       zone.x = pos.x
       zone.y = pos.y
-      zone.radius = GAME_CONFIG.patrol.safeZoneRadius
+      zone.radius = safeZoneRadius
       zone.playerRadius = 22
       zone.active = false
 
@@ -150,6 +174,15 @@ export class PatrolAvoid {
       this.safeZones.push(zone)
       this.container.addChild(zone)
     })
+  }
+
+  recreateSafeZones() {
+    this.safeZones.forEach(zone => {
+      this.container.removeChild(zone)
+      zone.destroy()
+    })
+    this.safeZones = []
+    this.createSafeZones()
   }
 
   createPlayer() {
@@ -226,10 +259,12 @@ export class PatrolAvoid {
 
     guard.addChild(body, hat, badge)
 
-    guard.speed = (GAME_CONFIG.patrol.guardSpeed + this.extraGuardSpeed) * (0.8 + Math.random() * 0.4)
+    const baseGuardSpeed = this.getStationConfig(this.station, 'guardSpeed', GAME_CONFIG.patrol.guardSpeed)
+    guard.speed = (baseGuardSpeed + this.extraGuardSpeed) * (0.8 + Math.random() * 0.4)
     guard.angle = Math.random() * Math.PI * 2
     guard.visionAngle = Math.random() * Math.PI * 2
-    guard.visionRange = GAME_CONFIG.patrol.flashRadius * this.patrolRangeMultiplier
+    const baseFlashRadius = this.getStationConfig(this.station, 'flashRadius', GAME_CONFIG.patrol.flashRadius)
+    guard.visionRange = baseFlashRadius * this.patrolRangeMultiplier
     guard.visionSpread = Math.PI / 3
     guard.changeTimer = 1 + Math.random() * 2
 
@@ -244,7 +279,8 @@ export class PatrolAvoid {
   }
 
   spawnGuard() {
-    if (this.guards.length >= GAME_CONFIG.patrol.maxGuards) return
+    const maxGuards = this.getStationConfig(this.station, 'maxGuards', GAME_CONFIG.patrol.maxGuards)
+    if (this.guards.length >= maxGuards) return
 
     const edges = [
       { x: 50, y: 150 + Math.random() * (GAME_CONFIG.height - 300) },
@@ -258,6 +294,8 @@ export class PatrolAvoid {
   }
 
   createLaserBeam() {
+    const laserEnabled = this.getStationConfig(this.station, 'laserEnabled', false)
+    if (!laserEnabled) return
     if (Math.random() > 0.5) return
 
     const horizontal = Math.random() > 0.5
@@ -281,12 +319,13 @@ export class PatrolAvoid {
     this.container.addChild(beam)
   }
 
-  start() {
+  start(station) {
     this.isRunning = true
     this.isCaught = false
     this.gameTime = 0
     this.spawnTimer = 1500
     this.laserTimer = 3000
+    this.station = station || null
 
     this.guards.forEach(g => {
       this.container.removeChild(g)
@@ -300,9 +339,15 @@ export class PatrolAvoid {
     })
     this.laserBeams = []
 
+    if (station) {
+      this.duration = this.getStationConfig(station, 'duration', 20)
+      this.recreateSafeZones()
+    }
+
     this.createPlayer()
     this.container.visible = true
-    this.showPrompt('躲避巡逻!', 0x3498db)
+    const startText = this.getFeedbackText('start')
+    this.showPrompt(startText, 0x3498db)
     this.setupInput()
   }
 
@@ -418,7 +463,8 @@ export class PatrolAvoid {
     const remaining = Math.max(0, this.duration - this.gameTime)
     this.updateTimerBar(remaining / this.duration)
 
-    if (this.spawnTimer >= GAME_CONFIG.patrol.spawnInterval) {
+    const spawnInterval = this.getStationConfig(this.station, 'spawnInterval', GAME_CONFIG.patrol.spawnInterval)
+    if (this.spawnTimer >= spawnInterval) {
       this.spawnTimer = 0
       this.spawnGuard()
     }
@@ -573,7 +619,7 @@ export class PatrolAvoid {
       const dist = Math.sqrt(dx * dx + dy * dy)
 
       if (dist < 40) {
-        this.onCaught('被发现了!')
+        this.onCaught()
         return
       }
 
@@ -585,7 +631,7 @@ export class PatrolAvoid {
 
         const effectiveSpread = guard.isFlashing ? guard.visionSpread * 2 : guard.visionSpread / 2
         if (Math.abs(angleDiff) < effectiveSpread) {
-          this.onCaught('被发现了!')
+          this.onCaught()
           return
         }
       }
@@ -595,12 +641,12 @@ export class PatrolAvoid {
       if (beam.progress >= beam.warningDuration && beam.progress < beam.totalDuration) {
         if (beam.isHorizontal) {
           if (Math.abs(this.player.y - beam.y) < beam.width / 2 + 15) {
-            this.onCaught('激光警报!')
+            this.onCaught()
             return
           }
         } else {
           if (Math.abs(this.player.x - beam.x) < beam.width / 2 + 15) {
-            this.onCaught('激光警报!')
+            this.onCaught()
             return
           }
         }
@@ -608,12 +654,12 @@ export class PatrolAvoid {
     }
   }
 
-  onCaught(message) {
+  onCaught() {
     this.isCaught = true
     this.isRunning = false
 
     audioManager.playSFX('caught')
-    this.showPrompt(message, 0xff4444)
+    this.showPrompt(this.getFeedbackText('caught'), 0xff4444)
     scoreManager.addScore('caught')
     this.callbacks.onScoreUpdate(-GAME_CONFIG.patrol.caughtPenalty, 'caught')
 
