@@ -12,9 +12,14 @@ export class MapScene {
     this.stationNodes = []
     this.currentStationIndex = 0
     this.currentLineIndex = 0
+    this.currentLine = null
     this.train = null
     this.trainTargetStation = null
     this.isTransitioning = false
+    this.bgParticles = []
+    this.lineGlowLayers = []
+    this.stationHighlights = []
+    this.themeTween = null
     this.setup()
   }
 
@@ -27,9 +32,16 @@ export class MapScene {
     this.themeDecorations = new PIXI.Container()
     this.container.addChild(this.themeDecorations)
 
+    this.bgParticleContainer = new PIXI.Container()
+    this.container.addChild(this.bgParticleContainer)
+
     this.lineGlowLayers = []
+    this.stationHighlightLayer = new PIXI.Container()
+    this.container.addChild(this.stationHighlightLayer)
+
     this.drawBackground()
     this.drawThemeDecorations()
+    this.createBgParticles()
 
     const title = new PIXI.Text('地铁线路图', {
       fontFamily: 'Arial',
@@ -60,22 +72,91 @@ export class MapScene {
     this.createLegend()
   }
 
-  drawBackground() {
+  drawBackground(targetLine = null) {
     this.bg.clear()
     
-    const gradient = this.bg.createLinearGradient
-    this.bg.beginFill(0x0a0a1a, 0.95)
+    const line = targetLine || this.currentLine || LINES[0]
+    const theme = line.theme
+    const mapTheme = theme.map
+    
+    const bgColor = mapTheme?.bgColor || '#0a0a1a'
+    const lineColor = parseInt(line.color.replace('#', '0x'))
+    
+    const bgNum = parseInt(bgColor.replace('#', '0x'))
+    this.bg.beginFill(bgNum, 0.95)
     this.bg.drawRect(0, 0, GAME_CONFIG.width, GAME_CONFIG.height)
     this.bg.endFill()
-
+    
+    const gradientOverlay = new PIXI.Graphics()
+    const centerY = line.id === 'line1' ? 350 : 850
+    const gradientRadius = 600
+    
+    for (let i = 0; i < 5; i++) {
+      const alpha = 0.15 - i * 0.03
+      const radius = gradientRadius - i * 80
+      gradientOverlay.beginFill(lineColor, alpha)
+      gradientOverlay.drawCircle(GAME_CONFIG.width / 2, centerY, radius)
+      gradientOverlay.endFill()
+    }
+    this.bg.addChild(gradientOverlay)
+    
     for (let i = 0; i < 50; i++) {
       const x = Math.random() * GAME_CONFIG.width
       const y = Math.random() * GAME_CONFIG.height
       const size = Math.random() * 2 + 0.5
-      this.bg.beginFill(0xffffff, Math.random() * 0.3 + 0.1)
+      const distToCenter = Math.sqrt((x - GAME_CONFIG.width / 2) ** 2 + (y - centerY) ** 2)
+      const alpha = Math.random() * 0.3 + 0.1 + Math.max(0, 1 - distToCenter / gradientRadius) * 0.3
+      this.bg.beginFill(lineColor, alpha)
       this.bg.drawCircle(x, y, size)
       this.bg.endFill()
     }
+  }
+
+  createBgParticles() {
+    this.bgParticleContainer.removeChildren()
+    this.bgParticles = []
+    
+    for (let i = 0; i < 30; i++) {
+      const particle = new PIXI.Graphics()
+      const size = Math.random() * 4 + 2
+      particle.beginFill(0xffffff, Math.random() * 0.5 + 0.2)
+      particle.drawCircle(0, 0, size)
+      particle.endFill()
+      
+      particle.x = Math.random() * GAME_CONFIG.width
+      particle.y = Math.random() * GAME_CONFIG.height
+      particle.vx = (Math.random() - 0.5) * 0.3
+      particle.vy = (Math.random() - 0.5) * 0.3
+      particle.baseAlpha = particle.alpha
+      
+      this.bgParticles.push(particle)
+      this.bgParticleContainer.addChild(particle)
+    }
+  }
+
+  updateBgParticles() {
+    const line = this.currentLine || LINES[0]
+    const lineColor = parseInt(line.color.replace('#', '0x'))
+    const centerY = line.id === 'line1' ? 350 : 850
+    
+    this.bgParticles.forEach(particle => {
+      particle.x += particle.vx
+      particle.y += particle.vy
+      
+      if (particle.x < 0) particle.x = GAME_CONFIG.width
+      if (particle.x > GAME_CONFIG.width) particle.x = 0
+      if (particle.y < 0) particle.y = GAME_CONFIG.height
+      if (particle.y > GAME_CONFIG.height) particle.y = 0
+      
+      const distToCenter = Math.sqrt((particle.x - GAME_CONFIG.width / 2) ** 2 + (particle.y - centerY) ** 2)
+      const glowFactor = Math.max(0, 1 - distToCenter / 500)
+      particle.alpha = particle.baseAlpha * (0.5 + glowFactor * 0.5)
+      
+      particle.clear()
+      particle.beginFill(lineColor, particle.alpha)
+      particle.drawCircle(0, 0, 3 + glowFactor * 2)
+      particle.endFill()
+    })
   }
 
   drawThemeDecorations() {
@@ -121,7 +202,11 @@ export class MapScene {
       const lineColor = parseInt(line.color.replace('#', '0x'))
       const theme = line.theme
       
-      const glowGraphics = new PIXI.Graphics()
+      const glowGraphics = new PIXI.Container()
+      const glow1 = new PIXI.Graphics()
+      const glow2 = new PIXI.Graphics()
+      glowGraphics.addChild(glow1, glow2)
+      
       const mainGraphics = new PIXI.Graphics()
       const branchGraphics = new PIXI.Graphics()
 
@@ -130,18 +215,19 @@ export class MapScene {
           const prereqStation = line.stations.find(s => s.id === station.unlockCondition.prerequisite)
           if (prereqStation) {
             const g = station.isBranch ? branchGraphics : mainGraphics
-            const glowG = station.isBranch ? branchGraphics : glowGraphics
+            const glowG1 = station.isBranch ? branchGraphics : glow1
+            const glowG2 = station.isBranch ? branchGraphics : glow2
             
             if (station.isBranch) {
               g.lineStyle(4, 0x9b59b6, 0.7)
             } else {
-              glowG.lineStyle(14, lineColor, 0.15)
-              glowG.moveTo(prereqStation.x, prereqStation.y)
-              glowG.lineTo(station.x, station.y)
+              glowG1.lineStyle(16, lineColor, 0.1)
+              glowG1.moveTo(prereqStation.x, prereqStation.y)
+              glowG1.lineTo(station.x, station.y)
               
-              glowG.lineStyle(10, lineColor, 0.25)
-              glowG.moveTo(prereqStation.x, prereqStation.y)
-              glowG.lineTo(station.x, station.y)
+              glowG2.lineStyle(10, lineColor, 0.2)
+              glowG2.moveTo(prereqStation.x, prereqStation.y)
+              glowG2.lineTo(station.x, station.y)
               
               g.lineStyle(6, lineColor, 0.8)
             }
@@ -155,7 +241,51 @@ export class MapScene {
       this.container.addChild(mainGraphics)
       this.container.addChild(branchGraphics)
       
-      this.lineGlowLayers.push({ line, glow: glowGraphics, main: mainGraphics })
+      this.lineGlowLayers.push({ 
+        line, 
+        glowContainer: glowGraphics,
+        glow1, 
+        glow2, 
+        main: mainGraphics,
+        baseAlpha: 1
+      })
+    })
+  }
+
+  updateLineGlow() {
+    this.lineGlowLayers.forEach(layer => {
+      const isActive = this.currentLine && layer.line.id === this.currentLine.id
+      const mapTheme = layer.line.theme.map
+      const lineColor = parseInt(layer.line.color.replace('#', '0x'))
+      
+      if (isActive) {
+        layer.glowContainer.alpha = 1
+        layer.main.alpha = 1
+        
+        layer.glow1.clear()
+        layer.glow2.clear()
+        
+        layer.line.stations.forEach(station => {
+          if (station.unlockCondition && station.unlockCondition.type === 'score') {
+            const prereqStation = layer.line.stations.find(s => s.id === station.unlockCondition.prerequisite)
+            if (prereqStation && !station.isBranch) {
+              const time = performance.now() / 1000
+              const pulseAlpha = 0.15 + Math.sin(time * 2) * 0.05
+              
+              layer.glow1.lineStyle(20, lineColor, pulseAlpha * 0.8)
+              layer.glow1.moveTo(prereqStation.x, prereqStation.y)
+              layer.glow1.lineTo(station.x, station.y)
+              
+              layer.glow2.lineStyle(12, lineColor, pulseAlpha * 1.5)
+              layer.glow2.moveTo(prereqStation.x, prereqStation.y)
+              layer.glow2.lineTo(station.x, station.y)
+            }
+          }
+        })
+      } else {
+        layer.glowContainer.alpha = 0.3
+        layer.main.alpha = 0.6
+      }
     })
   }
 
@@ -171,6 +301,9 @@ export class MapScene {
         stationContainer.y = station.y
         stationContainer.eventMode = 'static'
         stationContainer.cursor = isUnlocked ? 'pointer' : 'default'
+
+        const pulseRing = new PIXI.Graphics()
+        stationContainer.addChild(pulseRing)
 
         const outerRing = new PIXI.Graphics()
         if (station.isBranch) {
@@ -305,10 +438,50 @@ export class MapScene {
           line,
           index: idx,
           lineIdx,
-          isUnlocked
+          isUnlocked,
+          pulseRing,
+          outerRing,
+          innerCircle,
+          core,
+          label
         })
         this.container.addChild(stationContainer)
       })
+    })
+  }
+
+  updateStationHighlights() {
+    const time = performance.now() / 1000
+    
+    this.stationNodes.forEach(node => {
+      const isActiveLine = this.currentLine && node.line.id === this.currentLine.id
+      const isUnlocked = node.isUnlocked
+      const lineColor = parseInt(node.line.color.replace('#', '0x'))
+      const mapTheme = node.line.theme.map
+      const pulseColor = mapTheme?.stationPulse ? parseInt(mapTheme.stationPulse.replace('#', '0x')) : lineColor
+      
+      if (isActiveLine && isUnlocked) {
+        node.container.alpha = 1
+        node.label.style.fill = 0xffffff
+        
+        const pulsePhase = (time * 2 + node.index * 0.5) % (Math.PI * 2)
+        const pulseSize = 1 + Math.sin(pulsePhase) * 0.3
+        const pulseAlpha = 0.4 + Math.sin(pulsePhase) * 0.2
+        
+        node.pulseRing.clear()
+        node.pulseRing.lineStyle(3, pulseColor, pulseAlpha)
+        node.pulseRing.drawCircle(0, 0, 35 * pulseSize)
+        node.pulseRing.endFill()
+        
+        node.pulseRing.beginFill(pulseColor, pulseAlpha * 0.3)
+        node.pulseRing.drawCircle(0, 0, 28)
+        node.pulseRing.endFill()
+      } else {
+        node.container.alpha = isUnlocked ? 0.6 : 0.4
+        node.label.style.fill = isUnlocked ? 0xcccccc : 0x666677
+        
+        node.pulseRing.clear()
+      }
     })
   }
 
@@ -444,6 +617,7 @@ export class MapScene {
     this.currentStationIndex = idx
     
     this.updateTrainColor(line)
+    this.updateTheme(line)
 
     if (!scoreManager.unlockedStations.includes(station.id)) {
       scoreManager.unlockedStations.push(station.id)
@@ -458,14 +632,75 @@ export class MapScene {
     }, 300)
   }
 
+  updateTheme(targetLine) {
+    if (!targetLine || targetLine.id === this.currentLine?.id) return
+    
+    this.currentLine = targetLine
+    this.drawBackground(targetLine)
+    
+    this.themeDecorations.alpha = 0
+    this.drawThemeDecorations()
+    
+    const startTime = performance.now()
+    const duration = 500
+    
+    const tween = () => {
+      const elapsed = performance.now() - startTime
+      const progress = Math.min(elapsed / duration, 1)
+      const eased = 1 - Math.pow(1 - progress, 3)
+      
+      this.themeDecorations.alpha = eased * 0.15
+      
+      if (progress < 1) {
+        requestAnimationFrame(tween)
+      }
+    }
+    tween()
+  }
+
+  startAnimationLoop() {
+    if (this.animationId) return
+    
+    const animate = () => {
+      if (this.container.visible) {
+        this.updateBgParticles()
+        this.updateLineGlow()
+        this.updateStationHighlights()
+      }
+      this.animationId = requestAnimationFrame(animate)
+    }
+    this.animationId = requestAnimationFrame(animate)
+  }
+
+  stopAnimationLoop() {
+    if (this.animationId) {
+      cancelAnimationFrame(this.animationId)
+      this.animationId = null
+    }
+  }
+
   show() {
     this.container.visible = true
     this.refreshStationStatus()
     this.updateNextGoalPreview()
+    this.startAnimationLoop()
+    
+    if (!this.currentLine) {
+      this.currentLine = LINES[0]
+      this.drawBackground(this.currentLine)
+    }
   }
 
   hide() {
     this.container.visible = false
+    this.stopAnimationLoop()
+  }
+
+  setCurrentLine(line) {
+    if (line && line.id !== this.currentLine?.id) {
+      this.currentLine = line
+      this.drawBackground(line)
+    }
   }
 
   refreshStationStatus() {
@@ -486,6 +721,9 @@ export class MapScene {
         stationContainer.y = station.y
         stationContainer.eventMode = 'static'
         stationContainer.cursor = isUnlocked ? 'pointer' : 'default'
+
+        const pulseRing = new PIXI.Graphics()
+        stationContainer.addChild(pulseRing)
 
         const outerRing = new PIXI.Graphics()
         if (station.isBranch) {
@@ -620,7 +858,12 @@ export class MapScene {
           line,
           index: idx,
           lineIdx,
-          isUnlocked
+          isUnlocked,
+          pulseRing,
+          outerRing,
+          innerCircle,
+          core,
+          label
         })
         this.container.addChild(stationContainer)
       })

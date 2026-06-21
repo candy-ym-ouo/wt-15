@@ -173,6 +173,9 @@ export class GameEngine {
   showMap() {
     this._fadeTransition(() => {
       this._hideAllScenes()
+      if (this.currentLine) {
+        this.mapScene.setCurrentLine(this.currentLine)
+      }
       this.mapScene.show()
       this.state = GameState.MAP
       this.callbacks.onStateChange(this.state)
