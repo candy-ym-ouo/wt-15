@@ -1107,6 +1107,53 @@ class ScoreManager {
     return allStations.slice(0, 5)
   }
 
+  getStationChallengeRank(stationId) {
+    const allStations = []
+    for (const line of LINES) {
+      for (const station of line.stations) {
+        if (station.unlockCondition?.type === 'default') continue
+        if (this.unlockedStations.includes(station.id)) continue
+
+        const prereqId = station.unlockCondition?.prerequisite
+        const prereqUnlocked = prereqId ? this.unlockedStations.includes(prereqId) : false
+        const prereqScore = prereqId ? this.getStationScore(prereqId) : 0
+        const minScore = station.unlockCondition?.minScore || 0
+        const progress = minScore > 0 ? Math.min(1, prereqScore / minScore) : 0
+
+        let priority = 0
+        if (prereqUnlocked && progress >= 1) priority = 100
+        else if (prereqUnlocked && progress >= 0.7) priority = 80
+        else if (prereqUnlocked && progress > 0) priority = 60
+        else if (prereqUnlocked) priority = 40
+        else priority = 10 + progress * 20
+
+        if (station.isBranch) priority -= 5
+
+        allStations.push({
+          stationId: station.id,
+          stationName: station.name,
+          lineName: line.name,
+          lineColor: line.color,
+          isBranch: station.isBranch || false,
+          minScore,
+          currentScore: prereqScore,
+          progress,
+          prereqUnlocked,
+          priority
+        })
+      }
+    }
+
+    allStations.sort((a, b) => b.priority - a.priority)
+
+    const idx = allStations.findIndex(s => s.stationId === stationId)
+    return {
+      rank: idx >= 0 ? idx + 1 : null,
+      total: allStations.length,
+      allStations
+    }
+  }
+
   getRecentTasks() {
     const tasks = []
     const totalHits = this.perfectCount + this.goodCount + this.missCount

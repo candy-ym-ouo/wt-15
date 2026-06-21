@@ -1096,7 +1096,6 @@ export class MapScene {
 
     const rewardsData = scoreManager.getStationRewards(station.id)
     const unlockReq = scoreManager.getUnlockRequirement(station)
-    const recommended = scoreManager.getRecommendedChallengeOrder()
     const stationInfo = scoreManager.getStationInfo(station.id)
     const lineColor = parseInt(line.color.replace('#', '0x'))
 
@@ -1408,12 +1407,13 @@ export class MapScene {
     this.stationDetailContainer.addChild(recTitle)
     curY += 32
 
-    const stationInRec = recommended.find(r => r.stationId === station.id)
-    const recRank = stationInRec ? recommended.indexOf(stationInRec) + 1 : null
+    const rankInfo = scoreManager.getStationChallengeRank(station.id)
 
-    if (recRank !== null) {
+    if (rankInfo.rank !== null) {
+      const recRank = rankInfo.rank
+      const rankColor = recRank <= 1 ? 0x2ecc71 : recRank <= 2 ? 0xf39c12 : recRank <= 3 ? 0x3498db : 0x9b59b6
+
       const recRankBg = new PIXI.Graphics()
-      const rankColor = recRank <= 1 ? 0x2ecc71 : recRank <= 2 ? 0xf39c12 : 0x3498db
       recRankBg.beginFill(rankColor, 0.2)
       recRankBg.drawRoundedRect(panelX + 45, curY, 60, 30, 8)
       recRankBg.endFill()
@@ -1430,27 +1430,40 @@ export class MapScene {
       recRankText.y = curY + 7
       this.stationDetailContainer.addChild(recRankText)
 
+      let rankDesc = ''
+      if (recRank <= 1) rankDesc = '最优先挑战！'
+      else if (recRank <= 2) rankDesc = '推荐优先挑战'
+      else if (recRank <= 3) rankDesc = '建议接下来挑战'
+      else if (recRank <= Math.ceil(rankInfo.total / 2)) rankDesc = '中期目标'
+      else rankDesc = '后期挑战，可先积累实力'
+
       const recLabel = new PIXI.Text(
-        recRank <= 1 ? '最优先挑战！' : recRank <= 2 ? '推荐优先挑战' : '可后续挑战',
+        `${rankDesc}（共 ${rankInfo.total} 个待解锁）`,
         {
           fontFamily: 'Arial',
-          fontSize: 14,
-          fill: 0xffffff
+          fontSize: 13,
+          fill: 0xcccccc
         }
       )
       recLabel.x = panelX + 120
-      recLabel.y = curY + 6
+      recLabel.y = curY + 7
       this.stationDetailContainer.addChild(recLabel)
       curY += 40
     }
 
-    recommended.slice(0, 4).forEach((rec, i) => {
+    const displayList = this._buildRecDisplayList(rankInfo, station.id, 4)
+    displayList.forEach((rec, i) => {
       const rLineColor = parseInt(rec.lineColor.replace('#', '0x'))
+      const isCurrent = rec.stationId === station.id
 
       const rowBg = new PIXI.Graphics()
-      rowBg.beginFill(0xffffff, i === (recRank ? recRank - 1 : -1) ? 0.08 : 0.03)
+      rowBg.beginFill(0xffffff, isCurrent ? 0.1 : 0.03)
       rowBg.drawRoundedRect(panelX + 45, curY, panelW - 90, 34, 8)
       rowBg.endFill()
+      if (isCurrent) {
+        rowBg.lineStyle(1, 0xf39c12, 0.5)
+        rowBg.drawRoundedRect(panelX + 45, curY, panelW - 90, 34, 8)
+      }
       this.stationDetailContainer.addChild(rowBg)
 
       const rankDot = new PIXI.Graphics()
@@ -1459,7 +1472,7 @@ export class MapScene {
       rankDot.endFill()
       this.stationDetailContainer.addChild(rankDot)
 
-      const rankNum = new PIXI.Text(`${i + 1}`, {
+      const rankNum = new PIXI.Text(`${rec.displayRank}`, {
         fontFamily: 'Arial',
         fontSize: 10,
         fontWeight: 'bold',
@@ -1470,12 +1483,15 @@ export class MapScene {
       rankNum.y = curY + 11
       this.stationDetailContainer.addChild(rankNum)
 
-      const recName = new PIXI.Text(rec.stationName, {
-        fontFamily: 'Arial',
-        fontSize: 13,
-        fontWeight: 'bold',
-        fill: rec.stationId === station.id ? 0xf39c12 : 0xffffff
-      })
+      const recName = new PIXI.Text(
+        isCurrent ? `▸ ${rec.stationName}` : rec.stationName,
+        {
+          fontFamily: 'Arial',
+          fontSize: 13,
+          fontWeight: 'bold',
+          fill: isCurrent ? 0xf39c12 : 0xffffff
+        }
+      )
       recName.x = panelX + 88
       recName.y = curY + 8
       this.stationDetailContainer.addChild(recName)
@@ -1541,6 +1557,46 @@ export class MapScene {
       this.stationDetailData = null
       this.stationDetailCloseTarget = null
     }
+  }
+
+  _buildRecDisplayList(rankInfo, currentStationId, maxItems) {
+    const { allStations, rank } = rankInfo
+    if (!allStations || allStations.length === 0) return []
+
+    const result = []
+    const currentIdx = rank !== null ? rank - 1 : -1
+    const currentInTop = currentIdx < maxItems
+
+    const added = new Set()
+
+    if (currentInTop || currentIdx < 0) {
+      for (let i = 0; i < Math.min(maxItems, allStations.length); i++) {
+        const s = allStations[i]
+        result.push({ ...s, displayRank: i + 1 })
+        added.add(s.stationId)
+      }
+    } else {
+      const before = Math.floor((maxItems - 1) / 2)
+      const after = maxItems - 1 - before
+
+      let start = Math.max(0, currentIdx - before)
+      let end = Math.min(allStations.length, start + maxItems)
+      if (end - start < maxItems) {
+        start = Math.max(0, end - maxItems)
+      }
+
+      for (let i = start; i < end; i++) {
+        const s = allStations[i]
+        result.push({ ...s, displayRank: i + 1 })
+        added.add(s.stationId)
+      }
+    }
+
+    if (currentIdx >= 0 && !added.has(currentStationId)) {
+      result.push({ ...allStations[currentIdx], displayRank: currentIdx + 1 })
+    }
+
+    return result
   }
 
   updateNextGoalPreview() {
