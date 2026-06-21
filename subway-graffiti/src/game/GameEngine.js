@@ -5,6 +5,7 @@ import { scoreManager } from './ScoreManager.js'
 import { profileManager } from './ProfileManager.js'
 import { battlePassManager } from './BattlePassManager.js'
 import { cityEventManager } from './CityEventManager.js'
+import { questManager } from './QuestManager.js'
 import { MapScene } from './MapScene.js'
 import { GraffitiGame } from './GraffitiGame.js'
 import { PatrolAvoid } from './PatrolAvoid.js'
@@ -21,7 +22,9 @@ export const GameState = {
   REPLAY: 'replay',
   PROFILES: 'profiles',
   SEASON_PASS: 'season_pass',
-  WORKSHOP: 'workshop'
+  WORKSHOP: 'workshop',
+  CUTSCENE: 'cutscene',
+  CHAPTER_COMPLETE: 'chapter_complete'
 }
 
 export class GameEngine {
@@ -44,6 +47,41 @@ export class GameEngine {
     this._preStationStatsSnapshot = null
 
     this._onResize = this._onResize.bind(this)
+    this._setupQuestListeners()
+  }
+
+  _setupQuestListeners() {
+    questManager.on('cutscene_start', (cutscene) => {
+      this._showCutscene(cutscene)
+    })
+
+    questManager.on('quest_completed', (quest) => {
+      if (this.callbacks.onQuestCompleted) {
+        this.callbacks.onQuestCompleted(quest)
+      }
+    })
+
+    questManager.on('reward_claimed', (data) => {
+      if (this.callbacks.onRewardClaimed) {
+        this.callbacks.onRewardClaimed(data)
+      }
+    })
+
+    questManager.on('chapter_completed', (data) => {
+      this._showChapterComplete(data)
+    })
+
+    questManager.on('chapter_unlocked', (chapterId) => {
+      if (this.callbacks.onChapterUnlocked) {
+        this.callbacks.onChapterUnlocked(chapterId)
+      }
+    })
+
+    questManager.on('quest_reset', () => {
+      if (this.callbacks.onQuestReset) {
+        this.callbacks.onQuestReset()
+      }
+    })
   }
 
   computeDifficultyParams() {
@@ -113,6 +151,10 @@ export class GameEngine {
 
     this._setupScenes()
     this._setupTicker()
+
+    scoreManager.setOnComboUpdate((combo) => {
+      questManager.onComboUpdate(combo)
+    })
 
     window.addEventListener('resize', this._onResize)
     this._onResize()
@@ -234,9 +276,61 @@ export class GameEngine {
     this.callbacks.onStateChange(this.state)
   }
 
+  _showCutscene(cutscene) {
+    const prevState = this.state
+    this._previousStateBeforeCutscene = prevState
+    this.state = GameState.CUTSCENE
+    this.callbacks.onStateChange(this.state, {
+      cutscene,
+      previousState: prevState
+    })
+  }
+
+  closeCutscene() {
+    questManager.closeCutscene()
+    if (this._previousStateBeforeCutscene) {
+      this.state = this._previousStateBeforeCutscene
+      this._previousStateBeforeCutscene = null
+    } else {
+      this.showMap()
+    }
+    this.callbacks.onStateChange(this.state)
+  }
+
+  _showChapterComplete(data) {
+    const { chapter, reward } = data
+    this.state = GameState.CHAPTER_COMPLETE
+    this.callbacks.onStateChange(this.state, {
+      chapter,
+      reward
+    })
+  }
+
+  continueAfterChapterComplete() {
+    questManager.save()
+    this.showMap()
+  }
+
+  startQuest(questId) {
+    return questManager.startQuest(questId)
+  }
+
+  startNextQuest() {
+    return questManager.startNextQuest()
+  }
+
+  claimQuestReward(questId) {
+    return questManager.claimQuestReward(questId)
+  }
+
+  getQuestManager() {
+    return questManager
+  }
+
   switchProfile(profileId) {
     if (profileManager.switchProfile(profileId)) {
       scoreManager.loadProfile(profileId)
+      questManager.loadProfile(profileId)
       this._resetGameEngineState()
       this.showMenu()
       if (this.callbacks.onProfileSwitched) {
@@ -325,6 +419,7 @@ export class GameEngine {
     scoreManager.setScoreMultiplier(totalMultiplier)
     scoreManager.setCityEventEffects(stationEffects)
     scoreManager.startStation(station)
+    questManager.onStationStart(station.id)
 
     if (this.callbacks.onStationEffectsApplied) {
       this.callbacks.onStationEffectsApplied(stationEffects, station.id)
@@ -467,8 +562,16 @@ export class GameEngine {
       caughtCount: scoreManager.stationCaughtCount
     })
 
+    const completedQuests = questManager.onStationComplete(this.currentStation.id, {
+      stationScore,
+      evaluation
+    })
+
     scoreManager._syncBattlePassSkins()
     scoreManager.save()
+    questManager.save()
+
+    const questSummary = questManager.getQuestSummary()
 
     this.state = GameState.STATION_COMPLETE
     this.callbacks.onStateChange(this.state, {
@@ -486,6 +589,11 @@ export class GameEngine {
         ...battlePassResult,
         before: preStationStats?.battlePass,
         after: battlePassManager.getSummary()
+      },
+      quest: {
+        completedQuests,
+        summary: questSummary,
+        pendingCutscene: questManager.currentCutscene
       }
     })
   }

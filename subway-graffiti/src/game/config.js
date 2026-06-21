@@ -1627,3 +1627,435 @@ export const LINES = [
     ]
   }
 ]
+
+export const QUEST_LINES = {
+  chapters: [
+    {
+      id: 'chapter_1',
+      name: '第一章 · 街头初露',
+      description: '刚刚踏入地铁涂鸦世界的你，需要证明自己的实力。从最基础的站点开始，一步步建立你的名声。',
+      icon: '🎨',
+      color: '#e94560',
+      order: 1,
+      unlockedByDefault: true,
+      quests: [
+        {
+          id: 'quest_1_1',
+          name: '涂鸦启程',
+          description: '在1号线「起点站」完成首次涂鸦挑战',
+          icon: '🚀',
+          type: 'station_clear',
+          target: { stationId: 's1-1', minScore: 500 },
+          cutscenes: {
+            start: {
+              title: '新的旅程',
+              text: '欢迎来到地铁涂鸦世界！\n这里是涂鸦艺术家的天堂，\n也是保安巡逻的战场。\n\n拿起你的喷漆，在「起点站」\n留下你的第一个印记吧！',
+              speaker: '神秘导师',
+              avatar: '🎭'
+            },
+            complete: {
+              title: '首战告捷',
+              text: '干得漂亮！\n你已经成功在「起点站」\n留下了你的涂鸦作品。\n\n继续前进，下一站等着你！',
+              speaker: '神秘导师',
+              avatar: '🎭'
+            }
+          },
+          rewards: {
+            score: 500,
+            battlePassExp: 100,
+            unlockStations: ['s1-2'],
+            message: '解锁了新站点「老街区」！'
+          },
+          prerequisiteQuests: []
+        },
+        {
+          id: 'quest_1_2',
+          name: '老街风采',
+          description: '在1号线「老街区」获得600分以上',
+          icon: '🏘️',
+          type: 'station_score',
+          target: { stationId: 's1-2', minScore: 600 },
+          cutscenes: {
+            start: {
+              title: '老街的召唤',
+              text: '「老街区」的砖墙\n承载着这座城市的记忆。\n\n用你的涂鸦，\n为这片老街区注入新的活力！\n\n目标：获得 600 分以上',
+              speaker: '神秘导师',
+              avatar: '🎭'
+            },
+            complete: {
+              title: '复古与潮流',
+              text: '完美！\n你在老街区的作品\n将传统与现代完美融合。\n\n你的涂鸦天赋正在显现！',
+              speaker: '神秘导师',
+              avatar: '🎭'
+            }
+          },
+          rewards: {
+            score: 300,
+            battlePassExp: 80,
+            unlockStations: ['s1-3'],
+            message: '解锁了新站点「商业中心」！'
+          },
+          prerequisiteQuests: ['quest_1_1']
+        },
+        {
+          id: 'quest_1_3',
+          name: '连击新秀',
+          description: '在任意站点达成 10 连击',
+          icon: '🔥',
+          type: 'combo_target',
+          target: { combo: 10 },
+          cutscenes: {
+            start: {
+              title: '连击的艺术',
+              text: '涂鸦不仅是技术，\n更是节奏的掌控。\n\n连续命中目标可以触发连击，\n连击越高，分数倍率越大！\n\n试试达成 10 连击吧！',
+              speaker: '神秘导师',
+              avatar: '🎭'
+            },
+            complete: {
+              title: '节奏大师',
+              text: '太棒了！\n你已经掌握了连击的精髓。\n\n继续磨练，\n更高的连击在等着你！',
+              speaker: '神秘导师',
+              avatar: '🎭'
+            }
+          },
+          rewards: {
+            score: 400,
+            battlePassExp: 120,
+            unlockSkins: ['fire'],
+            message: '解锁了新皮肤「烈焰红」！'
+          },
+          prerequisiteQuests: ['quest_1_2']
+        },
+        {
+          id: 'quest_1_4',
+          name: 'CBD闪电战',
+          description: '在1号线「商业中心」完成挑战',
+          icon: '💼',
+          type: 'station_clear',
+          target: { stationId: 's1-3', minScore: 800 },
+          cutscenes: {
+            start: {
+              title: '商业中心',
+              text: '「商业中心」人来人往，\n保安巡逻严密。\n\n你需要在高速缩圈和\n多重目标的压力下，\n完成这次闪电般的涂鸦。\n\n准备好了吗？',
+              speaker: '神秘导师',
+              avatar: '🎭'
+            },
+            complete: {
+              title: '速度与激情',
+              text: '难以置信！\n你在商业中心的表现\n堪称完美！\n\n现在，你已经是\n小有名气的涂鸦艺术家了。',
+              speaker: '神秘导师',
+              avatar: '🎭'
+            }
+          },
+          rewards: {
+            score: 600,
+            battlePassExp: 150,
+            unlockStations: ['s1-4', 's1-5'],
+            unlockChapter: 'chapter_2',
+            message: '解锁了支线「艺术区」和「大学城」！\n第二章「艺术之路」已开启！'
+          },
+          prerequisiteQuests: ['quest_1_3']
+        }
+      ],
+      completionReward: {
+        title: '第一章完成！',
+        text: '恭喜你完成了第一章「街头初露」！\n\n你已经从一个涂鸦新手\n成长为独当一面的艺术家。\n\n新的挑战在第二章等着你！',
+        rewards: {
+          score: 2000,
+          battlePassExp: 500,
+          unlockSpray: 'spray_basic_yellow',
+          title: '街头新秀'
+        }
+      }
+    },
+    {
+      id: 'chapter_2',
+      name: '第二章 · 艺术之路',
+      description: '你的名声开始传播，更多高难度的委托接踵而至。在艺术与技术的交融中，探索涂鸦的无限可能。',
+      icon: '🎭',
+      color: '#9b59b6',
+      order: 2,
+      unlockedByDefault: false,
+      quests: [
+        {
+          id: 'quest_2_1',
+          name: '艺术殿堂',
+          description: '在1号线「艺术区」获得1200分以上',
+          icon: '🖼️',
+          type: 'station_score',
+          target: { stationId: 's1-4', minScore: 1200 },
+          cutscenes: {
+            start: {
+              title: '艺术的圣地',
+              text: '「艺术区」是涂鸦者的天堂，\n这里的每一面墙\n都是展示才华的画布。\n\n在这里，完美判定区域更大，\n尽情展现你的艺术天赋吧！',
+              speaker: '画廊策展人',
+              avatar: '👩‍🎨'
+            },
+            complete: {
+              title: '艺术新星',
+              text: '你的作品\n让艺术区的老艺术家们\n都赞不绝口！\n\n你正在用涂鸦\n重新定义「艺术」的边界。',
+              speaker: '画廊策展人',
+              avatar: '👩‍🎨'
+            }
+          },
+          rewards: {
+            score: 500,
+            battlePassExp: 120,
+            unlockPattern: 'pattern_stencil_art',
+            message: '解锁了新图案「模板艺术」！'
+          },
+          prerequisiteQuests: []
+        },
+        {
+          id: 'quest_2_2',
+          name: '校园传说',
+          description: '在1号线「大学城」达成 25 连击',
+          icon: '🎓',
+          type: 'station_combo',
+          target: { stationId: 's1-5', combo: 25 },
+          cutscenes: {
+            start: {
+              title: '大学城的挑战',
+              text: '学弟学妹们都在看着你呢！\n\n「大学城」的连击加成\n可以让你获得更高的分数。\n\n目标：达成 25 连击！',
+              speaker: '学生会主席',
+              avatar: '🧑‍🎓'
+            },
+            complete: {
+              title: '学霸级操作',
+              text: '25 连击！\n你已经是\n大学城的传说级人物了！\n\n学弟学妹们纷纷\n把你视为偶像！',
+              speaker: '学生会主席',
+              avatar: '🧑‍🎓'
+            }
+          },
+          rewards: {
+            score: 600,
+            battlePassExp: 150,
+            unlockSkins: ['neon'],
+            message: '解锁了新皮肤「霓虹绿」！'
+          },
+          prerequisiteQuests: ['quest_2_1']
+        },
+        {
+          id: 'quest_2_3',
+          name: '完美主义者',
+          description: '在任意站点实现零失误通关',
+          icon: '💯',
+          type: 'perfect_station',
+          target: { zeroMiss: true, zeroCaught: true },
+          cutscenes: {
+            start: {
+              title: '极致追求',
+              text: '真正的大师，\n追求的是完美无瑕。\n\n尝试在一个站点中\n不出现任何失误，\n也不被保安抓住。\n\n这才是真正的考验！',
+              speaker: '传奇涂鸦大师',
+              avatar: '👴'
+            },
+            complete: {
+              title: '完美无瑕',
+              text: '太惊人了！\n零失误的完美表演！\n\n你已经具备了\n成为传奇的潜质。',
+              speaker: '传奇涂鸦大师',
+              avatar: '👴'
+            }
+          },
+          rewards: {
+            score: 1000,
+            battlePassExp: 200,
+            unlockSpray: 'spray_neon_cyan',
+            message: '解锁了新喷漆「霓虹青」！'
+          },
+          prerequisiteQuests: ['quest_2_2']
+        },
+        {
+          id: 'quest_2_4',
+          name: '黑客艺术家',
+          description: '在1号线「科技园」完成终极挑战',
+          icon: '💻',
+          type: 'station_clear',
+          target: { stationId: 's1-6', minScore: 1500 },
+          cutscenes: {
+            start: {
+              title: '科技园的防火墙',
+              text: '「科技园」的安保系统\n是全市最严密的。\n\n激光安保、高速巡逻、\n精密的缩圈机制...\n\n只有真正的黑客艺术家\n才能突破这里！',
+              speaker: '神秘导师',
+              avatar: '🎭'
+            },
+            complete: {
+              title: '系统已攻破',
+              text: '恭喜！\n你成功突破了\n科技园的重重安保！\n\n你已经证明了\n自己的实力，\n更大的舞台在等着你！',
+              speaker: '神秘导师',
+              avatar: '🎭'
+            }
+          },
+          rewards: {
+            score: 800,
+            battlePassExp: 180,
+            unlockStations: ['s1-7', 's1-8'],
+            unlockChapter: 'chapter_3',
+            message: '解锁了「河畔公园」和「终点站」！\n第三章「传奇之路」已开启！'
+          },
+          prerequisiteQuests: ['quest_2_3']
+        }
+      ],
+      completionReward: {
+        title: '第二章完成！',
+        text: '恭喜你完成了第二章「艺术之路」！\n\n你已经掌握了涂鸦的精髓，\n技术与艺术的完美结合。\n\n但真正的考验才刚刚开始...',
+        rewards: {
+          score: 3000,
+          battlePassExp: 800,
+          unlockSpray: 'spray_neon_magenta',
+          unlockPattern: 'pattern_wildstyle',
+          title: '艺术达人'
+        }
+      }
+    },
+    {
+      id: 'chapter_3',
+      name: '第三章 · 传奇之路',
+      description: '你已经是业内公认的高手。但传说中的地铁站，只有真正的王者才能征服。踏上最后的旅程，成为传奇！',
+      icon: '👑',
+      color: '#f1c40f',
+      order: 3,
+      unlockedByDefault: false,
+      quests: [
+        {
+          id: 'quest_3_1',
+          name: '2号线的邀约',
+          description: '完成2号线「北站」挑战',
+          icon: '🚉',
+          type: 'station_clear',
+          target: { stationId: 's2-1', minScore: 500 },
+          cutscenes: {
+            start: {
+              title: '新的线路',
+              text: '1号线的传奇已经落幕，\n2号线的旅程才刚刚开始。\n\n「北站」是2号线的门户，\n让我们从这里出发，\n征服全新的线路！',
+              speaker: '地铁调度员',
+              avatar: '🧑‍✈️'
+            },
+            complete: {
+              title: '北站打卡',
+              text: '欢迎来到2号线！\n这条线路的站点\n更加具有挑战性。\n\n准备好迎接\n更艰难的考验了吗？',
+              speaker: '地铁调度员',
+              avatar: '🧑‍✈️'
+            }
+          },
+          rewards: {
+            score: 400,
+            battlePassExp: 100,
+            unlockStations: ['s2-2'],
+            message: '解锁了新站点「体育馆」！'
+          },
+          prerequisiteQuests: []
+        },
+        {
+          id: 'quest_3_2',
+          name: '大师连击',
+          description: '在任意站点达成 50 连击',
+          icon: '🔥',
+          type: 'combo_target',
+          target: { combo: 50 },
+          cutscenes: {
+            start: {
+              title: '传奇连击',
+              text: '50 连击\n是涂鸦大师的标志。\n\n只有完美的节奏把控\n和稳定的心理素质\n才能达成这一成就。\n\n你准备好了吗？',
+              speaker: '传奇涂鸦大师',
+              avatar: '👴'
+            },
+            complete: {
+              title: '传说连击',
+              text: '50 连击达成！\n你已经跻身\n大师级涂鸦艺术家之列！\n\n你的名字将被\n铭刻在涂鸦史册上！',
+              speaker: '传奇涂鸦大师',
+              avatar: '👴'
+            }
+          },
+          rewards: {
+            score: 1500,
+            battlePassExp: 300,
+            unlockSkins: ['royal'],
+            message: '解锁了新皮肤「皇家紫」！'
+          },
+          prerequisiteQuests: ['quest_3_1']
+        },
+        {
+          id: 'quest_3_3',
+          name: '收集星星',
+          description: '累计收集 20 颗星星',
+          icon: '⭐',
+          type: 'stars_collect',
+          target: { totalStars: 20 },
+          cutscenes: {
+            start: {
+              title: '星星收藏家',
+              text: '每个站点的表现\n都会被评为 1-5 颗星。\n\n收集 20 颗星星\n来证明你的全能实力！\n\n高分、零失误、高连击\n都是获得高星的关键。',
+              speaker: '神秘导师',
+              avatar: '🎭'
+            },
+            complete: {
+              title: '繁星满天',
+              text: '20 颗星星！\n你在各个站点的表现\n都堪称典范！\n\n你已经是真正的\n全地形涂鸦专家！',
+              speaker: '神秘导师',
+              avatar: '🎭'
+            }
+          },
+          rewards: {
+            score: 1200,
+            battlePassExp: 250,
+            unlockSpray: 'spray_metal_gold',
+            message: '解锁了新喷漆「金属金」！'
+          },
+          prerequisiteQuests: ['quest_3_2']
+        },
+        {
+          id: 'quest_3_4',
+          name: '双线王者',
+          description: '完成1号线「终点站」和2号线「南站」',
+          icon: '👑',
+          type: 'multi_station',
+          target: { stationIds: ['s1-8', 's2-8'], minScore: 2000 },
+          cutscenes: {
+            start: {
+              title: '终极考验',
+              text: '这是最后的挑战！\n\n1号线「终点站」\n和 2号线「南站」\n是全市最难的两个站点。\n\n只有真正的王者\n才能同时征服它们！',
+              speaker: '神秘导师',
+              avatar: '🎭'
+            },
+            complete: {
+              title: '传奇诞生',
+              text: '难以置信！\n你完成了不可能的任务！\n\n两条线路的终点站\n都被你征服了！\n\n你就是\n地铁涂鸦之王！\n\n涂鸦史册上\n将永远铭记你的名字！',
+              speaker: '全城市民',
+              avatar: '🎉'
+            }
+          },
+          rewards: {
+            score: 5000,
+            battlePassExp: 1000,
+            unlockSkins: ['gold', 'cosmic'],
+            unlockSpray: 'spray_legendary_rainbow',
+            unlockPattern: 'pattern_mural_master',
+            title: '涂鸦传奇',
+            message: '解锁了传说级奖励！\n你已成为地铁涂鸦传奇！'
+          },
+          prerequisiteQuests: ['quest_3_3']
+        }
+      ],
+      completionReward: {
+        title: '第三章完成！',
+        text: '恭喜你完成了所有章节！\n\n你已经是\n地铁涂鸦界的传奇人物！\n\n但这不是结束...\n真正的涂鸦之路，\n永无止境！\n\n感谢你的游玩！🎨',
+        rewards: {
+          score: 10000,
+          battlePassExp: 2000,
+          unlockSpray: 'spray_legendary_chrome',
+          title: '传奇涂鸦艺术家'
+        }
+      }
+    }
+  ],
+
+  questTypes: {
+    station_clear: { name: '站点通关', description: '完成指定站点挑战' },
+    station_score: { name: '分数挑战', description: '在指定站点达到目标分数' },
+    station_combo: { name: '连击挑战', description: '在指定站点达成目标连击' },
+    combo_target: { name: '连击目标', description: '在任意站点达成目标连击' },
+    perfect_station: { name: '完美通关', description: '零失误完成站点' },
+    stars_collect: { name: '星星收集', description: '累计收集指定数量星星' },
+    multi_station: { name: '多站挑战', description: '完成多个站点挑战' }
+  }
+}

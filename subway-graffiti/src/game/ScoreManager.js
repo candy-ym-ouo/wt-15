@@ -379,6 +379,10 @@ class ScoreManager {
     this.cityEventEffects = effects || null
   }
 
+  setOnComboUpdate(callback) {
+    this._onComboUpdate = callback
+  }
+
   getCityEventEffects() {
     return this.cityEventEffects
   }
@@ -613,6 +617,10 @@ class ScoreManager {
     }
     if (this.combo > this.stationMaxCombo) {
       this.stationMaxCombo = this.combo
+    }
+
+    if (this.currentStationId && this.combo > 0 && this._onComboUpdate) {
+      this._onComboUpdate(this.combo)
     }
 
     if (this.currentPhaseType === 'graffiti') {
