@@ -59,6 +59,20 @@ class ScoreManager {
     this.currentPerfectStreak = 0
     this.currentPhaseType = null
 
+    this.lastComboBeforeBreak = 0
+    this.rescueWindowActive = false
+    this.rescueWindowStartTime = 0
+    this.rescuePerfectStreak = 0
+    this.stationRescueCount = 0
+    this.gameRescueCount = 0
+    this.totalRescueSuccess = 0
+    this.totalRescueFail = 0
+    this.totalPreserveTriggered = 0
+    this.rescueWindowRemaining = 0
+    this.preservedCombo = 0
+    this.justRescued = false
+    this.rescueResult = null
+
     this.MILESTONE_TIERS = [
       { combo: 10, name: '新手连击', bonus: 200, color: '#3498db', tier: 1, particles: { count: { 1: 30, 2: 50, 3: 80, 4: 120, 5: 200 } }, screenShake: { 1: 5, 2: 10, 3: 15, 4: 25, 5: 40 } },
       { combo: 25, name: '高手连击', bonus: 600, color: '#2ecc71', tier: 2, particles: { count: { 1: 30, 2: 50, 3: 80, 4: 120, 5: 200 } }, screenShake: { 1: 5, 2: 10, 3: 15, 4: 25, 5: 40 } },
@@ -134,6 +148,9 @@ class ScoreManager {
         this.gameHistory = saved.gameHistory || []
         this.missSources = saved.missSources || { timeout: 0, early: 0, late: 0 }
         this.caughtLocations = saved.caughtLocations || []
+        this.totalRescueSuccess = saved.totalRescueSuccess || 0
+        this.totalRescueFail = saved.totalRescueFail || 0
+        this.totalPreserveTriggered = saved.totalPreserveTriggered || 0
       }
     } catch (e) {
       console.warn('读取存档失败:', e)
@@ -160,7 +177,10 @@ class ScoreManager {
         totalMilestoneBonus: this.totalMilestoneBonus,
         gameHistory: this.gameHistory,
         missSources: this.missSources,
-        caughtLocations: this.caughtLocations
+        caughtLocations: this.caughtLocations,
+        totalRescueSuccess: this.totalRescueSuccess,
+        totalRescueFail: this.totalRescueFail,
+        totalPreserveTriggered: this.totalPreserveTriggered
       }
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
     } catch (e) {
@@ -180,6 +200,16 @@ class ScoreManager {
     }
     this.maxPerfectStreak = 0
     this.currentPerfectStreak = 0
+    this.lastComboBeforeBreak = 0
+    this.rescueWindowActive = false
+    this.rescueWindowStartTime = 0
+    this.rescuePerfectStreak = 0
+    this.stationRescueCount = 0
+    this.gameRescueCount = 0
+    this.rescueWindowRemaining = 0
+    this.preservedCombo = 0
+    this.justRescued = false
+    this.rescueResult = null
   }
 
   startStation(station) {
@@ -195,6 +225,14 @@ class ScoreManager {
     this.stationCaughtLocations = []
     this.stationMilestones = []
     this.currentPhaseType = null
+    this.stationRescueCount = 0
+    this.rescueWindowActive = false
+    this.rescueWindowStartTime = 0
+    this.rescuePerfectStreak = 0
+    this.rescueWindowRemaining = 0
+    this.preservedCombo = 0
+    this.justRescued = false
+    this.rescueResult = null
   }
 
   setPhaseType(type) {
@@ -207,10 +245,13 @@ class ScoreManager {
 
   addScore(type, extra = {}) {
     let points = 0
+    const comboConfig = GAME_CONFIG.comboSystem
+    this.rescueResult = null
+    this.justRescued = false
+
     switch (type) {
       case 'perfect':
         points = GAME_CONFIG.graffiti.perfectScore
-        this.combo++
         this.perfectCount++
         this.stationPerfectCount++
         this.currentPerfectStreak++
@@ -220,20 +261,53 @@ class ScoreManager {
         if (this.currentPhaseType === 'graffiti') {
           this.currentGamePhaseBreakdown.graffiti.perfect++
         }
+
+        if (comboConfig.rescueEnabled && this.rescueWindowActive) {
+          this.rescuePerfectStreak++
+          const canRescue = this.stationRescueCount < comboConfig.rescueMaxPerStation &&
+                           this.gameRescueCount < comboConfig.rescueMaxPerGame
+
+          if (canRescue && this.rescuePerfectStreak >= comboConfig.rescuePerfectRequired) {
+            const restoredCombo = this.lastComboBeforeBreak
+            this.combo = restoredCombo + 1
+            this.stationRescueCount++
+            this.gameRescueCount++
+            this.totalRescueSuccess++
+            this.rescueWindowActive = false
+            this.rescuePerfectStreak = 0
+            this.justRescued = true
+            this.rescueResult = {
+              type: 'rescue_success',
+              restoredCombo,
+              bonusMultiplier: comboConfig.rescueBonusMultiplier
+            }
+            points = Math.floor(points * comboConfig.rescueBonusMultiplier)
+          } else if (!canRescue) {
+            this.combo++
+          } else {
+            this.combo++
+          }
+        } else {
+          this.combo++
+        }
         break
+
       case 'good':
         points = GAME_CONFIG.graffiti.goodScore
         this.combo++
         this.goodCount++
         this.stationGoodCount++
         this.currentPerfectStreak = 0
+        if (comboConfig.rescueEnabled && this.rescueWindowActive) {
+          this.rescuePerfectStreak = 0
+        }
         if (this.currentPhaseType === 'graffiti') {
           this.currentGamePhaseBreakdown.graffiti.good++
         }
         break
+
       case 'miss':
         points = GAME_CONFIG.graffiti.missScore
-        this.combo = 0
         this.missCount++
         this.stationMissCount++
         this.currentPerfectStreak = 0
@@ -247,10 +321,47 @@ class ScoreManager {
         if (this.currentPhaseType === 'graffiti') {
           this.currentGamePhaseBreakdown.graffiti.miss++
         }
+
+        if (comboConfig.enabled && this.combo > 0) {
+          this.lastComboBeforeBreak = this.combo
+          const preserved = Math.min(
+            comboConfig.preserveBase + Math.floor(this.combo * comboConfig.preserveRatio),
+            comboConfig.preserveMax
+          )
+          this.preservedCombo = preserved
+          this.combo = preserved
+          this.totalPreserveTriggered++
+
+          if (comboConfig.rescueEnabled && this.combo > 0) {
+            const canRescue = this.stationRescueCount < comboConfig.rescueMaxPerStation &&
+                             this.gameRescueCount < comboConfig.rescueMaxPerGame
+            if (canRescue) {
+              this.rescueWindowActive = true
+              this.rescueWindowStartTime = Date.now()
+              this.rescueWindowRemaining = comboConfig.rescueWindow
+              this.rescuePerfectStreak = 0
+              this.rescueResult = {
+                type: 'combo_break',
+                lastCombo: this.lastComboBeforeBreak,
+                preservedCombo: preserved,
+                rescueWindow: comboConfig.rescueWindow,
+                perfectRequired: comboConfig.rescuePerfectRequired
+              }
+            } else {
+              this.rescueResult = {
+                type: 'combo_break_no_rescue',
+                lastCombo: this.lastComboBeforeBreak,
+                preservedCombo: preserved
+              }
+            }
+          }
+        } else {
+          this.combo = 0
+        }
         break
+
       case 'caught':
         points = -GAME_CONFIG.patrol.caughtPenalty
-        this.combo = 0
         this.caughtCount++
         this.stationCaughtCount++
         this.currentPerfectStreak = 0
@@ -259,6 +370,43 @@ class ScoreManager {
         this.stationCaughtLocations.push(locData)
         if (this.currentPhaseType === 'patrol') {
           this.currentGamePhaseBreakdown.patrol.caught++
+        }
+
+        if (comboConfig.enabled && this.combo > 0) {
+          this.lastComboBeforeBreak = this.combo
+          const preserved = Math.min(
+            comboConfig.preserveBase + Math.floor(this.combo * comboConfig.preserveRatio),
+            comboConfig.preserveMax
+          )
+          this.preservedCombo = preserved
+          this.combo = preserved
+          this.totalPreserveTriggered++
+
+          if (comboConfig.rescueEnabled && this.combo > 0) {
+            const canRescue = this.stationRescueCount < comboConfig.rescueMaxPerStation &&
+                             this.gameRescueCount < comboConfig.rescueMaxPerGame
+            if (canRescue) {
+              this.rescueWindowActive = true
+              this.rescueWindowStartTime = Date.now()
+              this.rescueWindowRemaining = comboConfig.rescueWindow
+              this.rescuePerfectStreak = 0
+              this.rescueResult = {
+                type: 'combo_break',
+                lastCombo: this.lastComboBeforeBreak,
+                preservedCombo: preserved,
+                rescueWindow: comboConfig.rescueWindow,
+                perfectRequired: comboConfig.rescuePerfectRequired
+              }
+            } else {
+              this.rescueResult = {
+                type: 'combo_break_no_rescue',
+                lastCombo: this.lastComboBeforeBreak,
+                preservedCombo: preserved
+              }
+            }
+          }
+        } else {
+          this.combo = 0
         }
         break
     }
@@ -288,6 +436,41 @@ class ScoreManager {
     }
 
     return points
+  }
+
+  updateRescueWindow(currentTime) {
+    if (!this.rescueWindowActive) return null
+
+    const comboConfig = GAME_CONFIG.comboSystem
+    const elapsed = (currentTime - this.rescueWindowStartTime) / 1000
+    this.rescueWindowRemaining = Math.max(0, comboConfig.rescueWindow - elapsed)
+
+    if (this.rescueWindowRemaining <= 0) {
+      this.rescueWindowActive = false
+      this.rescuePerfectStreak = 0
+      this.totalRescueFail++
+      return {
+        type: 'rescue_timeout',
+        lastCombo: this.lastComboBeforeBreak
+      }
+    }
+    return null
+  }
+
+  getComboState() {
+    const comboConfig = GAME_CONFIG.comboSystem
+    return {
+      combo: this.combo,
+      lastComboBeforeBreak: this.lastComboBeforeBreak,
+      rescueWindowActive: this.rescueWindowActive,
+      rescueWindowRemaining: this.rescueWindowRemaining,
+      rescuePerfectStreak: this.rescuePerfectStreak,
+      perfectRequired: comboConfig.rescuePerfectRequired,
+      stationRescueRemaining: Math.max(0, comboConfig.rescueMaxPerStation - this.stationRescueCount),
+      gameRescueRemaining: Math.max(0, comboConfig.rescueMaxPerGame - this.gameRescueCount),
+      preservedCombo: this.preservedCombo,
+      rescueResult: this.rescueResult
+    }
   }
 
   checkComboMilestone() {
@@ -350,6 +533,9 @@ class ScoreManager {
       this.highScore = this.currentScore
     }
 
+    const gameRescueCount = this.gameRescueCount
+    const totalPreserveInGame = this.currentGameStations.reduce((acc, s) => acc + (s.preserveCount || 0), 0)
+
     const gameRecord = {
       id: `g_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
       timestamp: Date.now(),
@@ -367,7 +553,9 @@ class ScoreManager {
         }
         return acc
       }, { timeout: 0, early: 0, late: 0 }),
-      caughtLocations: this.currentGameStations.flatMap(s => s.caughtLocations || [])
+      caughtLocations: this.currentGameStations.flatMap(s => s.caughtLocations || []),
+      rescueCount: gameRescueCount,
+      preserveCount: totalPreserveInGame
     }
 
     this.gameHistory.unshift(gameRecord)
@@ -559,6 +747,11 @@ class ScoreManager {
       entry.stars = Math.max(entry.stars || 0, this._calculateStars(stationScore, stationId))
     }
 
+    const stationPreserveCount = (entry.preserveCount || 0) + this.totalPreserveTriggered - (entry.totalPreserveCount || 0)
+    const stationRescueCount = this.stationRescueCount
+    entry.totalPreserveCount = this.totalPreserveTriggered
+    entry.totalRescueCount = (entry.totalRescueCount || 0) + stationRescueCount
+
     const stationRecord = {
       id: stationId,
       name: station?.name || stationId,
@@ -580,7 +773,9 @@ class ScoreManager {
       caughtLocations: [...this.stationCaughtLocations],
       stars: entry.stars,
       isFirstClear: isSuccess && entry.clearCount === 1,
-      isNewHigh
+      isNewHigh,
+      rescueCount: stationRescueCount,
+      preserveCount: stationPreserveCount
     }
     this.currentGameStations.push(stationRecord)
 
@@ -844,6 +1039,30 @@ class ScoreManager {
       color: '#9b59b6'
     })
 
+    tasks.push({
+      id: 'rescue_3',
+      name: '救场新手',
+      description: '成功救场 3 次',
+      icon: '🆘',
+      current: this.totalRescueSuccess,
+      target: 3,
+      progress: Math.min(1, this.totalRescueSuccess / 3),
+      completed: this.totalRescueSuccess >= 3,
+      color: '#e74c3c'
+    })
+
+    tasks.push({
+      id: 'rescue_10',
+      name: '救场大师',
+      description: '成功救场 10 次',
+      icon: '🔥',
+      current: this.totalRescueSuccess,
+      target: 10,
+      progress: Math.min(1, this.totalRescueSuccess / 10),
+      completed: this.totalRescueSuccess >= 10,
+      color: '#f39c12'
+    })
+
     return tasks
   }
 
@@ -867,6 +1086,9 @@ class ScoreManager {
       caughtCount: this.caughtCount,
       totalMilestones: this.totalMilestones,
       totalMilestoneBonus: this.totalMilestoneBonus,
+      totalRescueSuccess: this.totalRescueSuccess,
+      totalRescueFail: this.totalRescueFail,
+      totalPreserveTriggered: this.totalPreserveTriggered,
       accuracy: this.perfectCount + this.goodCount + this.missCount > 0
         ? Math.round((this.perfectCount + this.goodCount) / (this.perfectCount + this.goodCount + this.missCount) * 100)
         : 0

@@ -18,6 +18,20 @@ export const GAME_CONFIG = {
     missScore: -20
   },
 
+  comboSystem: {
+    enabled: true,
+    preserveBase: 3,
+    preserveRatio: 0.25,
+    preserveMax: 15,
+    rescueEnabled: true,
+    rescueWindow: 3.0,
+    rescuePerfectRequired: 3,
+    rescueMaxPerStation: 2,
+    rescueMaxPerGame: 5,
+    rescueBonusMultiplier: 1.5,
+    showFloatingText: true
+  },
+
   patrol: {
     guardSpeed: 150,
     flashRadius: 120,

@@ -39,6 +39,7 @@ const showArrival = ref(false);
 const arrivalData = ref(null);
 const showReplay = ref(false);
 const currentReplayData = ref(null);
+const comboState = reactive(scoreManager.getComboState());
 
 const currentTheme = computed(() => {
   if (currentLine.value?.theme) {
@@ -321,6 +322,7 @@ function onStateChange(state, data) {
 function onTick() {
  score.value = scoreManager.currentScore;
  combo.value = scoreManager.combo;
+ Object.assign(comboState, scoreManager.getComboState());
 }
 function onMilestone(milestone, bonusPoints) {
   currentMilestone.value = milestone;
@@ -541,6 +543,43 @@ onUnmounted(() => {
 
       <div v-if="combo > 1 && (currentState === GameState.GRAFFITI || currentState === GameState.PATROL)" class="combo-display" :style="{ color: currentTheme.ui.accent, textShadow: `0 0 15px ${currentTheme.ui.glowColor}` }">
         {{ combo }} COMBO
+      </div>
+
+      <transition name="rescue">
+        <div v-if="comboState.rescueWindowActive && (currentState === GameState.GRAFFITI || currentState === GameState.PATROL)" class="rescue-container">
+          <div class="rescue-header">
+            <span class="rescue-title">🆘 救场窗口</span>
+            <span class="rescue-timer">{{ comboState.rescueWindowRemaining.toFixed(1) }}s</span>
+          </div>
+          <div class="rescue-progress-bar">
+            <div
+              class="rescue-progress-fill"
+              :style="{
+                width: (comboState.rescueWindowRemaining / GAME_CONFIG.comboSystem.rescueWindow * 100) + '%',
+                background: comboState.rescueWindowRemaining < 1 ? '#ff4444' : '#f39c12'
+              }"
+            ></div>
+          </div>
+          <div class="rescue-streak">
+            <span class="rescue-streak-label">Perfect 连击</span>
+            <div class="rescue-streak-dots">
+              <span
+                v-for="i in comboState.perfectRequired"
+                :key="i"
+                class="streak-dot"
+                :class="{ filled: i <= comboState.rescuePerfectStreak }"
+              ></span>
+            </div>
+            <span class="rescue-streak-count">{{ comboState.rescuePerfectStreak }}/{{ comboState.perfectRequired }}</span>
+          </div>
+          <div class="rescue-remaining">
+            剩余救场: 本站 {{ comboState.stationRescueRemaining }} · 本局 {{ comboState.gameRescueRemaining }}
+          </div>
+        </div>
+      </transition>
+
+      <div v-if="!comboState.rescueWindowActive && (currentState === GameState.GRAFFITI || currentState === GameState.PATROL) && (comboState.stationRescueRemaining > 0 || comboState.gameRescueRemaining > 0)" class="rescue-status-mini">
+        <span>🆘 救场: 站 {{ comboState.stationRescueRemaining }} / 局 {{ comboState.gameRescueRemaining }}</span>
       </div>
 
       <transition name="milestone">
@@ -1002,6 +1041,18 @@ onUnmounted(() => {
                 <div class="stat-row">
                   <span class="stat-label">💰 彩蛋奖励总分</span>
                   <span class="stat-value" style="color: #f39c12;">+{{ stats.totalMilestoneBonus.toLocaleString() }}</span>
+                </div>
+                <div class="stat-row">
+                  <span class="stat-label">🛡️ 保底触发次数</span>
+                  <span class="stat-value" style="color: #3498db;">{{ stats.totalPreserveTriggered }}</span>
+                </div>
+                <div class="stat-row">
+                  <span class="stat-label">🆘 救场成功</span>
+                  <span class="stat-value" style="color: #2ecc71;">{{ stats.totalRescueSuccess }}</span>
+                </div>
+                <div class="stat-row">
+                  <span class="stat-label">❌ 救场失败</span>
+                  <span class="stat-value" style="color: #e74c3c;">{{ stats.totalRescueFail }}</span>
                 </div>
               </div>
             </div>
@@ -2571,5 +2622,136 @@ onUnmounted(() => {
   font-size: 13px;
   font-weight: bold;
   color: #f1c40f;
+}
+
+.rescue-container {
+  position: absolute;
+  top: 180px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(10px);
+  border-radius: 16px;
+  padding: 16px 20px;
+  min-width: 280px;
+  border: 2px solid #f39c12;
+  box-shadow: 0 0 30px rgba(243, 156, 18, 0.4);
+  z-index: 25;
+  animation: rescuePulse 1s ease-in-out infinite;
+}
+
+@keyframes rescuePulse {
+  0%, 100% { box-shadow: 0 0 30px rgba(243, 156, 18, 0.4); }
+  50% { box-shadow: 0 0 50px rgba(243, 156, 18, 0.7); }
+}
+
+.rescue-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.rescue-title {
+  font-size: 16px;
+  font-weight: bold;
+  color: #f39c12;
+}
+
+.rescue-timer {
+  font-size: 20px;
+  font-weight: 900;
+  color: #f39c12;
+  font-family: 'Courier New', monospace;
+}
+
+.rescue-progress-bar {
+  width: 100%;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 12px;
+}
+
+.rescue-progress-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.1s linear, background 0.3s ease;
+}
+
+.rescue-streak {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.rescue-streak-label {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.7);
+  white-space: nowrap;
+}
+
+.rescue-streak-dots {
+  display: flex;
+  gap: 6px;
+  flex: 1;
+}
+
+.streak-dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  transition: all 0.3s ease;
+}
+
+.streak-dot.filled {
+  background: #2ecc71;
+  border-color: #27ae60;
+  box-shadow: 0 0 10px rgba(46, 204, 113, 0.6);
+  animation: dotFill 0.3s ease;
+}
+
+@keyframes dotFill {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.3); }
+  100% { transform: scale(1); }
+}
+
+.rescue-streak-count {
+  font-size: 14px;
+  font-weight: bold;
+  color: #2ecc71;
+  font-family: 'Courier New', monospace;
+}
+
+.rescue-remaining {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.5);
+  text-align: center;
+}
+
+.rescue-status-mini {
+  position: absolute;
+  top: 160px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.4);
+  z-index: 20;
+}
+
+.rescue-enter-active,
+.rescue-leave-active {
+  transition: all 0.3s ease;
+}
+
+.rescue-enter-from,
+.rescue-leave-to {
+  opacity: 0;
+  transform: translateX(-50%) translateY(-20px);
 }
 </style>

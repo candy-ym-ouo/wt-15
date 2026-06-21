@@ -385,6 +385,21 @@ export class GraffitiGame {
     const count = result === 'perfect' ? particleConfig.count.perfect : particleConfig.count.good
     this.createParticles(target.x, target.y, result === 'miss' ? color : null, count)
 
+    const rescueResult = scoreManager.rescueResult
+    if (rescueResult) {
+      if (rescueResult.type === 'combo_break') {
+        this.showPrompt(`保底 ${rescueResult.preservedCombo} 连击! 救场窗口 ${rescueResult.rescueWindow}s`, 0xf39c12)
+        this.createRescueEffect(target.x, target.y, 'preserve')
+      } else if (rescueResult.type === 'combo_break_no_rescue') {
+        this.showPrompt(`保底 ${rescueResult.preservedCombo} 连击!`, 0xf39c12)
+        this.createRescueEffect(target.x, target.y, 'preserve')
+      } else if (rescueResult.type === 'rescue_success') {
+        this.showPrompt(`救场成功! 恢复 ${rescueResult.restoredCombo} 连击 x${rescueResult.bonusMultiplier}!`, 0x2ecc71)
+        this.createRescueEffect(target.x, target.y, 'rescue')
+        audioManager.playSFX('milestone', { tier: 3 })
+      }
+    }
+
     replayManager.recordGraffitiTarget({
       ...target,
       currentRadius,
@@ -401,7 +416,7 @@ export class GraffitiGame {
         audioManager.playSFX('milestone', { tier: milestone.tier })
         this.triggerMilestoneEffect(milestone, bonusPoints, target.x, target.y)
         this.callbacks.onMilestone(milestone, bonusPoints)
-      } else if (scoreManager.combo > 0 && scoreManager.combo % 5 === 0) {
+      } else if (scoreManager.combo > 0 && scoreManager.combo % 5 === 0 && !rescueResult) {
         audioManager.playSFX('combo')
         this.showPrompt(`${scoreManager.combo} COMBO!`, 0xf39c12)
       }
@@ -453,6 +468,58 @@ export class GraffitiGame {
 
       this.particles.push(particle)
       this.container.addChild(particle)
+    }
+  }
+
+  createRescueEffect(x, y, type) {
+    const colors = type === 'rescue'
+      ? ['#2ecc71', '#27ae60', '#f1c40f', '#e67e22']
+      : ['#f39c12', '#e67e22', '#d35400', '#f1c40f']
+    const count = type === 'rescue' ? 60 : 40
+
+    for (let i = 0; i < count; i++) {
+      const particle = new PIXI.Graphics()
+      const colorStr = colors[Math.floor(Math.random() * colors.length)]
+      const colorNum = parseInt(colorStr.replace('#', '0x'))
+      particle.beginFill(colorNum)
+
+      const size = type === 'rescue'
+        ? 6 + Math.random() * 12
+        : 4 + Math.random() * 8
+
+      const shape = Math.random() > 0.5 ? 'star' : 'circle'
+      if (shape === 'star') {
+        this.drawStar(particle, 0, 0, 5, size, size / 2)
+      } else {
+        particle.drawCircle(0, 0, size)
+      }
+      particle.endFill()
+
+      const angle = (Math.PI * 2 * i) / count + Math.random() * 0.3
+      const speed = type === 'rescue'
+        ? 300 + Math.random() * 400
+        : 200 + Math.random() * 250
+
+      particle.x = x
+      particle.y = y
+      particle.vx = Math.cos(angle) * speed
+      particle.vy = Math.sin(angle) * speed
+      particle.life = type === 'rescue' ? 1.2 + Math.random() * 0.6 : 0.8 + Math.random() * 0.4
+      particle.maxLife = particle.life
+      particle.gravity = type === 'rescue' ? 150 : 300
+      particle.hasTrail = true
+      particle.trailPoints = []
+
+      this.particles.push(particle)
+      this.container.addChild(particle)
+    }
+
+    if (type === 'rescue') {
+      this.shakeIntensity = 15
+      this.shakeTime = 0.4
+    } else {
+      this.shakeIntensity = 8
+      this.shakeTime = 0.25
     }
   }
 
@@ -901,6 +968,12 @@ export class GraffitiGame {
 
     const remaining = Math.max(0, this.duration - this.gameTime)
     this.updateTimerBar(remaining / this.duration)
+
+    const rescueTimeout = scoreManager.updateRescueWindow(Date.now())
+    if (rescueTimeout && rescueTimeout.type === 'rescue_timeout') {
+      this.showPrompt(`救场失败!`, 0xff4444)
+      audioManager.playSFX('miss')
+    }
 
     const spawnInterval = this.getStationConfig(this.station, 'spawnInterval', GAME_CONFIG.graffiti.spawnInterval)
     if (this.spawnTimer >= spawnInterval) {
