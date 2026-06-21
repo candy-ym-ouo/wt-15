@@ -763,13 +763,17 @@ class ScoreManager {
     for (const line of LINES) {
       for (const station of line.stations) {
         if (!this.unlockedStations.includes(station.id) && station.unlockCondition?.type === 'score') {
-          const prereqScore = this.getStationScore(station.unlockCondition.prerequisite)
-          const prereqStation = this._findStationById(station.unlockCondition.prerequisite)
+          const prereqId = station.unlockCondition.prerequisite
+          if (!this.unlockedStations.includes(prereqId)) {
+            continue
+          }
+          const prereqScore = this.getStationScore(prereqId)
+          const prereqStation = this._findStationById(prereqId)
           nextStations.push({
             ...station,
             lineName: line.name,
             lineColor: line.color,
-            prerequisiteName: prereqStation?.name || station.unlockCondition.prerequisite,
+            prerequisiteName: prereqStation?.name || prereqId,
             currentScore: prereqScore,
             requiredScore: station.unlockCondition.minScore,
             remaining: Math.max(0, station.unlockCondition.minScore - prereqScore),
@@ -778,7 +782,12 @@ class ScoreManager {
         }
       }
     }
-    nextStations.sort((a, b) => a.progress - b.progress)
+    nextStations.sort((a, b) => {
+      if (a.remaining !== b.remaining) {
+        return a.remaining - b.remaining
+      }
+      return b.progress - a.progress
+    })
     return nextStations
   }
 
