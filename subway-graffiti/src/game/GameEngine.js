@@ -543,6 +543,12 @@ export class GameEngine {
     const preStationStats = this._preStationStatsSnapshot
 
     const stationScore = scoreManager.currentScore - (this.stationStartScore || 0)
+    
+    const stationHeatGained = heatSystem.addHeatFromResult('score', { score: stationScore })
+    if (stationHeatGained > 0) {
+      console.log(`[HeatSystem] 站点结算高分热度 +${stationHeatGained}, 本站得分: ${stationScore}`)
+    }
+    
     const { isNewStationHigh, stationRecord } = scoreManager.updateStationResult(
       this.currentStation.id,
       stationScore

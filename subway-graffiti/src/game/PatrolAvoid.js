@@ -604,6 +604,21 @@ export class PatrolAvoid {
     this.lastSafeZone = null
     this.disengageEffects = []
 
+    this._heatLevelUpHandler = (prevLevel, newLevel, levelInfo) => {
+      if (this.isRunning) {
+        const effects = heatSystem.getCurrentEffects()
+        const effectTexts = []
+        if (effects.guardCountAdd > 0) effectTexts.push(`守卫+${effects.guardCountAdd}`)
+        if (effects.guardSpeedMultiplier > 1) effectTexts.push(`速度×${effects.guardSpeedMultiplier.toFixed(1)}`)
+        if (effects.flashRadiusMultiplier > 1) effectTexts.push(`视野×${effects.flashRadiusMultiplier.toFixed(1)}`)
+        if (effects.laserChanceMultiplier > 0) effectTexts.push(`激光×${effects.laserChanceMultiplier.toFixed(1)}`)
+        const effectText = effectTexts.length > 0 ? ` (${effectTexts.join(', ')})` : ''
+        this.showPrompt(`🚨 ${levelInfo.name}! 追捕升级!${effectText}`, parseInt(levelInfo.color.replace('#', '0x')))
+        audioManager.playSFX('alert', { level: newLevel })
+      }
+    }
+    heatSystem.onLevelUp(this._heatLevelUpHandler)
+
     replayManager.startRecording('patrol', station)
 
     this.drawBackground(this.currentLine)
@@ -648,6 +663,10 @@ export class PatrolAvoid {
     this.isRunning = false
     this.container.visible = false
     this.removeInput()
+    if (this._heatLevelUpHandler) {
+      heatSystem.levelUpCallbacks = heatSystem.levelUpCallbacks.filter(cb => cb !== this._heatLevelUpHandler)
+      this._heatLevelUpHandler = null
+    }
   }
 
   setupInput() {

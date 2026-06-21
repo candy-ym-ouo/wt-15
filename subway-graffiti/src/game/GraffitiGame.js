@@ -259,6 +259,20 @@ export class GraffitiGame {
     this.currentLine = this.getLineByStation(station)
     this.startTime = Date.now()
     
+    this._heatLevelUpHandler = (prevLevel, newLevel, levelInfo) => {
+      if (this.isRunning) {
+        const effects = heatSystem.getCurrentEffects()
+        const effectTexts = []
+        if (effects.guardCountAdd > 0) effectTexts.push(`守卫+${effects.guardCountAdd}`)
+        if (effects.guardSpeedMultiplier > 1) effectTexts.push(`速度×${effects.guardSpeedMultiplier.toFixed(1)}`)
+        if (effects.laserChanceMultiplier > 0) effectTexts.push(`激光×${effects.laserChanceMultiplier.toFixed(1)}`)
+        const effectText = effectTexts.length > 0 ? ` (${effectTexts.join(', ')})` : ''
+        this.showPrompt(`🚨 ${levelInfo.name}! 追捕升级!${effectText}`, parseInt(levelInfo.color.replace('#', '0x')))
+        audioManager.playSFX('alert', { level: newLevel })
+      }
+    }
+    heatSystem.onLevelUp(this._heatLevelUpHandler)
+    
     replayManager.startRecording('graffiti', station)
     
     this.drawWall(this.currentLine)
@@ -278,6 +292,10 @@ export class GraffitiGame {
     this.isRunning = false
     this.clearTargets()
     this.container.visible = false
+    if (this._heatLevelUpHandler) {
+      heatSystem.levelUpCallbacks = heatSystem.levelUpCallbacks.filter(cb => cb !== this._heatLevelUpHandler)
+      this._heatLevelUpHandler = null
+    }
   }
 
   showPrompt(text, color = 0xffffff) {
@@ -407,7 +425,9 @@ export class GraffitiGame {
       this.showPrompt(this.getFeedbackText('miss'), color)
     }
 
+    const prevScore = scoreManager.currentScore
     const points = scoreManager.addScore(result, result === 'miss' ? { source: missSource } : {})
+    const newScore = scoreManager.currentScore
     audioManager.playSFX(result)
     const particleConfig = scoreManager.getSkinParticles()
     const count = result === 'perfect' ? particleConfig.count.perfect : particleConfig.count.good
@@ -416,6 +436,16 @@ export class GraffitiGame {
     heatSystem.addHeatFromResult(result)
     if (result !== 'miss' && scoreManager.combo > 0 && scoreManager.combo % 10 === 0) {
       heatSystem.addHeatFromResult('combo', { combo: scoreManager.combo })
+    }
+    
+    const prevThousand = Math.floor(prevScore / 1000)
+    const newThousand = Math.floor(newScore / 1000)
+    if (newThousand > prevThousand) {
+      const thousandGained = newThousand - prevThousand
+      const heatGained = heatSystem.addHeatFromResult('score', { score: thousandGained * 1000 })
+      if (heatGained > 0) {
+        this.showPrompt(`🔥 高分热度 +${heatGained}!`, 0xff6b6b)
+      }
     }
 
     const rescueResult = scoreManager.rescueResult

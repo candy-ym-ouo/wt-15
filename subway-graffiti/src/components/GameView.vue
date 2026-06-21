@@ -691,6 +691,12 @@ function getGameMaxStationScore(game) {
   if (scores.length === 0) return 100;
   return Math.max(...scores.map(s => Math.abs(s.score)), 100);
 }
+
+function getHeatLevelColor(level) {
+  const colors = ['#2ecc71', '#f1c40f', '#e67e22', '#e74c3c', '#c0392b'];
+  return colors[Math.min(level, colors.length - 1)];
+}
+
 function showGamePrompt(text, color = '#fff') {
  promptText.value = text;
  promptColor.value = color;
@@ -2070,6 +2076,44 @@ onUnmounted(() => {
                 <span v-if="stationResult.evaluation.details.hasNoMisses && stationResult.evaluation.details.hasNoCatches">、</span>
                 <span v-if="stationResult.evaluation.details.hasNoCatches">零被抓+5</span>
               </span>
+            </div>
+            
+            <div v-if="stationResult.evaluation.details.heat && stationResult.evaluation.details.heat.peakLevel > 0" style="margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.1);">
+              <div style="text-align: center; font-size: 13px; color: #f39c12; margin-bottom: 8px;">
+                🔥 热度追捕影响
+              </div>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 12px;">
+                <div class="eval-detail-row">
+                  <span class="eval-detail-label">📊 峰值热度</span>
+                  <span class="eval-detail-value" :style="{ color: getHeatLevelColor(stationResult.evaluation.details.heat.peakLevel) }">
+                    {{ stationResult.evaluation.details.heat.peakHeat }}
+                    <span style="font-size: 10px; opacity: 0.7;">({{ stationResult.evaluation.details.heat.peakLevelName }})</span>
+                  </span>
+                </div>
+                <div class="eval-detail-row">
+                  <span class="eval-detail-label">📈 平均热度</span>
+                  <span class="eval-detail-value">{{ stationResult.evaluation.details.heat.averageHeat }}</span>
+                </div>
+                <div class="eval-detail-row">
+                  <span class="eval-detail-label">⭐ 星级调整</span>
+                  <span class="eval-detail-value" :class="stationResult.evaluation.details.heat.starPenalty > 0 ? 'text-red' : 'text-green'">
+                    {{ stationResult.evaluation.details.heat.starPenalty > 0 ? '-' : '' }}{{ stationResult.evaluation.details.heat.starPenalty }}
+                  </span>
+                </div>
+                <div class="eval-detail-row">
+                  <span class="eval-detail-label">🏆 段位调整</span>
+                  <span class="eval-detail-value" :class="stationResult.evaluation.details.heat.rankPenalty > 0 ? 'text-red' : 'text-green'">
+                    {{ stationResult.evaluation.details.heat.rankPenalty > 0 ? '-' : '' }}{{ stationResult.evaluation.details.heat.rankPenalty }}
+                  </span>
+                </div>
+                <div class="eval-detail-row" style="grid-column: 1 / -1;">
+                  <span class="eval-detail-label">💰 高分加成</span>
+                  <span class="eval-detail-value" style="color: #2ecc71;">
+                    ×{{ stationResult.evaluation.details.heat.bonusScoreMultiplier.toFixed(2) }}
+                    <span style="font-size: 10px; opacity: 0.7;">(+{{ stationResult.evaluation.bonusScore.toLocaleString() }}分)</span>
+                  </span>
+                </div>
+              </div>
             </div>
           </div>
 

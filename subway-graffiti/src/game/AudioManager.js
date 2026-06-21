@@ -201,6 +201,14 @@ class AudioManager {
         this.playTone(freq, 0.1, 'sine', 0.08, 'sfx')
         break
       }
+      case 'alert': {
+        const level = details?.level || 1
+        const baseFreq = 440 + level * 50
+        this.playTone(baseFreq, 0.15, 'sawtooth', 0.3, category)
+        setTimeout(() => this.playTone(baseFreq * 1.2, 0.15, 'sawtooth', 0.3, category), 100)
+        setTimeout(() => this.playTone(baseFreq * 1.5, 0.2, 'sawtooth', 0.35, category), 200)
+        break
+      }
     }
   }
 
