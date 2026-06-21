@@ -96,12 +96,13 @@ export class GameEngine {
 
     this.graffitiGame = new GraffitiGame(this.app, {
       onScoreUpdate: (points, type) => this._onScoreUpdate(points, type),
-      onComplete: () => this._onPhaseComplete()
+      onComplete: (result) => this._onPhaseComplete(result),
+      onMilestone: (milestone, bonusPoints) => this._onMilestone(milestone, bonusPoints)
     })
 
     this.patrolGame = new PatrolAvoid(this.app, {
       onScoreUpdate: (points, type) => this._onScoreUpdate(points, type),
-      onComplete: () => this._onPhaseComplete()
+      onComplete: (result) => this._onPhaseComplete(result)
     })
 
     this._createTransitionLayer()
@@ -248,11 +249,18 @@ export class GameEngine {
     }, 400)
   }
 
-  _onPhaseComplete() {
+  _onPhaseComplete(result = {}) {
     this.currentPhase++
+    
+    if (result.replayData && (result.caught || result.replayData?.problems?.length > 0)) {
+      if (this.callbacks.onReplayAvailable) {
+        this.callbacks.onReplayAvailable(result.replayData)
+      }
+    }
+    
     setTimeout(() => {
       this._startNextPhase()
-    }, 800)
+    }, result.caught ? 1500 : 800)
   }
 
   _onStationComplete() {
@@ -295,6 +303,12 @@ export class GameEngine {
   _onScoreUpdate(points, type) {
     if (this.callbacks.onScoreUpdate) {
       this.callbacks.onScoreUpdate(points, type)
+    }
+  }
+
+  _onMilestone(milestone, bonusPoints) {
+    if (this.callbacks.onMilestone) {
+      this.callbacks.onMilestone(milestone, bonusPoints)
     }
   }
 

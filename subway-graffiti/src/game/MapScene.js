@@ -103,7 +103,13 @@ export class MapScene {
         const outerRing = new PIXI.Graphics()
         if (station.isBranch) {
           outerRing.lineStyle(3, isUnlocked ? parseInt(line.color.replace('#', '0x')) : 0x333344, 0.8)
-          outerRing.drawStar(0, 0, 6, 30, 20)
+          const points = []
+          for (let i = 0; i < 12; i++) {
+            const angle = (i * Math.PI) / 6 - Math.PI / 2
+            const radius = i % 2 === 0 ? 30 : 20
+            points.push(Math.cos(angle) * radius, Math.sin(angle) * radius)
+          }
+          outerRing.drawPolygon(points)
         } else {
           outerRing.beginFill(isUnlocked ? parseInt(line.color.replace('#', '0x')) : 0x333344)
           outerRing.drawCircle(0, 0, 28)
@@ -136,7 +142,7 @@ export class MapScene {
             fontSize: 10,
             fontWeight: 'bold',
             fill: 0xffffff,
-            stroke: parseInt(line.color.replace('#', '0x')),
+            stroke: parseInt((line?.color || '#e94560').replace('#', '0x')),
             strokeThickness: 2
           })
           branchTag.anchor.set(0.5)
@@ -145,7 +151,7 @@ export class MapScene {
         }
 
         if (isUnlocked && stationInfo.firstClearAt) {
-          const firstClearBadge = new PIXI.Text('🏆', { fontSize: 14 })
+          const firstClearBadge = new PIXI.Text('🏆', { fontSize: 14, fill: 0xffffff })
           firstClearBadge.anchor.set(0.5)
           firstClearBadge.x = station.isBranch ? 22 : 20
           firstClearBadge.y = station.isBranch ? -22 : -18
@@ -221,7 +227,7 @@ export class MapScene {
         }
 
         if (!isUnlocked) {
-          const lock = new PIXI.Text('🔒', { fontSize: 18 })
+          const lock = new PIXI.Text('🔒', { fontSize: 18, fill: 0xffffff })
           lock.anchor.set(0.5)
           stationContainer.addChild(lock)
 
@@ -342,7 +348,13 @@ export class MapScene {
 
     const branchDot = new PIXI.Graphics()
     branchDot.lineStyle(2, 0x9b59b6, 1)
-    branchDot.drawStar(legendX + 10, legendY2, 6, 14, 8)
+    const branchPoints = []
+    for (let i = 0; i < 12; i++) {
+      const angle = (i * Math.PI) / 6 - Math.PI / 2
+      const radius = i % 2 === 0 ? 14 : 8
+      branchPoints.push(legendX + 10 + Math.cos(angle) * radius, legendY2 + Math.sin(angle) * radius)
+    }
+    branchDot.drawPolygon(branchPoints)
     this.container.addChild(branchDot)
 
     const branchText = new PIXI.Text('支线站点', {
@@ -439,7 +451,7 @@ export class MapScene {
     bg.drawRoundedRect(GAME_CONFIG.width / 2 - 260, 200, 520, 160, 20)
     this.arrivalBroadcastContainer.addChild(bg)
 
-    const icon = new PIXI.Text('🚇', { fontSize: 32 })
+    const icon = new PIXI.Text('🚇', { fontSize: 32, fill: 0xffffff })
     icon.anchor.set(0.5)
     icon.x = GAME_CONFIG.width / 2
     icon.y = 235
@@ -533,7 +545,7 @@ export class MapScene {
     bg.drawRoundedRect(GAME_CONFIG.width / 2 - 200, 420, 400, 160, 20)
     this.rewardContainer.addChild(bg)
 
-    const rewardIcon = new PIXI.Text('🎯', { fontSize: 28 })
+    const rewardIcon = new PIXI.Text('🎯', { fontSize: 28, fill: 0xffffff })
     rewardIcon.anchor.set(0.5)
     rewardIcon.x = GAME_CONFIG.width / 2
     rewardIcon.y = 455
@@ -861,7 +873,13 @@ export class MapScene {
         const outerRing = new PIXI.Graphics()
         if (station.isBranch) {
           outerRing.lineStyle(3, isUnlocked ? parseInt(line.color.replace('#', '0x')) : 0x333344, 0.8)
-          outerRing.drawStar(0, 0, 6, 30, 20)
+          const points = []
+          for (let i = 0; i < 12; i++) {
+            const angle = (i * Math.PI) / 6 - Math.PI / 2
+            const radius = i % 2 === 0 ? 30 : 20
+            points.push(Math.cos(angle) * radius, Math.sin(angle) * radius)
+          }
+          outerRing.drawPolygon(points)
         } else {
           outerRing.beginFill(isUnlocked ? parseInt(line.color.replace('#', '0x')) : 0x333344)
           outerRing.drawCircle(0, 0, 28)
@@ -894,7 +912,7 @@ export class MapScene {
             fontSize: 10,
             fontWeight: 'bold',
             fill: 0xffffff,
-            stroke: parseInt(line.color.replace('#', '0x')),
+            stroke: parseInt((line?.color || '#e94560').replace('#', '0x')),
             strokeThickness: 2
           })
           branchTag.anchor.set(0.5)
@@ -903,7 +921,7 @@ export class MapScene {
         }
 
         if (isUnlocked && stationInfo.firstClearAt) {
-          const firstClearBadge = new PIXI.Text('🏆', { fontSize: 14 })
+          const firstClearBadge = new PIXI.Text('🏆', { fontSize: 14, fill: 0xffffff })
           firstClearBadge.anchor.set(0.5)
           firstClearBadge.x = station.isBranch ? 22 : 20
           firstClearBadge.y = station.isBranch ? -22 : -18
@@ -979,7 +997,7 @@ export class MapScene {
         }
 
         if (!isUnlocked) {
-          const lock = new PIXI.Text('🔒', { fontSize: 18 })
+          const lock = new PIXI.Text('🔒', { fontSize: 18, fill: 0xffffff })
           lock.anchor.set(0.5)
           stationContainer.addChild(lock)
 

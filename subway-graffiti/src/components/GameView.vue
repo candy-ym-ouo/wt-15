@@ -3,6 +3,7 @@ import { GameEngine, GameState } from '@/game/GameEngine.js';
 import { scoreManager } from '@/game/ScoreManager.js';
 import { GAME_CONFIG, LINES } from '@/game/config.js';
 import { audioManager } from '@/game/AudioManager.js';
+import ReplayView from './ReplayView.vue';
 const canvasRef = ref(null);
 const containerRef = ref(null);
 let engine = null;
@@ -36,6 +37,8 @@ const caughtStats = ref({ locations: {}, sources: {} });
 const statsTab = ref('overview');
 const showArrival = ref(false);
 const arrivalData = ref(null);
+const showReplay = ref(false);
+const currentReplayData = ref(null);
 
 const currentTheme = computed(() => {
   if (currentLine.value?.theme) {
@@ -354,6 +357,27 @@ function backFromSubscreen() {
  currentState.value = GameState.MENU;
 }
 
+function onReplayAvailable(replayData) {
+  if (replayData && (replayData.problems?.length > 0 || replayData.summary?.totalProblems > 0)) {
+    currentReplayData.value = replayData;
+    setTimeout(() => {
+      showReplay.value = true;
+    }, 500);
+  }
+}
+
+function closeReplay() {
+  showReplay.value = false;
+}
+
+function retryFromReplay() {
+  showReplay.value = false;
+  if (engine && engine.currentStation) {
+    engine.currentPhase = 0;
+    engine._startNextPhase();
+  }
+}
+
 function getAnimationName(animation) {
  const names = {
  bounce: '弹跳',
@@ -395,7 +419,8 @@ onMounted(async () => {
  onStateChange,
  onTick,
  onMilestone,
- onTrainArrival
+ onTrainArrival,
+ onReplayAvailable
  });
  await engine.init();
 });
@@ -1311,6 +1336,14 @@ onUnmounted(() => {
       <div v-if="currentState === GameState.GRAFFITI" style="position: absolute; bottom: 100px; left: 50%; transform: translateX(-50%); background: rgba(46, 204, 113, 0.8); padding: 8px 20px; border-radius: 20px; font-size: 14px; font-weight: bold;">
         🎯 缩圈到绿圈时点击!
       </div>
+
+      <ReplayView
+        v-if="showReplay && currentReplayData"
+        :replay-data="currentReplayData"
+        :visible="showReplay"
+        @close="closeReplay"
+        @retry="retryFromReplay"
+      />
     </div>
   </div>
 </template>

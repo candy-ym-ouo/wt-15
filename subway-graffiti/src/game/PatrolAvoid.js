@@ -2,6 +2,7 @@ import * as PIXI from 'pixi.js'
 import { GAME_CONFIG, LINES } from './config.js'
 import { scoreManager } from './ScoreManager.js'
 import { audioManager } from './AudioManager.js'
+import { replayManager, RiskLevel } from './ReplayManager.js'
 
 export class PatrolAvoid {
   constructor(app, callbacks) {
@@ -556,6 +557,8 @@ export class PatrolAvoid {
     this.lastSafeZone = null
     this.disengageEffects = []
 
+    replayManager.startRecording('patrol', station)
+
     this.drawBackground(this.currentLine)
 
     this.safeZones.forEach(zone => {
@@ -670,12 +673,33 @@ export class PatrolAvoid {
       if (inSafeZone) {
         this.lastSafeZone = activeZone
         audioManager.playTone(523, 0.1, 'sine', 0.2)
+        replayManager.recordEvent('safe_zone_enter', {
+          x: this.player.x,
+          y: this.player.y,
+          zoneX: activeZone?.x,
+          zoneY: activeZone?.y
+        })
       } else if (wasSafe && this.lastSafeZone && !this.lastSafeZone.onCooldown) {
         this.activateShield()
         this.lastSafeZone.onCooldown = true
         this.lastSafeZone.cooldownTimer = this.lastSafeZone.cooldownDuration
         this.lastSafeZone.lastUsedTime = this.gameTime
         this.lastSafeZone.active = false
+        replayManager.recordEvent('safe_zone_exit', {
+          x: this.player.x,
+          y: this.player.y,
+          zoneX: this.lastSafeZone?.x,
+          zoneY: this.lastSafeZone?.y,
+          shieldActivated: true
+        })
+      } else if (wasSafe) {
+        replayManager.recordEvent('safe_zone_exit', {
+          x: this.player.x,
+          y: this.player.y,
+          zoneX: this.lastSafeZone?.x,
+          zoneY: this.lastSafeZone?.y,
+          shieldActivated: false
+        })
       }
     } else if (inSafeZone && activeZone) {
       this.lastSafeZone = activeZone
@@ -823,6 +847,8 @@ export class PatrolAvoid {
     const vision = this.isPlayerInVision(guard)
     const prevState = guard.aiState
 
+    replayManager.recordPatrolGuard(guard)
+
     switch (guard.aiState) {
       case 'patrol': {
         if (vision.detected) {
@@ -834,12 +860,14 @@ export class PatrolAvoid {
             guard.wasTracking = true
             this.triggerFlanking(guard)
             audioManager.playTone(600, 0.1, 'sawtooth', 0.15)
+            replayManager.recordPatrolGuard(guard, 'patrol->chase')
           } else {
             guard.aiState = 'alert'
             guard.alertTimer = GAME_CONFIG.patrol.alertDuration || 0.8
             guard.lastKnownPlayerX = this.player.x
             guard.lastKnownPlayerY = this.player.y
             audioManager.playTone(400, 0.08, 'sine', 0.1)
+            replayManager.recordPatrolGuard(guard, 'patrol->alert')
           }
         }
         break
@@ -866,6 +894,7 @@ export class PatrolAvoid {
             guard.wasTracking = true
             this.triggerFlanking(guard)
             audioManager.playTone(700, 0.12, 'sawtooth', 0.15)
+            replayManager.recordPatrolGuard(guard, 'alert->chase')
           }
         } else {
           if (guard.alertTimer <= 0) {
@@ -873,6 +902,7 @@ export class PatrolAvoid {
             guard.searchTimer = GAME_CONFIG.patrol.searchDuration || 3
             guard.searchPhaseReached = false
             guard.searchLookAngle = guard.visionAngle
+            replayManager.recordPatrolGuard(guard, 'alert->search')
           }
         }
         break
@@ -888,6 +918,7 @@ export class PatrolAvoid {
           guard.searchTimer = GAME_CONFIG.patrol.searchDuration || 3
           guard.searchPhaseReached = false
           guard.searchLookAngle = guard.visionAngle
+          replayManager.recordPatrolGuard(guard, 'chase->search')
         }
         break
       }
@@ -899,6 +930,7 @@ export class PatrolAvoid {
           guard.lastKnownPlayerY = this.player.y
           guard.isFlanking = false
           audioManager.playTone(600, 0.1, 'sawtooth', 0.12)
+          replayManager.recordPatrolGuard(guard, 'search->chase')
           break
         }
 
@@ -927,6 +959,7 @@ export class PatrolAvoid {
             guard.wasTracking = false
           }
           guard.isFlanking = false
+          replayManager.recordPatrolGuard(guard, 'search->patrol')
         }
         break
       }
@@ -1336,6 +1369,20 @@ export class PatrolAvoid {
       const isChased = this.guards.some(g => g.aiState === 'chase')
       const effectiveDanger = isChased ? Math.min(dangerLevel * 1.5, 1) : dangerLevel
 
+      let riskLevel = RiskLevel.LOW
+      if (effectiveDanger > 0.7) riskLevel = RiskLevel.CRITICAL
+      else if (effectiveDanger > 0.4) riskLevel = RiskLevel.HIGH
+      else if (effectiveDanger > 0.2) riskLevel = RiskLevel.MEDIUM
+
+      if (riskLevel !== RiskLevel.LOW) {
+        replayManager.recordRiskWarning(
+          this.player.x,
+          this.player.y,
+          riskLevel,
+          nearestGuard?._id
+        )
+      }
+
       this.dangerFlash.clear()
       this.dangerFlash.beginFill(GAME_CONFIG.patrol.dangerColor || 0xff4444, effectiveDanger * 0.15)
       this.dangerFlash.drawRect(0, 0, GAME_CONFIG.width, GAME_CONFIG.height)
@@ -1469,6 +1516,22 @@ export class PatrolAvoid {
       location: location ? { ...location, stationId } : null,
       source
     })
+
+    const caughtX = location?.x ?? this.player?.x
+    const caughtY = location?.y ?? this.player?.y
+
+    replayManager.recordCaught(source, caughtX, caughtY)
+
+    replayManager.stopRecording({
+      success: false,
+      caught: true,
+      caughtSource: source,
+      caughtX,
+      caughtY,
+      duration: (Date.now() - this.startTime) / 1000,
+      finalScore: scoreManager.currentScore
+    })
+
     this.callbacks.onScoreUpdate(-GAME_CONFIG.patrol.caughtPenalty, 'caught')
 
     let flashAlpha = 0
@@ -1488,7 +1551,11 @@ export class PatrolAvoid {
       } else {
         setTimeout(() => {
           const duration = Date.now() - this.startTime
-          this.callbacks.onComplete({ duration, caught: true })
+          this.callbacks.onComplete({ 
+            duration, 
+            caught: true,
+            replayData: replayManager.getReplayData()
+          })
         }, 1000)
       }
     }
@@ -1527,7 +1594,18 @@ export class PatrolAvoid {
     if (this.gameTime >= this.duration && !this.isCaught) {
       this.isRunning = false
       const duration = Date.now() - this.startTime
-      this.callbacks.onComplete({ duration })
+      
+      replayManager.stopRecording({
+        success: true,
+        caught: false,
+        duration: duration / 1000,
+        finalScore: scoreManager.currentScore
+      })
+      
+      this.callbacks.onComplete({ 
+        duration,
+        replayData: replayManager.getReplayData()
+      })
     }
   }
 
@@ -1545,6 +1623,13 @@ export class PatrolAvoid {
 
     this.player.x = Math.max(30, Math.min(GAME_CONFIG.width - 30, this.player.x))
     this.player.y = Math.max(130, Math.min(GAME_CONFIG.height - 30, this.player.y))
+
+    replayManager.recordPatrolPlayerPosition(
+      this.player.x,
+      this.player.y,
+      this.player.isSafe,
+      this.player.hasShield
+    )
   }
 
   updateTimerBar(progress) {

@@ -91,7 +91,9 @@ class AudioManager {
     osc.type = type
     osc.frequency.setValueAtTime(frequency, this.ctx.currentTime)
 
-    gain.gain.setValueAtTime(volume * categoryVolume * this.masterVolume, this.ctx.currentTime)
+    let gainValue = volume * categoryVolume * this.masterVolume
+    if (!isFinite(gainValue) || gainValue < 0) gainValue = 0.1
+    gain.gain.setValueAtTime(gainValue, this.ctx.currentTime)
     gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + duration)
 
     osc.connect(gain)

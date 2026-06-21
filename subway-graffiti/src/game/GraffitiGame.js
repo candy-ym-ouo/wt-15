@@ -2,6 +2,7 @@ import * as PIXI from 'pixi.js'
 import { GAME_CONFIG, LINES } from './config.js'
 import { scoreManager } from './ScoreManager.js'
 import { audioManager } from './AudioManager.js'
+import { replayManager } from './ReplayManager.js'
 
 export class GraffitiGame {
   constructor(app, callbacks) {
@@ -144,7 +145,7 @@ export class GraffitiGame {
         const neon = new PIXI.Text('▮▮▮', {
           fontFamily: 'Arial',
           fontSize: 24 + Math.random() * 20,
-          fill: parseInt(theme.ui.accent.replace('#', '0x')),
+          fill: parseInt((theme?.ui?.accent || '#e94560').replace('#', '0x')),
           alpha: 0.3 + Math.random() * 0.3
         })
         neon.x = 50 + Math.random() * (GAME_CONFIG.width - 150)
@@ -231,6 +232,8 @@ export class GraffitiGame {
     this.station = station || null
     this.currentLine = this.getLineByStation(station)
     this.startTime = Date.now()
+    
+    replayManager.startRecording('graffiti', station)
     
     this.drawWall(this.currentLine)
     
@@ -336,7 +339,7 @@ export class GraffitiGame {
     target.shrinkRing = shrinkRing
     target.addChild(shrinkRing)
 
-    const icon = new PIXI.Text('🎨', { fontSize: 36 })
+    const icon = new PIXI.Text('🎨', { fontSize: 36, fill: 0xffffff })
     icon.anchor.set(0.5)
     icon.y = -target.radius - 20
     target.addChild(icon)
@@ -350,6 +353,8 @@ export class GraffitiGame {
 
     this.targets.push(target)
     this.container.addChild(target)
+    
+    replayManager.recordGraffitiTarget(target, 'spawn')
   }
 
   onTargetTap(target) {
@@ -379,6 +384,13 @@ export class GraffitiGame {
     const particleConfig = scoreManager.getSkinParticles()
     const count = result === 'perfect' ? particleConfig.count.perfect : particleConfig.count.good
     this.createParticles(target.x, target.y, result === 'miss' ? color : null, count)
+
+    replayManager.recordGraffitiTarget({
+      ...target,
+      currentRadius,
+      result,
+      source: result === 'miss' ? missSource : null
+    }, 'tap')
 
     if (result !== 'miss') {
       this.createGraffitiMark(target.x, target.y, result)
@@ -902,6 +914,14 @@ export class GraffitiGame {
         scoreManager.addScore('miss', { source: 'timeout' })
         audioManager.playSFX('miss')
         this.showPrompt(this.getFeedbackText('miss'), 0xff4444)
+        
+        replayManager.recordGraffitiTarget({
+          ...target,
+          currentRadius: 0,
+          result: 'miss',
+          source: 'timeout'
+        }, 'miss')
+        
         this.callbacks.onScoreUpdate(GAME_CONFIG.graffiti.missScore, 'miss')
         this.removeTarget(target)
         return
@@ -1019,7 +1039,14 @@ export class GraffitiGame {
     if (this.gameTime >= this.duration) {
       this.isRunning = false
       const duration = Date.now() - this.startTime
-      this.callbacks.onComplete({ duration })
+      
+      replayManager.stopRecording({
+        success: true,
+        duration: duration / 1000,
+        finalScore: scoreManager.currentScore
+      })
+      
+      this.callbacks.onComplete({ duration, replayData: replayManager.getReplayData() })
     }
   }
 
