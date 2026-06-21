@@ -397,6 +397,22 @@ function getSkinName(skinId) {
   return skin ? skin.name : skinId;
 }
 
+function getBattlePassRewardById(rewardId) {
+  if (!rewardId) return null;
+  let reward = BATTLE_PASS_CONFIG.freeTrack.find(r => r.id === rewardId);
+  if (!reward) {
+    reward = BATTLE_PASS_CONFIG.premiumTrack.find(r => r.id === rewardId);
+  }
+  return reward;
+}
+
+function getRewardName(rewardId, type) {
+  const reward = getBattlePassRewardById(rewardId);
+  if (reward) return reward.name;
+  if (type === 'skin') return getSkinName(rewardId);
+  return rewardId;
+}
+
 function refreshStats() {
  Object.assign(stats, scoreManager.getStats());
  gameHistory.value = scoreManager.getGameHistory();
@@ -1979,21 +1995,21 @@ onUnmounted(() => {
                     :key="skinId"
                     class="bp-reward-pill skin-reward"
                   >
-                    👕 {{ getSkinName(skinId) }}
+                    👕 {{ getRewardName(skinId, 'skin') }}
                   </div>
                   <div
-                    v-for="title in (routeEarnings.battlePass.newlyUnlocked.titles || [])"
-                    :key="title"
+                    v-for="titleId in (routeEarnings.battlePass.newlyUnlocked.titles || [])"
+                    :key="titleId"
                     class="bp-reward-pill title-reward"
                   >
-                    🎖️ {{ title }}
+                    🎖️ {{ getRewardName(titleId, 'title') }}
                   </div>
                   <div
-                    v-for="emote in (routeEarnings.battlePass.newlyUnlocked.emotes || [])"
-                    :key="emote"
+                    v-for="emoteId in (routeEarnings.battlePass.newlyUnlocked.emotes || [])"
+                    :key="emoteId"
                     class="bp-reward-pill emote-reward"
                   >
-                    💃 {{ emote }}
+                    💃 {{ getRewardName(emoteId, 'emote') }}
                   </div>
                 </div>
               </div>
@@ -2158,21 +2174,21 @@ onUnmounted(() => {
                 <div
                   class="bp-reward-card free-track"
                   :class="{
-                    unlocked: item.free?.unlocked,
+                    unlocked: item.unlocked,
                     claimed: item.free?.claimed
                   }"
                   @click="item.free?.canClaim && claimBattlePassReward(item.free?.id, 'free')"
                 >
                   <div class="bp-reward-card-inner">
-                    <div class="bp-reward-icon" :style="{ background: item.free ? getRarityStyle(item.free.reward?.rarity)?.color : '#444' }">
-                      {{ item.free?.reward ? getRewardTypeIcon(item.free.reward.type) : '—' }}
+                    <div class="bp-reward-icon" :style="{ background: item.free ? getRarityStyle(item.free.rarity)?.color : '#444' }">
+                      {{ item.free ? getRewardTypeIcon(item.free.type) : '—' }}
                     </div>
                     <div class="bp-reward-info">
-                      <div class="bp-reward-name">{{ item.free?.reward?.name || '免费奖励' }}</div>
+                      <div class="bp-reward-name">{{ item.free?.name || '免费奖励' }}</div>
                       <div class="bp-reward-type">
-                        {{ item.free?.reward ? getRewardTypeName(item.free.reward.type) : '' }}
-                        <span v-if="item.free?.reward?.rarity" :style="{ color: getRarityStyle(item.free.reward.rarity)?.glow }">
-                          [{{ getRarityStyle(item.free.reward.rarity)?.name }}]
+                        {{ item.free ? getRewardTypeName(item.free.type) : '' }}
+                        <span v-if="item.free?.rarity" :style="{ color: getRarityStyle(item.free.rarity)?.glow }">
+                          [{{ getRarityStyle(item.free.rarity)?.name }}]
                         </span>
                       </div>
                     </div>
@@ -2187,22 +2203,22 @@ onUnmounted(() => {
                 <div
                   class="bp-reward-card premium-track"
                   :class="{
-                    unlocked: item.premium?.unlocked,
+                    unlocked: item.unlocked,
                     claimed: item.premium?.claimed,
                     'premium-locked': !battlePassSummary.premiumUnlocked
                   }"
                   @click="item.premium?.canClaim && claimBattlePassReward(item.premium?.id, 'premium')"
                 >
                   <div class="bp-reward-card-inner">
-                    <div class="bp-reward-icon premium" :style="{ background: item.premium ? getRarityStyle(item.premium.reward?.rarity)?.color : '#444' }">
-                      {{ item.premium?.reward ? getRewardTypeIcon(item.premium.reward.type) : '—' }}
+                    <div class="bp-reward-icon premium" :style="{ background: item.premium ? getRarityStyle(item.premium.rarity)?.color : '#444' }">
+                      {{ item.premium ? getRewardTypeIcon(item.premium.type) : '—' }}
                     </div>
                     <div class="bp-reward-info">
-                      <div class="bp-reward-name premium-name">{{ item.premium?.reward?.name || '高级奖励' }}</div>
+                      <div class="bp-reward-name premium-name">{{ item.premium?.name || '高级奖励' }}</div>
                       <div class="bp-reward-type">
-                        ⭐ {{ item.premium?.reward ? getRewardTypeName(item.premium.reward.type) : '' }}
-                        <span v-if="item.premium?.reward?.rarity" :style="{ color: getRarityStyle(item.premium.reward.rarity)?.glow }">
-                          [{{ getRarityStyle(item.premium.reward.rarity)?.name }}]
+                        ⭐ {{ item.premium ? getRewardTypeName(item.premium.type) : '' }}
+                        <span v-if="item.premium?.rarity" :style="{ color: getRarityStyle(item.premium.rarity)?.glow }">
+                          [{{ getRarityStyle(item.premium.rarity)?.name }}]
                         </span>
                       </div>
                     </div>

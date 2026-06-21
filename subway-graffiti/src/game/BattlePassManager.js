@@ -318,10 +318,23 @@ class BattlePassManager {
 
     this._updateTaskProgressForStation(options)
 
+    const prevLevel = this.level - addResult.levelsGained
+    const levelsReached = []
+    for (let lv = prevLevel + 1; lv <= this.level; lv++) {
+      levelsReached.push(lv)
+    }
+
+    const levelUpResult = {
+      ...addResult,
+      levelsUp: addResult.levelsGained,
+      levelsGained: addResult.levelsGained,
+      levelsReached
+    }
+
     this.save()
     return {
       exp: expResult,
-      levelUp: addResult,
+      levelUp: levelUpResult,
       newlyUnlocked: {
         skins: [...this._newlyUnlockedSkins],
         titles: [...this._newlyUnlockedTitles],
@@ -545,13 +558,17 @@ class BattlePassManager {
       level: this.level,
       maxLevel: this.getMaxLevel(),
       exp: this.exp,
+      currentLevelExp: this.exp,
       expNeeded: this.getCurrentLevelExp(),
+      expRequiredForNext: this.getCurrentLevelExp(),
       expProgress: this.getExpProgress(),
       totalExp: this.totalExp,
       totalExpProgress: this.getTotalExpProgress(),
       premiumUnlocked: this.premiumUnlocked,
       freeRewardsUnlocked: this.claimedRewards.free.length,
+      claimedFreeRewards: this.claimedRewards.free.length,
       premiumRewardsUnlocked: this.claimedRewards.premium.length,
+      claimedPremiumRewards: this.claimedRewards.premium.length,
       freeRewardsTotal: BATTLE_PASS_CONFIG.freeTrack.length,
       premiumRewardsTotal: BATTLE_PASS_CONFIG.premiumTrack.length,
       remainingExpToNext: this.getRemainingExpToNextLevel(),
