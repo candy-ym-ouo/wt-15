@@ -235,6 +235,12 @@ class ScoreManager {
       if (this.combo > this.currentGameData.maxCombo) {
         this.currentGameData.maxCombo = this.combo
       }
+      if (this.currentGameData.currentStation) {
+        const stationCombo = this.combo
+        if (stationCombo > this.currentGameData.currentStation.maxCombo) {
+          this.currentGameData.currentStation.maxCombo = stationCombo
+        }
+      }
       if (type === 'perfect' || type === 'good') {
         this.currentGameData.phaseBreakdown.graffiti.score += points
       } else if (type === 'caught') {
@@ -252,6 +258,8 @@ class ScoreManager {
       name: station.name,
       startScore: this.currentScore,
       startTime: Date.now(),
+      startCombo: this.combo,
+      maxCombo: this.combo,
       phases: [],
       graffiti: { score: 0, perfect: 0, good: 0, miss: 0, milestoneBonus: 0, duration: 0 },
       patrol: { score: 0, caught: 0, duration: 0 }
@@ -368,7 +376,7 @@ class ScoreManager {
     const stationConfig = this._findStationById(station.id)
     const evaluation = this.evaluateStation({
       ...station,
-      maxCombo: this.currentGameData.maxCombo
+      maxCombo: station.maxCombo
     }, stationConfig)
     
     if (!this.stationEvaluations) {
@@ -384,6 +392,7 @@ class ScoreManager {
       name: station.name,
       score: station.totalScore,
       duration: station.duration,
+      maxCombo: station.maxCombo,
       graffiti: station.graffiti,
       patrol: station.patrol,
       phases: station.phases,
