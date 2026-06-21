@@ -461,7 +461,8 @@ export class PatrolAvoid {
     guard.addChild(body, hat, badge)
 
     const baseGuardSpeed = this.getStationConfig(this.station, 'guardSpeed', GAME_CONFIG.patrol.guardSpeed)
-    guard.speed = (baseGuardSpeed + this.extraGuardSpeed) * (0.8 + Math.random() * 0.4)
+    guard.baseSpeed = (baseGuardSpeed + this.extraGuardSpeed) * (0.8 + Math.random() * 0.4)
+    guard.speed = guard.baseSpeed
     guard.angle = Math.random() * Math.PI * 2
     guard.visionAngle = Math.random() * Math.PI * 2
     const baseFlashRadius = this.getStationConfig(this.station, 'flashRadius', GAME_CONFIG.patrol.flashRadius)
@@ -781,7 +782,6 @@ export class PatrolAvoid {
         guard.wasTracking = true
         guard.lastKnownPlayerX = this.player.x
         guard.lastKnownPlayerY = this.player.y
-        guard.speed = guard.speed * flankSpeedMult
         guard.aiState = 'chase'
       }
     })
@@ -942,8 +942,8 @@ export class PatrolAvoid {
           guard.angle = Math.random() * Math.PI * 2
         }
 
-        guard.x += Math.cos(guard.angle) * guard.speed * delta
-        guard.y += Math.sin(guard.angle) * guard.speed * delta
+        guard.x += Math.cos(guard.angle) * guard.baseSpeed * delta
+        guard.y += Math.sin(guard.angle) * guard.baseSpeed * delta
         guard.visionAngle += delta * 0.5
         break
       }
@@ -968,7 +968,10 @@ export class PatrolAvoid {
         const dist = Math.sqrt(dx * dx + dy * dy)
 
         if (dist > 5) {
-          const chaseSpeed = guard.speed * (GAME_CONFIG.patrol.chaseSpeedMultiplier || 1.6)
+          const speedMult = guard.isFlanking
+            ? (GAME_CONFIG.patrol.flankSpeedMultiplier || 1.3)
+            : (GAME_CONFIG.patrol.chaseSpeedMultiplier || 1.6)
+          const chaseSpeed = guard.baseSpeed * speedMult
           const move = Math.min(chaseSpeed * delta, dist)
           guard.x += (dx / dist) * move
           guard.y += (dy / dist) * move
@@ -1002,7 +1005,7 @@ export class PatrolAvoid {
           const dist = Math.sqrt(dx * dx + dy * dy)
 
           if (dist > 10) {
-            const searchSpeed = guard.speed * 0.8
+            const searchSpeed = guard.baseSpeed * 0.8
             const move = Math.min(searchSpeed * delta, dist)
             guard.x += (dx / dist) * move
             guard.y += (dy / dist) * move
