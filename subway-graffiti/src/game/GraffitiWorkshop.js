@@ -518,6 +518,11 @@ class GraffitiWorkshop {
     }
 
     const preview = this.previewCustomSkin(validSprays, validPatterns)
+    const makeGradient = (palette) => {
+      if (palette.length === 0) return '#e94560'
+      if (palette.length === 1) return palette[0]
+      return `linear-gradient(135deg, ${palette.join(', ')})`
+    }
 
     const skin = {
       id: this._generateId('custom_skin'),
@@ -529,9 +534,13 @@ class GraffitiWorkshop {
       isCustom: true,
       rarity: preview.rarity,
       sprays: validSprays,
+      sprayIds: validSprays,
       patterns: validPatterns,
+      patternIds: validPatterns,
       attributes: preview.attributes,
       effects: preview.effects,
+      palette: preview.palette,
+      previewGradient: makeGradient(preview.palette),
       createdAt: Date.now()
     }
 
@@ -554,26 +563,41 @@ class GraffitiWorkshop {
     return true
   }
 
-  updateCustomSkin(skinId, updates) {
+  updateCustomSkin(skinId, ...args) {
     const skin = this.customSkins.find(s => s.id === skinId)
-    if (!skin) return null
+    if (!skin) return { success: false, message: '皮肤不存在' }
 
-    if (updates.name) skin.name = updates.name
+    let name, sprayIds, patternIds
+    if (args.length === 1 && typeof args[0] === 'object') {
+      const updates = args[0]
+      name = updates.name
+      sprayIds = updates.sprays || updates.sprayIds
+      patternIds = updates.patterns || updates.patternIds
+    } else {
+      [name, sprayIds, patternIds] = args
+    }
+
+    if (name) skin.name = name
 
     let needRebuild = false
-    let newSprays = skin.sprays
-    let newPatterns = skin.patterns
+    const makeGradient = (palette) => {
+      if (palette.length === 0) return '#e94560'
+      if (palette.length === 1) return palette[0]
+      return `linear-gradient(135deg, ${palette.join(', ')})`
+    }
 
-    if (updates.sprays) {
-      newSprays = updates.sprays.filter(id => this.unlockedSprays.includes(id))
-      if (newSprays.length > 0) {
-        skin.sprays = newSprays
+    if (sprayIds) {
+      const validSprays = sprayIds.filter(id => this.unlockedSprays.includes(id))
+      if (validSprays.length > 0) {
+        skin.sprays = validSprays
+        skin.sprayIds = validSprays
         needRebuild = true
       }
     }
-    if (updates.patterns) {
-      newPatterns = updates.patterns.filter(id => this.unlockedPatterns.includes(id))
-      skin.patterns = newPatterns
+    if (patternIds) {
+      const validPatterns = patternIds.filter(id => this.unlockedPatterns.includes(id))
+      skin.patterns = validPatterns
+      skin.patternIds = validPatterns
       needRebuild = true
     }
 
@@ -583,12 +607,14 @@ class GraffitiWorkshop {
       skin.rarity = preview.rarity
       skin.attributes = preview.attributes
       skin.effects = preview.effects
+      skin.palette = preview.palette
+      skin.previewGradient = makeGradient(preview.palette)
       skin.description = `由 ${skin.sprays.length} 种喷漆和 ${skin.patterns.length} 种图案合成`
     }
 
     this.save()
     this._emit('skin_updated', skin)
-    return skin
+    return { success: true, skin }
   }
 
   getCustomSkins() {
@@ -657,32 +683,44 @@ class GraffitiWorkshop {
   }
 
   getQuickPresets() {
-    return [
+    const makeGradient = (palette) => {
+      if (palette.length === 0) return '#e94560'
+      if (palette.length === 1) return palette[0]
+      return `linear-gradient(135deg, ${palette.join(', ')})`
+    }
+    const presets = [
       {
         id: 'preset_neon',
         name: '霓虹朋克',
-        sprays: ['spray_neon_cyan', 'spray_neon_magenta'],
-        patterns: ['pattern_wildstyle']
+        sprayIds: ['spray_neon_cyan', 'spray_neon_magenta'],
+        patternIds: ['pattern_wildstyle']
       },
       {
         id: 'preset_gold',
         name: '黄金奢华',
-        sprays: ['spray_metal_gold', 'spray_metal_silver'],
-        patterns: ['pattern_3d_block']
+        sprayIds: ['spray_metal_gold', 'spray_metal_silver'],
+        patternIds: ['pattern_3d_block']
       },
       {
         id: 'preset_rainbow',
         name: '彩虹传说',
-        sprays: ['spray_legendary_rainbow'],
-        patterns: ['pattern_mural_master']
+        sprayIds: ['spray_legendary_rainbow'],
+        patternIds: ['pattern_mural_master']
       },
       {
         id: 'preset_classic',
         name: '经典街头',
-        sprays: ['spray_basic_blue', 'spray_basic_red'],
-        patterns: ['pattern_tag_simple', 'pattern_bubble_round']
+        sprayIds: ['spray_basic_blue', 'spray_basic_red'],
+        patternIds: ['pattern_tag_simple', 'pattern_bubble_round']
       }
     ]
+    return presets.map(p => {
+      const preview = this.previewCustomSkin(p.sprayIds, p.patternIds)
+      return {
+        ...p,
+        previewGradient: makeGradient(preview.palette)
+      }
+    })
   }
 }
 

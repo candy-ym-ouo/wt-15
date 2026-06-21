@@ -6,7 +6,9 @@ import { GAME_CONFIG, LINES, BATTLE_PASS_CONFIG, CITY_EVENTS } from '@/game/conf
 import { cityEventManager } from '@/game/CityEventManager.js';
 import { audioManager } from '@/game/AudioManager.js';
 import { battlePassManager } from '@/game/BattlePassManager.js';
+import { graffitiWorkshop } from '@/game/GraffitiWorkshop.js';
 import ReplayView from './ReplayView.vue';
+import GraffitiWorkshopView from './GraffitiWorkshop.vue';
 const canvasRef = ref(null);
 const containerRef = ref(null);
 let engine = null;
@@ -192,7 +194,9 @@ const skins = computed(() => {
   }));
 });
 const unlockedSkinsCount = computed(() => scoreManager.unlockedSkins.length);
-const totalSkinsCount = computed(() => GAME_CONFIG.skins.length + BATTLE_PASS_CONFIG.battlePassSkins.length);
+const totalSkinsCount = computed(() => GAME_CONFIG.skins.length + BATTLE_PASS_CONFIG.battlePassSkins.length + graffitiWorkshop.getCustomSkins().length);
+const workshopCustomSkinsCount = computed(() => graffitiWorkshop.getCustomSkins().length);
+const workshopHasActiveCustom = computed(() => !!graffitiWorkshop.getSelectedCustomSkinId());
 const nextUnlockScore = computed(() => {
   for (const skin of GAME_CONFIG.skins) {
     if (!scoreManager.unlockedSkins.includes(skin.id)) {
@@ -691,6 +695,14 @@ function closeVolumePanel() {
 function showSkinsScreen() {
  audioManager.playSFX('click');
  currentState.value = GameState.SKINS;
+}
+function showWorkshopScreen() {
+  audioManager.playSFX('click');
+  graffitiWorkshop.load();
+  currentState.value = GameState.WORKSHOP;
+}
+function onWorkshopSaved() {
+  refreshStats();
 }
 function showStatsScreen() {
  audioManager.playSFX('click');
@@ -1286,9 +1298,16 @@ onUnmounted(() => {
             <button class="btn btn-secondary" @click="showSkinsScreen">
               👕 皮肤
             </button>
+            <button class="btn btn-secondary workshop-btn" @click="showWorkshopScreen" style="position: relative;">
+              🎨 工坊
+              <span v-if="workshopHasActiveCustom" class="btn-notification-dot" style="background: #2ecc71;"></span>
+            </button>
             <button class="btn btn-secondary" @click="showStatsScreen">
               📊 统计
             </button>
+          </div>
+
+          <div class="buttons-row">
             <button class="btn btn-secondary battle-pass-btn" @click="showSeasonPassScreen">
               🎖️ 通行证
               <span v-if="battlePassHasUnclaimedRewards" class="btn-notification-dot"></span>
@@ -1296,6 +1315,10 @@ onUnmounted(() => {
             <button class="btn btn-secondary" @click="showProfilesScreen">
               👤 档案
             </button>
+          </div>
+
+          <div v-if="workshopCustomSkinsCount > 0" style="text-align: center; margin-top: 16px; font-size: 13px; color: #2ecc71; opacity: 0.8;">
+            🎨 已创建 {{ workshopCustomSkinsCount }} 款自定义皮肤 · {{ workshopHasActiveCustom ? '自定义皮肤已启用' : '使用默认皮肤' }}
           </div>
 
           <div v-if="nextUnlockScore" style="text-align: center; margin-top: 24px; opacity: 0.6; font-size: 14px;">
@@ -1372,6 +1395,12 @@ onUnmounted(() => {
           </button>
         </div>
       </div>
+
+      <GraffitiWorkshopView
+        v-if="currentState === GameState.WORKSHOP"
+        @back="backFromSubscreen"
+        @saved="onWorkshopSaved"
+      />
 
       <div v-if="currentState === GameState.STATS" class="screen stats-screen">
         <div class="screen-title" style="font-size: 32px;">游戏统计</div>

@@ -20,7 +20,8 @@ export const GameState = {
   STATS: 'stats',
   REPLAY: 'replay',
   PROFILES: 'profiles',
-  SEASON_PASS: 'season_pass'
+  SEASON_PASS: 'season_pass',
+  WORKSHOP: 'workshop'
 }
 
 export class GameEngine {
