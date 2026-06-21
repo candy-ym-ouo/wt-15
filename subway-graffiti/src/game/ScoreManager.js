@@ -1,6 +1,6 @@
 import { GAME_CONFIG, LINES } from './config.js'
+import { profileManager } from './ProfileManager.js'
 
-const STORAGE_KEY = 'subway_graffiti_save'
 const SAVE_VERSION = 2
 
 const FAIL_REASONS = {
@@ -127,10 +127,12 @@ class ScoreManager {
   }
 
   load() {
+    const currentProfile = profileManager.getCurrentProfile()
+    if (!currentProfile) return
+
     try {
-      const data = localStorage.getItem(STORAGE_KEY)
-      if (data) {
-        const saved = JSON.parse(data)
+      const saved = profileManager.loadProfileData(currentProfile.id)
+      if (saved) {
         this.highScore = saved.highScore || 0
         this.totalScore = saved.totalScore || 0
         this.maxCombo = saved.maxCombo || 0
@@ -157,7 +159,66 @@ class ScoreManager {
     }
   }
 
+  loadProfile(profileId) {
+    try {
+      const saved = profileManager.loadProfileData(profileId)
+      if (saved) {
+        this.highScore = saved.highScore || 0
+        this.totalScore = saved.totalScore || 0
+        this.maxCombo = saved.maxCombo || 0
+        this.gamesPlayed = saved.gamesPlayed || 0
+        this.perfectCount = saved.perfectCount || 0
+        this.goodCount = saved.goodCount || 0
+        this.missCount = saved.missCount || 0
+        this.caughtCount = saved.caughtCount || 0
+        this.unlockedSkins = saved.unlockedSkins || ['default']
+        this.selectedSkin = saved.selectedSkin || 'default'
+        this.unlockedStations = saved.unlockedStations || ['s1-1', 's2-1']
+        this.stationScores = this._migrateStationScores(saved.stationScores || {})
+        this.totalMilestones = saved.totalMilestones || 0
+        this.totalMilestoneBonus = saved.totalMilestoneBonus || 0
+        this.gameHistory = saved.gameHistory || []
+        this.missSources = saved.missSources || { timeout: 0, early: 0, late: 0 }
+        this.caughtLocations = saved.caughtLocations || []
+        this.totalRescueSuccess = saved.totalRescueSuccess || 0
+        this.totalRescueFail = saved.totalRescueFail || 0
+        this.totalPreserveTriggered = saved.totalPreserveTriggered || 0
+      } else {
+        this._resetProfileData()
+      }
+    } catch (e) {
+      console.warn('读取档案失败:', e)
+      this._resetProfileData()
+    }
+  }
+
+  _resetProfileData() {
+    this.highScore = 0
+    this.totalScore = 0
+    this.maxCombo = 0
+    this.gamesPlayed = 0
+    this.perfectCount = 0
+    this.goodCount = 0
+    this.missCount = 0
+    this.caughtCount = 0
+    this.unlockedSkins = ['default']
+    this.selectedSkin = 'default'
+    this.unlockedStations = ['s1-1', 's2-1']
+    this.stationScores = {}
+    this.totalMilestones = 0
+    this.totalMilestoneBonus = 0
+    this.gameHistory = []
+    this.missSources = { timeout: 0, early: 0, late: 0 }
+    this.caughtLocations = []
+    this.totalRescueSuccess = 0
+    this.totalRescueFail = 0
+    this.totalPreserveTriggered = 0
+  }
+
   save() {
+    const currentProfile = profileManager.getCurrentProfile()
+    if (!currentProfile) return
+
     try {
       const data = {
         version: SAVE_VERSION,
@@ -182,7 +243,7 @@ class ScoreManager {
         totalRescueFail: this.totalRescueFail,
         totalPreserveTriggered: this.totalPreserveTriggered
       }
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
+      profileManager.saveProfileData(currentProfile.id, data)
     } catch (e) {
       console.warn('保存存档失败:', e)
     }

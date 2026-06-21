@@ -2,6 +2,7 @@ import * as PIXI from 'pixi.js'
 import { GAME_CONFIG } from './config.js'
 import { audioManager } from './AudioManager.js'
 import { scoreManager } from './ScoreManager.js'
+import { profileManager } from './ProfileManager.js'
 import { MapScene } from './MapScene.js'
 import { GraffitiGame } from './GraffitiGame.js'
 import { PatrolAvoid } from './PatrolAvoid.js'
@@ -15,7 +16,8 @@ export const GameState = {
   GAME_OVER: 'game_over',
   SKINS: 'skins',
   STATS: 'stats',
-  REPLAY: 'replay'
+  REPLAY: 'replay',
+  PROFILES: 'profiles'
 }
 
 export class GameEngine {
@@ -193,6 +195,50 @@ export class GameEngine {
   showStats() {
     this.state = GameState.STATS
     this.callbacks.onStateChange(this.state)
+  }
+
+  showProfiles() {
+    this.state = GameState.PROFILES
+    this.callbacks.onStateChange(this.state)
+  }
+
+  switchProfile(profileId) {
+    if (profileManager.switchProfile(profileId)) {
+      scoreManager.loadProfile(profileId)
+      this.showMenu()
+      if (this.callbacks.onProfileSwitched) {
+        this.callbacks.onProfileSwitched(profileManager.getCurrentProfile())
+      }
+      return true
+    }
+    return false
+  }
+
+  createProfile(name, color) {
+    const profile = profileManager.createProfile(name, color)
+    if (profile && this.callbacks.onProfileCreated) {
+      this.callbacks.onProfileCreated(profile)
+    }
+    return profile
+  }
+
+  deleteProfile(profileId) {
+    const currentProfile = profileManager.getCurrentProfile()
+    const result = profileManager.deleteProfile(profileId)
+    if (result && currentProfile?.id === profileId) {
+      const newCurrent = profileManager.getCurrentProfile()
+      if (newCurrent) {
+        scoreManager.loadProfile(newCurrent.id)
+      }
+    }
+    if (this.callbacks.onProfileDeleted) {
+      this.callbacks.onProfileDeleted(profileId, result)
+    }
+    return result
+  }
+
+  updateProfile(profileId, updates) {
+    return profileManager.updateProfile(profileId, updates)
   }
 
   _onStationSelected(station, line) {

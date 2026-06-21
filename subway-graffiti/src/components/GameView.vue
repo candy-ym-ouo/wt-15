@@ -1,6 +1,7 @@
 <script setup>import { ref, onMounted, onUnmounted, computed, reactive, watch } from 'vue';
 import { GameEngine, GameState } from '@/game/GameEngine.js';
 import { scoreManager } from '@/game/ScoreManager.js';
+import { profileManager } from '@/game/ProfileManager.js';
 import { GAME_CONFIG, LINES } from '@/game/config.js';
 import { audioManager } from '@/game/AudioManager.js';
 import ReplayView from './ReplayView.vue';
@@ -40,6 +41,98 @@ const arrivalData = ref(null);
 const showReplay = ref(false);
 const currentReplayData = ref(null);
 const comboState = reactive(scoreManager.getComboState());
+
+const profiles = ref(profileManager.getAllProfiles());
+const currentProfile = computed(() => profileManager.getCurrentProfile());
+const showCreateProfileDialog = ref(false);
+const showDeleteConfirmDialog = ref(false);
+const profileToDelete = ref(null);
+const newProfileName = ref('');
+const newProfileColor = ref('#e94560');
+const availableColors = ['#e94560', '#3498db', '#2ecc71', '#f39c12', '#9b59b6', '#1abc9c', '#e67e22', '#e74c3c'];
+
+function refreshProfiles() {
+  profiles.value = profileManager.getAllProfiles();
+}
+
+function showProfilesScreen() {
+  audioManager.playSFX('click');
+  refreshProfiles();
+  currentState.value = GameState.PROFILES;
+}
+
+function handleSelectProfile(profileId) {
+  if (profileId === currentProfile.value?.id) return;
+  audioManager.playSFX('click');
+  if (engine.switchProfile(profileId)) {
+    refreshProfiles();
+    refreshStats();
+    showGamePrompt('档案切换成功', '#2ecc71');
+  }
+}
+
+function openCreateProfileDialog() {
+  audioManager.playSFX('click');
+  newProfileName.value = '';
+  newProfileColor.value = availableColors[0];
+  showCreateProfileDialog.value = true;
+}
+
+function closeCreateProfileDialog() {
+  showCreateProfileDialog.value = false;
+}
+
+function createNewProfile() {
+  if (!newProfileName.value.trim()) {
+    showGamePrompt('请输入档案名称', '#f39c12');
+    return;
+  }
+  audioManager.playSFX('click');
+  const profile = engine.createProfile(newProfileName.value.trim(), newProfileColor.value);
+  if (profile) {
+    refreshProfiles();
+    showCreateProfileDialog.value = false;
+    showGamePrompt('档案创建成功', '#2ecc71');
+  }
+}
+
+function openDeleteConfirmDialog(profile) {
+  if (profiles.value.length <= 1) {
+    showGamePrompt('至少保留一个档案', '#f39c12');
+    return;
+  }
+  audioManager.playSFX('click');
+  profileToDelete.value = profile;
+  showDeleteConfirmDialog.value = true;
+}
+
+function closeDeleteConfirmDialog() {
+  showDeleteConfirmDialog.value = false;
+  profileToDelete.value = null;
+}
+
+function confirmDeleteProfile() {
+  if (!profileToDelete.value) return;
+  audioManager.playSFX('click');
+  const result = engine.deleteProfile(profileToDelete.value.id);
+  if (result) {
+    refreshProfiles();
+    refreshStats();
+    closeDeleteConfirmDialog();
+    showGamePrompt('档案删除成功', '#2ecc71');
+  } else {
+    showGamePrompt('删除失败', '#e74c3c');
+  }
+}
+
+function getProfileStats(profileId) {
+  return profileManager.getProfileStats(profileId);
+}
+
+function formatProfileDate(timestamp) {
+  const d = new Date(timestamp);
+  return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()} ${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
+}
 
 const currentTheme = computed(() => {
   if (currentLine.value?.theme) {
@@ -317,6 +410,9 @@ function onStateChange(state, data) {
  }
  else if (state === GameState.MAP) {
    currentLine.value = null;
+ }
+ else if (state === GameState.PROFILES) {
+   refreshProfiles();
  }
 }
 function onTick() {
@@ -717,6 +813,19 @@ onUnmounted(() => {
         <div class="screen-subtitle">SUBWAY GRAFFITI TOUR</div>
 
         <div class="screen-content">
+          <div v-if="currentProfile" class="current-profile-bar" @click="showProfilesScreen">
+            <div class="current-profile-avatar" :style="{ background: currentProfile.color }">
+              {{ currentProfile.name.charAt(0) }}
+            </div>
+            <div class="current-profile-info">
+              <div class="current-profile-name">{{ currentProfile.name }}</div>
+              <div class="current-profile-stats">
+                🏆 {{ getProfileStats(currentProfile.id).highScore.toLocaleString() }} · 🎮 {{ getProfileStats(currentProfile.id).gamesPlayed }}局
+              </div>
+            </div>
+            <div class="current-profile-arrow">›</div>
+          </div>
+
           <div style="background: rgba(255,255,255,0.05); border-radius: 16px; padding: 20px; margin-bottom: 24px;">
             <div class="stat-row">
               <span class="stat-label">🏆 最高分</span>
@@ -888,6 +997,9 @@ onUnmounted(() => {
             </button>
             <button class="btn btn-secondary" @click="showStatsScreen">
               📊 统计
+            </button>
+            <button class="btn btn-secondary" @click="showProfilesScreen">
+              👤 档案
             </button>
           </div>
 
@@ -1331,6 +1443,59 @@ onUnmounted(() => {
         </div>
       </div>
 
+      <div v-if="currentState === GameState.PROFILES" class="screen profiles-screen">
+        <div class="screen-title" style="font-size: 32px;">档案管理</div>
+        <div class="screen-subtitle">MANAGE PROFILES</div>
+
+        <div class="screen-content">
+          <div style="margin-bottom: 16px;">
+            <button class="btn btn-primary" style="width: 100%;" @click="openCreateProfileDialog">
+              ➕ 创建新档案
+            </button>
+          </div>
+
+          <div class="profiles-list">
+            <div
+              v-for="profile in profiles"
+              :key="profile.id"
+              class="profile-item"
+              :class="{ active: profile.id === currentProfile?.id }"
+              @click="handleSelectProfile(profile.id)"
+            >
+              <div class="profile-avatar" :style="{ background: profile.color }">
+                {{ profile.name.charAt(0) }}
+              </div>
+              <div class="profile-info">
+                <div class="profile-name">
+                  {{ profile.name }}
+                  <span v-if="profile.id === currentProfile?.id" class="current-badge">当前</span>
+                </div>
+                <div class="profile-stats">
+                  <span>🏆 {{ getProfileStats(profile.id).highScore.toLocaleString() }}</span>
+                  <span>🎮 {{ getProfileStats(profile.id).gamesPlayed }}局</span>
+                  <span>⭐ {{ getProfileStats(profile.id).unlockedStationsCount }}站</span>
+                </div>
+                <div class="profile-date">
+                  创建: {{ formatProfileDate(profile.createdAt) }}
+                  <span v-if="profile.lastPlayedAt"> · 上次: {{ formatProfileDate(profile.lastPlayedAt) }}</span>
+                </div>
+              </div>
+              <button
+                class="profile-delete-btn"
+                @click.stop="openDeleteConfirmDialog(profile)"
+                :disabled="profiles.length <= 1"
+              >
+                🗑️
+              </button>
+            </div>
+          </div>
+
+          <button class="btn btn-outline" style="width: 100%; margin-top: 20px;" @click="backFromSubscreen">
+            ← 返回主菜单
+          </button>
+        </div>
+      </div>
+
       <div v-if="currentState === GameState.STATION_COMPLETE" class="screen">
         <div class="screen-title" style="font-size: 36px; background: linear-gradient(135deg, #f1c40f, var(--line-primary)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">站点完成!</div>
         <div class="screen-subtitle">{{ stationResult?.station?.name || '站点' }}</div>
@@ -1641,6 +1806,88 @@ onUnmounted(() => {
         @close="closeReplay"
         @retry="retryFromReplay"
       />
+
+      <transition name="modal">
+        <div v-if="showCreateProfileDialog" class="modal-overlay" @click="closeCreateProfileDialog">
+          <div class="modal-content" @click.stop>
+            <div class="modal-header">
+              <div class="modal-title">创建新档案</div>
+              <button class="modal-close-btn" @click="closeCreateProfileDialog">✕</button>
+            </div>
+            <div class="modal-body">
+              <div class="form-group">
+                <label class="form-label">档案名称</label>
+                <input
+                  type="text"
+                  v-model="newProfileName"
+                  class="form-input"
+                  placeholder="请输入档案名称"
+                  maxlength="10"
+                  @keyup.enter="createNewProfile"
+                />
+              </div>
+              <div class="form-group">
+                <label class="form-label">选择颜色</label>
+                <div class="color-picker">
+                  <button
+                    v-for="color in availableColors"
+                    :key="color"
+                    class="color-option"
+                    :class="{ selected: newProfileColor === color }"
+                    :style="{ background: color }"
+                    @click="newProfileColor = color"
+                  >
+                    <span v-if="newProfileColor === color">✓</span>
+                  </button>
+                </div>
+              </div>
+              <div v-if="newProfileName" class="profile-preview">
+                <div class="preview-avatar" :style="{ background: newProfileColor }">
+                  {{ newProfileName.charAt(0) }}
+                </div>
+                <div class="preview-name">{{ newProfileName }}</div>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button class="btn btn-outline" @click="closeCreateProfileDialog">取消</button>
+              <button class="btn btn-primary" @click="createNewProfile" :disabled="!newProfileName.trim()">
+                创建
+              </button>
+            </div>
+          </div>
+        </div>
+      </transition>
+
+      <transition name="modal">
+        <div v-if="showDeleteConfirmDialog" class="modal-overlay" @click="closeDeleteConfirmDialog">
+          <div class="modal-content" @click.stop>
+            <div class="modal-header">
+              <div class="modal-title">确认删除</div>
+              <button class="modal-close-btn" @click="closeDeleteConfirmDialog">✕</button>
+            </div>
+            <div class="modal-body">
+              <div v-if="profileToDelete" style="text-align: center; padding: 20px 0;">
+                <div class="delete-warning-icon">⚠️</div>
+                <div style="font-size: 16px; margin-bottom: 12px; color: #fff;">
+                  确定要删除档案 <strong style="color: #e74c3c;">{{ profileToDelete.name }}</strong> 吗？
+                </div>
+                <div style="font-size: 13px; color: rgba(255,255,255,0.6); line-height: 1.6;">
+                  此操作将永久删除该档案的所有游戏数据，<br>包括得分记录、解锁的皮肤和站点等。<br>删除后无法恢复！
+                </div>
+                <div v-if="profileToDelete.id === currentProfile?.id" style="margin-top: 16px; padding: 12px; background: rgba(231, 76, 60, 0.1); border-radius: 8px; border: 1px solid rgba(231, 76, 60, 0.3);">
+                  <span style="color: #e74c3c;">⚠️ 这是您当前正在使用的档案，删除后将自动切换到其他档案。</span>
+                </div>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button class="btn btn-outline" @click="closeDeleteConfirmDialog">取消</button>
+              <button class="btn btn-danger" @click="confirmDeleteProfile">
+                确认删除
+              </button>
+            </div>
+          </div>
+        </div>
+      </transition>
     </div>
   </div>
 </template>
@@ -2753,5 +3000,373 @@ onUnmounted(() => {
 .rescue-leave-to {
   opacity: 0;
   transform: translateX(-50%) translateY(-20px);
+}
+
+.current-profile-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.current-profile-bar:hover {
+  background: rgba(255, 255, 255, 0.08);
+  transform: translateY(-1px);
+}
+
+.current-profile-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  font-weight: bold;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.current-profile-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.current-profile-name {
+  font-size: 15px;
+  font-weight: bold;
+  color: #fff;
+  margin-bottom: 2px;
+}
+
+.current-profile-stats {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.current-profile-arrow {
+  font-size: 24px;
+  color: rgba(255, 255, 255, 0.4);
+  font-weight: bold;
+}
+
+.profiles-screen .screen-content {
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+.profiles-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.profile-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  padding: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 2px solid transparent;
+}
+
+.profile-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+  transform: translateY(-1px);
+}
+
+.profile-item.active {
+  border-color: #e94560;
+  background: rgba(233, 69, 96, 0.1);
+}
+
+.profile-avatar {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  font-weight: bold;
+  color: #fff;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.profile-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.profile-name {
+  font-size: 15px;
+  font-weight: bold;
+  color: #fff;
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.current-badge {
+  font-size: 10px;
+  padding: 2px 8px;
+  background: #e94560;
+  color: #fff;
+  border-radius: 10px;
+  font-weight: 600;
+}
+
+.profile-stats {
+  display: flex;
+  gap: 12px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.7);
+  margin-bottom: 4px;
+}
+
+.profile-date {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.profile-delete-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  border: none;
+  background: rgba(231, 76, 60, 0.1);
+  color: #e74c3c;
+  font-size: 16px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.profile-delete-btn:hover:not(:disabled) {
+  background: rgba(231, 76, 60, 0.2);
+}
+
+.profile-delete-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.modal-content {
+  background: linear-gradient(135deg, #1a1a2e, #16213e);
+  border-radius: 20px;
+  padding: 0;
+  width: 90%;
+  max-width: 400px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.modal-title {
+  font-size: 18px;
+  font-weight: bold;
+  color: #fff;
+}
+
+.modal-close-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: none;
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.modal-close-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+}
+
+.modal-body {
+  padding: 20px;
+}
+
+.modal-footer {
+  display: flex;
+  gap: 10px;
+  padding: 16px 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.modal-footer .btn {
+  flex: 1;
+}
+
+.modal-enter-active,
+.modal-leave-active {
+  transition: all 0.3s ease;
+}
+
+.modal-enter-from,
+.modal-leave-to {
+  opacity: 0;
+}
+
+.modal-enter-from .modal-content,
+.modal-leave-to .modal-content {
+  transform: scale(0.9) translateY(20px);
+  opacity: 0;
+}
+
+.form-group {
+  margin-bottom: 16px;
+}
+
+.form-label {
+  display: block;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.7);
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+
+.form-input {
+  width: 100%;
+  padding: 12px 16px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.05);
+  color: #fff;
+  font-size: 15px;
+  outline: none;
+  transition: all 0.2s ease;
+  box-sizing: border-box;
+}
+
+.form-input:focus {
+  border-color: #e94560;
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 0 0 3px rgba(233, 69, 96, 0.15);
+}
+
+.form-input::placeholder {
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.color-picker {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.color-option {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 3px solid transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 16px;
+  font-weight: bold;
+  transition: all 0.2s ease;
+}
+
+.color-option:hover {
+  transform: scale(1.1);
+}
+
+.color-option.selected {
+  border-color: #fff;
+  box-shadow: 0 0 15px rgba(255, 255, 255, 0.3);
+}
+
+.profile-preview {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  margin-top: 16px;
+}
+
+.preview-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  font-weight: bold;
+  color: #fff;
+}
+
+.preview-name {
+  font-size: 16px;
+  font-weight: bold;
+  color: #fff;
+}
+
+.delete-warning-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+.btn-danger {
+  background: linear-gradient(135deg, #e74c3c, #c0392b);
+  color: #fff;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-danger:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(231, 76, 60, 0.4);
+}
+
+.btn-danger:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
 }
 </style>
