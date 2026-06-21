@@ -34,6 +34,7 @@ export class GameEngine {
 
     this._pendingPhaseResult = null
     this._waitingForReplay = false
+    this._preStationStatsSnapshot = null
 
     this._onResize = this._onResize.bind(this)
   }
@@ -195,6 +196,22 @@ export class GameEngine {
   }
 
   _onStationSelected(station, line) {
+    this._preStationStatsSnapshot = {
+      totalScore: scoreManager.totalScore,
+      currentScore: scoreManager.currentScore,
+      totalStars: scoreManager.getTotalStars(),
+      unlockedStations: [...scoreManager.unlockedStations],
+      unlockedSkins: [...scoreManager.unlockedSkins],
+      maxCombo: scoreManager.maxCombo,
+      perfectCount: scoreManager.perfectCount,
+      goodCount: scoreManager.goodCount,
+      missCount: scoreManager.missCount,
+      caughtCount: scoreManager.caughtCount,
+      highScore: scoreManager.highScore,
+      stationScores: JSON.parse(JSON.stringify(scoreManager.stationScores)),
+      recentTasks: JSON.parse(JSON.stringify(scoreManager.getRecentTasks()))
+    }
+
     this.currentStation = station
     this.currentLine = line
     this.currentPhase = 0
@@ -314,6 +331,8 @@ export class GameEngine {
   _onStationComplete() {
     this.stationsCompleted++
 
+    const preStationStats = this._preStationStatsSnapshot
+
     const stationScore = scoreManager.currentScore - (this.stationStartScore || 0)
     const { isNewStationHigh, stationRecord } = scoreManager.updateStationResult(
       this.currentStation.id,
@@ -333,7 +352,8 @@ export class GameEngine {
       isNewStationHigh,
       evaluation,
       stationRecord,
-      newUnlocks
+      newUnlocks,
+      preStationStats
     })
   }
 

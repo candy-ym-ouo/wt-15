@@ -39,7 +39,6 @@ const showArrival = ref(false);
 const arrivalData = ref(null);
 const showReplay = ref(false);
 const currentReplayData = ref(null);
-const previousStats = ref(null);
 
 const currentTheme = computed(() => {
   if (currentLine.value?.theme) {
@@ -91,28 +90,30 @@ const recentTasks = computed(() => scoreManager.getRecentTasks());
 const completedTasksCount = computed(() => recentTasks.value.filter(t => t.completed).length);
 
 const routeEarnings = computed(() => {
-  if (!stationResult.value || !previousStats.value) return null;
+  const preStats = stationResult.value?.preStationStats;
+  if (!stationResult.value || !preStats) return null;
 
   const stationScore = stationResult.value.stationScore || 0;
-  const newTotalScore = stats.totalScore;
-  const prevTotalScore = previousStats.value.totalScore;
-  const scoreGained = newTotalScore - prevTotalScore;
+
+  const prevTotalScore = preStats.totalScore + preStats.currentScore;
+  const newTotalScore = stats.totalScore + scoreManager.currentScore;
+  const scoreGained = stationScore;
 
   const newTotalStars = scoreManager.getTotalStars();
-  const prevTotalStars = previousStats.value.totalStars;
+  const prevTotalStars = preStats.totalStars;
   const starsGained = newTotalStars - prevTotalStars;
 
   const newUnlockedStations = scoreManager.unlockedStations.filter(
-    id => !previousStats.value.unlockedStations.includes(id)
+    id => !preStats.unlockedStations.includes(id)
   );
   const newUnlockedSkins = scoreManager.unlockedSkins.filter(
-    id => !previousStats.value.unlockedSkins.includes(id)
+    id => !preStats.unlockedSkins.includes(id)
   );
 
-  const newMaxCombo = stats.maxCombo > previousStats.value.maxCombo;
-  const comboGained = newMaxCombo ? stats.maxCombo - previousStats.value.maxCombo : 0;
+  const newMaxCombo = stats.maxCombo > preStats.maxCombo;
+  const comboGained = newMaxCombo ? stats.maxCombo - preStats.maxCombo : 0;
 
-  const newPerfectCount = stats.perfectCount - previousStats.value.perfectCount;
+  const newPerfectCount = stats.perfectCount - preStats.perfectCount;
 
   const milestones = stationResult.value.stationRecord?.milestones || [];
   const milestoneBonus = milestones.reduce((sum, m) => sum + (m.bonus || 0), 0);
@@ -121,16 +122,14 @@ const routeEarnings = computed(() => {
   const patrolScore = stationResult.value.stationRecord?.patrol?.score || 0;
 
   const newlyCompletedTasks = [];
-  if (previousStats.value) {
-    const prevTasks = previousStats.value.recentTasks || [];
-    const currentTasks = recentTasks.value;
-    currentTasks.forEach(task => {
-      const prevTask = prevTasks.find(t => t.id === task.id);
-      if (task.completed && prevTask && !prevTask.completed) {
-        newlyCompletedTasks.push(task);
-      }
-    });
-  }
+  const prevTasks = preStats.recentTasks || [];
+  const currentTasks = recentTasks.value;
+  currentTasks.forEach(task => {
+    const prevTask = prevTasks.find(t => t.id === task.id);
+    if (task.completed && prevTask && !prevTask.completed) {
+      newlyCompletedTasks.push(task);
+    }
+  });
 
   return {
     stationScore,
@@ -151,7 +150,8 @@ const routeEarnings = computed(() => {
     patrolScore,
     newlyCompletedTasks,
     isFirstClear: stationResult.value.stationRecord?.isFirstClear,
-    isNewHigh: stationResult.value.isNewStationHigh
+    isNewHigh: stationResult.value.isNewStationHigh,
+    preStats
   };
 });
 
@@ -308,15 +308,6 @@ function onStateChange(state, data) {
    refreshStats();
  }
  else if (state === GameState.STATION_COMPLETE) {
-   previousStats.value = {
-     totalScore: stats.totalScore,
-     totalStars: scoreManager.getTotalStars(),
-     unlockedStations: [...scoreManager.unlockedStations],
-     unlockedSkins: [...scoreManager.unlockedSkins],
-     maxCombo: stats.maxCombo,
-     perfectCount: stats.perfectCount,
-     recentTasks: JSON.parse(JSON.stringify(recentTasks.value))
-   };
    stationResult.value = data;
    if (data?.line) {
      currentLine.value = data.line;
@@ -1478,7 +1469,7 @@ onUnmounted(() => {
                     <span v-else>{{ stats.maxCombo }}</span>
                   </div>
                   <div class="growth-label">最大连击</div>
-                  <div class="growth-sub">{{ previousStats?.maxCombo || 0 }} → {{ stats.maxCombo }}</div>
+                  <div class="growth-sub">{{ routeEarnings.preStats?.maxCombo || 0 }} → {{ stats.maxCombo }}</div>
                 </div>
                 
                 <div class="growth-item">
@@ -1488,7 +1479,7 @@ onUnmounted(() => {
                     <span v-else>{{ stats.perfectCount }}</span>
                   </div>
                   <div class="growth-label">Perfect总数</div>
-                  <div class="growth-sub">{{ previousStats?.perfectCount || 0 }} → {{ stats.perfectCount }}</div>
+                  <div class="growth-sub">{{ routeEarnings.preStats?.perfectCount || 0 }} → {{ stats.perfectCount }}</div>
                 </div>
                 
                 <div class="growth-item">
