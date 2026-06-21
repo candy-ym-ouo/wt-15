@@ -902,6 +902,225 @@ export const GAME_CONFIG = {
   }
 }
 
+export const CITY_EVENTS = {
+  refreshCycle: 4 * 60 * 60 * 1000,
+  maxActiveEvents: 3,
+  eventTypes: {
+    rush_hour: {
+      id: 'rush_hour',
+      name: '早高峰',
+      description: '早高峰时段，客流量大增，巡逻加倍！',
+      icon: '🌅',
+      color: '#f39c12',
+      rarity: 'common',
+      duration: 2 * 60 * 60 * 1000,
+      lineExclusive: false,
+      effects: {
+        scoreMultiplier: 1.5,
+        patrol: {
+          guardSpeedMultiplier: 1.2,
+          maxGuardsAdd: 1,
+          spawnIntervalMultiplier: 0.8
+        },
+        graffiti: {
+          spawnIntervalMultiplier: 0.85
+        }
+      },
+      audio: {
+        start: { type: 'sawtooth', baseFreq: 440, duration: 0.15 },
+        active: { type: 'square', baseFreq: 330, duration: 0.1 },
+        end: { type: 'triangle', baseFreq: 523, duration: 0.2 }
+      },
+      applicableStations: ['s1-3', 's1-5', 's2-1', 's2-5']
+    },
+    night_patrol: {
+      id: 'night_patrol',
+      name: '夜间巡逻',
+      description: '深夜的城市，保安格外警惕...',
+      icon: '🌙',
+      color: '#34495e',
+      rarity: 'rare',
+      duration: 3 * 60 * 60 * 1000,
+      lineExclusive: true,
+      effects: {
+        scoreMultiplier: 2.0,
+        patrol: {
+          guardSpeedMultiplier: 1.4,
+          maxGuardsAdd: 2,
+          flashRadiusMultiplier: 1.3,
+          spawnIntervalMultiplier: 0.7,
+          laserEnabled: true
+        },
+        graffiti: {
+          shrinkSpeedMultiplier: 1.15
+        }
+      },
+      audio: {
+        start: { type: 'sine', baseFreq: 220, duration: 0.3 },
+        active: { type: 'sine', baseFreq: 165, duration: 0.15 },
+        end: { type: 'sine', baseFreq: 440, duration: 0.25 }
+      },
+      applicableLines: [1],
+      applicableStations: ['s1-6', 's1-8', 's2-6', 's2-8']
+    },
+    art_festival: {
+      id: 'art_festival',
+      name: '艺术节',
+      description: '城市艺术节！涂鸦作品获得额外奖励！',
+      icon: '🎨',
+      color: '#9b59b6',
+      rarity: 'rare',
+      duration: 4 * 60 * 60 * 1000,
+      lineExclusive: false,
+      effects: {
+        scoreMultiplier: 2.5,
+        graffiti: {
+          perfectScoreMultiplier: 1.5,
+          goodScoreMultiplier: 1.3,
+          spawnIntervalMultiplier: 0.9
+        },
+        patrol: {
+          maxGuardsAdd: -1,
+          spawnIntervalMultiplier: 1.3
+        }
+      },
+      audio: {
+        start: { type: 'triangle', baseFreq: 523, duration: 0.12 },
+        active: { type: 'triangle', baseFreq: 659, duration: 0.08 },
+        end: { type: 'triangle', baseFreq: 784, duration: 0.2 }
+      },
+      applicableStations: ['s1-4', 's2-4', 's2-6']
+    },
+    sports_event: {
+      id: 'sports_event',
+      name: '体育赛事',
+      description: '体育馆有大型比赛，人流涌动！',
+      icon: '🏟️',
+      color: '#e74c3c',
+      rarity: 'epic',
+      duration: 5 * 60 * 60 * 1000,
+      lineExclusive: true,
+      effects: {
+        scoreMultiplier: 3.0,
+        graffiti: {
+          shrinkSpeedMultiplier: 1.25,
+          maxTargetsAdd: 1,
+          comboBonusMultiplier: 1.5
+        },
+        patrol: {
+          guardSpeedMultiplier: 1.3,
+          maxGuardsAdd: 2,
+          spawnIntervalMultiplier: 0.75,
+          chaseSpeedMultiplier: 1.2
+        }
+      },
+      audio: {
+        start: { type: 'sawtooth', baseFreq: 392, duration: 0.1 },
+        active: { type: 'sawtooth', baseFreq: 523, duration: 0.08 },
+        end: { type: 'sawtooth', baseFreq: 659, duration: 0.15 }
+      },
+      applicableLines: [2],
+      applicableStations: ['s2-2', 's2-5']
+    },
+    tech_conference: {
+      id: 'tech_conference',
+      name: '科技大会',
+      description: '科技园举办国际科技大会，安保升级！',
+      icon: '💻',
+      color: '#00bcd4',
+      rarity: 'epic',
+      duration: 6 * 60 * 60 * 1000,
+      lineExclusive: true,
+      effects: {
+        scoreMultiplier: 3.0,
+        graffiti: {
+          shrinkSpeedMultiplier: 1.3,
+          perfectRadiusMultiplier: 0.85,
+          targetRadiusMultiplier: 0.9
+        },
+        patrol: {
+          guardSpeedMultiplier: 1.5,
+          maxGuardsAdd: 3,
+          flashRadiusMultiplier: 1.4,
+          spawnIntervalMultiplier: 0.6,
+          laserEnabled: true
+        }
+      },
+      audio: {
+        start: { type: 'square', baseFreq: 440, duration: 0.1 },
+        active: { type: 'square', baseFreq: 587, duration: 0.07 },
+        end: { type: 'square', baseFreq: 740, duration: 0.18 }
+      },
+      applicableLines: [1],
+      applicableStations: ['s1-6']
+    },
+    holiday: {
+      id: 'holiday',
+      name: '节假日',
+      description: '全城放假！分数倍率爆炸！',
+      icon: '🎉',
+      color: '#f1c40f',
+      rarity: 'legendary',
+      duration: 8 * 60 * 60 * 1000,
+      lineExclusive: false,
+      effects: {
+        scoreMultiplier: 4.0,
+        graffiti: {
+          perfectScoreMultiplier: 2.0,
+          goodScoreMultiplier: 1.5,
+          comboBonusMultiplier: 2.0
+        },
+        patrol: {
+          maxGuardsAdd: -2,
+          spawnIntervalMultiplier: 1.5,
+          guardSpeedMultiplier: 0.8
+        }
+      },
+      audio: {
+        start: { type: 'sine', baseFreq: 523, duration: 0.1 },
+        active: { type: 'sine', baseFreq: 659, duration: 0.08 },
+        end: { type: 'sine', baseFreq: 784, duration: 0.12 }
+      },
+      applicableStations: ['s1-1', 's1-2', 's1-3', 's1-4', 's1-5', 's1-6', 's1-7', 's1-8', 's2-1', 's2-2', 's2-3', 's2-4', 's2-5', 's2-6', 's2-7', 's2-8']
+    },
+    storm: {
+      id: 'storm',
+      name: '暴风雨',
+      description: '暴风雨来袭！视野受限，保安躲雨...',
+      icon: '⛈️',
+      color: '#5d6d7e',
+      rarity: 'rare',
+      duration: 1.5 * 60 * 60 * 1000,
+      lineExclusive: false,
+      effects: {
+        scoreMultiplier: 1.8,
+        patrol: {
+          flashRadiusMultiplier: 0.6,
+          maxGuardsAdd: -1,
+          guardSpeedMultiplier: 0.7,
+          spawnIntervalMultiplier: 1.5
+        },
+        graffiti: {
+          shrinkSpeedMultiplier: 0.9,
+          perfectRadiusMultiplier: 1.15
+        }
+      },
+      audio: {
+        start: { type: 'sawtooth', baseFreq: 150, duration: 0.4 },
+        active: { type: 'sawtooth', baseFreq: 100, duration: 0.2 },
+        end: { type: 'triangle', baseFreq: 330, duration: 0.3 }
+      },
+      applicableStations: ['s1-7', 's2-7']
+    }
+  },
+  rarityConfig: {
+    common: { weight: 40, glow: 'rgba(243, 156, 18, 0.4)' },
+    rare: { weight: 30, glow: 'rgba(52, 152, 219, 0.4)' },
+    epic: { weight: 20, glow: 'rgba(155, 89, 182, 0.6)' },
+    legendary: { weight: 10, glow: 'rgba(241, 196, 15, 0.8)' }
+  }
+}
+
 export const LINES = [
   {
     id: 1,

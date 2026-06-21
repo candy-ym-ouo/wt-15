@@ -25,6 +25,7 @@ export class GraffitiGame {
     this.shockwaves = []
     this.milestoneParticles = []
     this.currentLine = null
+    this.cityEventEffects = null
     this.setup()
   }
 
@@ -32,11 +33,35 @@ export class GraffitiGame {
     this.shrinkSpeedMultiplier = shrinkSpeedMultiplier || 1
   }
 
-  getStationConfig(station, key, defaultValue) {
-    if (station && station.graffiti && station.graffiti[key] !== undefined) {
-      return station.graffiti[key]
+  setCityEventEffects(effects) {
+    this.cityEventEffects = effects || null
+  }
+
+  _applyEventEffects(value, key, baseValue) {
+    if (!this.cityEventEffects?.graffiti) return value
+
+    const eventConfig = this.cityEventEffects.graffiti
+
+    if (eventConfig[key + 'Multiplier'] !== undefined) {
+      return value * eventConfig[key + 'Multiplier']
     }
-    return GAME_CONFIG.graffiti[key] !== undefined ? GAME_CONFIG.graffiti[key] : defaultValue
+
+    if (eventConfig[key + 'Add'] !== undefined) {
+      return Math.max(0, value + eventConfig[key + 'Add'])
+    }
+
+    return value
+  }
+
+  getStationConfig(station, key, defaultValue) {
+    let value = defaultValue
+    if (station && station.graffiti && station.graffiti[key] !== undefined) {
+      value = station.graffiti[key]
+    } else if (GAME_CONFIG.graffiti[key] !== undefined) {
+      value = GAME_CONFIG.graffiti[key]
+    }
+
+    return this._applyEventEffects(value, key, defaultValue)
   }
 
   getFeedbackText(type) {

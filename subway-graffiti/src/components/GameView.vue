@@ -2,7 +2,8 @@
 import { GameEngine, GameState } from '@/game/GameEngine.js';
 import { scoreManager } from '@/game/ScoreManager.js';
 import { profileManager } from '@/game/ProfileManager.js';
-import { GAME_CONFIG, LINES, BATTLE_PASS_CONFIG } from '@/game/config.js';
+import { GAME_CONFIG, LINES, BATTLE_PASS_CONFIG, CITY_EVENTS } from '@/game/config.js';
+import { cityEventManager } from '@/game/CityEventManager.js';
 import { audioManager } from '@/game/AudioManager.js';
 import { battlePassManager } from '@/game/BattlePassManager.js';
 import ReplayView from './ReplayView.vue';
@@ -42,6 +43,15 @@ const arrivalData = ref(null);
 const showReplay = ref(false);
 const currentReplayData = ref(null);
 const comboState = reactive(scoreManager.getComboState());
+
+const activeCityEvents = ref([]);
+const showCityEventAnnouncement = ref(false);
+const currentCityEvent = ref(null);
+const stationCityEvents = ref([]);
+const currentStationEffects = ref(null);
+const cityEventUpdateTimer = ref(null);
+const showEventPanel = ref(false);
+const _cityEventUpdateInterval = ref(null);
 
 const profiles = ref(profileManager.getAllProfiles());
 const currentProfile = computed(() => profileManager.getCurrentProfile());
@@ -720,6 +730,78 @@ function retryFromReplay() {
   }
 }
 
+function onCityEventStarted(event) {
+  activeCityEvents.value = cityEventManager.getActiveEvents();
+  currentCityEvent.value = event;
+  showCityEventAnnouncement.value = true;
+  audioManager.playSFX('cityEventStart', { rarity: event.eventType.rarity });
+  
+  if (_cityEventUpdateInterval.value) {
+    clearInterval(_cityEventUpdateInterval.value);
+  }
+  _cityEventUpdateInterval.value = setInterval(() => {
+    activeCityEvents.value = [...cityEventManager.getActiveEvents()];
+  }, 1000);
+  
+  setTimeout(() => {
+    showCityEventAnnouncement.value = false;
+  }, 5000);
+}
+
+function onCityEventExpired(event) {
+  activeCityEvents.value = cityEventManager.getActiveEvents();
+  audioManager.playSFX('cityEventEnd', { freq: event.eventType.audio?.start?.baseFreq || 440 });
+  showGamePrompt(`${event.eventType.icon} ${event.eventType.name} 已结束`, event.eventType.color);
+}
+
+function onCityEventsCleared() {
+  activeCityEvents.value = [];
+  stationCityEvents.value = [];
+  currentStationEffects.value = null;
+}
+
+function onCityEventsUpdated(events) {
+  activeCityEvents.value = events;
+}
+
+function onStationEffectsApplied(effects, stationId) {
+  currentStationEffects.value = effects;
+  stationCityEvents.value = cityEventManager.getEventsForStation(stationId);
+}
+
+function getStationEvents(stationId) {
+  return cityEventManager.getEventsForStation(stationId);
+}
+
+function getStationTotalMultiplier(stationId) {
+  const effects = cityEventManager.getCombinedEffectsForStation(stationId);
+  return effects.scoreMultiplier || 1;
+}
+
+function formatEventTime(event) {
+  return cityEventManager.formatEventTimeRemaining(event);
+}
+
+function getRarityConfig(rarity) {
+  return CITY_EVENTS.rarityConfig[rarity] || {};
+}
+
+function toggleEventPanel() {
+  audioManager.playSFX('click');
+  showEventPanel.value = !showEventPanel.value;
+  if (showEventPanel.value) {
+    activeCityEvents.value = cityEventManager.getActiveEvents();
+  }
+}
+
+function refreshCityEvents() {
+  audioManager.playSFX('click');
+  if (engine) {
+    engine.refreshCityEvents();
+    showGamePrompt('事件已刷新！', '#2ecc71');
+  }
+}
+
 function getAnimationName(animation) {
  const names = {
  bounce: '弹跳',
@@ -762,11 +844,22 @@ onMounted(async () => {
  onTick,
  onMilestone,
  onTrainArrival,
- onReplayAvailable
+ onReplayAvailable,
+ onCityEventStarted,
+ onCityEventExpired,
+ onCityEventsCleared,
+ onCityEventsUpdated,
+ onStationEffectsApplied
  });
  await engine.init();
 });
 onUnmounted(() => {
+ if (_cityEventUpdateInterval.value) {
+   clearInterval(_cityEventUpdateInterval.value);
+ }
+ if (cityEventUpdateTimer.value) {
+   clearInterval(cityEventUpdateTimer.value);
+ }
  if (engine) {
  engine.destroy();
  }
@@ -782,6 +875,10 @@ onUnmounted(() => {
         <div class="hud-item">
           <div class="hud-label">得分</div>
           <div class="hud-value" :style="{ color: currentTheme.ui.primary, textShadow: `0 0 10px ${currentTheme.ui.glowColor}` }">{{ score }}</div>
+          <div v-if="stationCityEvents.length > 0" class="event-multiplier-badge" :style="{ background: stationCityEvents[0].eventType.color }">
+            <span class="event-icon">{{ stationCityEvents[0].eventType.icon }}</span>
+            <span class="event-mult">x{{ currentStationEffects?.scoreMultiplier?.toFixed(1) || '1.0' }}</span>
+          </div>
         </div>
         <div v-if="phaseInfo" class="hud-item" style="text-align: center;">
           <div class="hud-label">{{ phaseInfo.station?.name || '站点' }}</div>
@@ -2489,6 +2586,105 @@ onUnmounted(() => {
             </div>
           </div>
         </div>
+      </transition>
+
+      <transition name="announcement">
+        <div v-if="showCityEventAnnouncement && currentCityEvent" class="city-event-announcement" :style="{ '--event-color': currentCityEvent.eventType.color, '--event-glow': getRarityConfig(currentCityEvent.eventType.rarity).glow }">
+          <div class="event-announcement-icon">{{ currentCityEvent.eventType.icon }}</div>
+          <div class="event-announcement-content">
+            <div class="event-announcement-title">城市事件!</div>
+            <div class="event-announcement-name" :class="`rarity-${currentCityEvent.eventType.rarity}`">{{ currentCityEvent.eventType.name }}</div>
+            <div class="event-announcement-desc">{{ currentCityEvent.eventType.description }}</div>
+            <div class="event-announcement-bonus">
+              <span v-if="currentCityEvent.eventType.effects.scoreMultiplier" class="bonus-item">
+                💰 分数 x{{ currentCityEvent.eventType.effects.scoreMultiplier }}
+              </span>
+            </div>
+            <div class="event-announcement-duration">
+              ⏱️ 剩余 {{ formatEventTime(currentCityEvent) }}
+            </div>
+          </div>
+          <div class="event-announcement-rarity" :class="`rarity-badge-${currentCityEvent.eventType.rarity}`">
+            {{ currentCityEvent.eventType.rarity === 'common' ? '普通' : currentCityEvent.eventType.rarity === 'rare' ? '稀有' : currentCityEvent.eventType.rarity === 'epic' ? '史诗' : '传说' }}
+          </div>
+        </div>
+      </transition>
+
+      <button v-if="currentState === GameState.MENU || currentState === GameState.MAP" 
+              class="event-panel-toggle"
+              @click="toggleEventPanel">
+        <span class="event-icon">📅</span>
+        <span v-if="activeCityEvents.length > 0" class="event-count-badge">{{ activeCityEvents.length }}</span>
+      </button>
+
+      <transition name="slide-right">
+        <div v-if="showEventPanel" class="event-panel">
+          <div class="event-panel-header">
+            <h3>📅 城市事件</h3>
+            <button class="close-btn" @click="toggleEventPanel">✕</button>
+          </div>
+          
+          <div class="event-panel-actions">
+            <button class="refresh-btn" @click="refreshCityEvents">
+              🔄 刷新事件
+            </button>
+            <div class="next-refresh">
+              下次自动刷新: {{ cityEventManager.formatTimeRemaining(cityEventManager.getTimeUntilNextRefresh()) }}
+            </div>
+          </div>
+
+          <div class="event-list">
+            <div v-if="activeCityEvents.length === 0" class="empty-events">
+              暂无活动事件
+            </div>
+            <div v-for="event in activeCityEvents" :key="event.id" 
+                 class="event-card"
+                 :style="{ '--event-color': event.eventType.color, '--event-glow': getRarityConfig(event.eventType.rarity).glow }">
+              <div class="event-card-header">
+                <div class="event-card-icon">{{ event.eventType.icon }}</div>
+                <div class="event-card-info">
+                  <div class="event-card-name" :class="`rarity-${event.eventType.rarity}`">{{ event.eventType.name }}</div>
+                  <div class="event-card-rarity" :class="`rarity-badge-${event.eventType.rarity}`">
+                    {{ event.eventType.rarity === 'common' ? '普通' : event.eventType.rarity === 'rare' ? '稀有' : event.eventType.rarity === 'epic' ? '史诗' : '传说' }}
+                  </div>
+                </div>
+              </div>
+              <div class="event-card-desc">{{ event.eventType.description }}</div>
+              <div class="event-card-effects">
+                <div v-if="event.eventType.effects.scoreMultiplier" class="effect-item">
+                  💰 分数倍率: x{{ event.eventType.effects.scoreMultiplier }}
+                </div>
+                <div v-if="event.eventType.effects.graffiti?.perfectScoreMultiplier" class="effect-item">
+                  ✨ Perfect分数: x{{ event.eventType.effects.graffiti.perfectScoreMultiplier }}
+                </div>
+                <div v-if="event.eventType.effects.graffiti?.goodScoreMultiplier" class="effect-item">
+                  👍 Good分数: x{{ event.eventType.effects.graffiti.goodScoreMultiplier }}
+                </div>
+                <div v-if="event.eventType.effects.graffiti?.comboBonusMultiplier" class="effect-item">
+                  🔥 连击加成: x{{ event.eventType.effects.graffiti.comboBonusMultiplier }}
+                </div>
+                <div v-if="event.eventType.effects.patrol?.guardSpeedMultiplier" class="effect-item">
+                  👮 保安速度: x{{ event.eventType.effects.patrol.guardSpeedMultiplier }}
+                </div>
+                <div v-if="event.eventType.effects.patrol?.maxGuardsAdd" class="effect-item">
+                  👥 保安数量: {{ event.eventType.effects.patrol.maxGuardsAdd > 0 ? '+' : '' }}{{ event.eventType.effects.patrol.maxGuardsAdd }}
+                </div>
+              </div>
+              <div class="event-card-footer">
+                <div class="affected-stations">
+                  📍 站点: {{ event.affectedStations.length }}个
+                </div>
+                <div class="event-timer">
+                  ⏱️ {{ formatEventTime(event) }}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </transition>
+
+      <transition name="slide-right">
+        <div v-if="showEventPanel" class="event-panel-overlay" @click="toggleEventPanel"></div>
       </transition>
     </div>
   </div>
@@ -4692,6 +4888,466 @@ onUnmounted(() => {
   }
   .bp-level-num {
     font-size: 26px;
+  }
+}
+
+.event-multiplier-badge {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: bold;
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  animation: event-pulse 2s ease-in-out infinite;
+}
+
+.event-multiplier-badge .event-icon {
+  font-size: 14px;
+}
+
+.event-multiplier-badge .event-mult {
+  font-size: 13px;
+}
+
+@keyframes event-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+
+.city-event-announcement {
+  position: fixed;
+  top: 100px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px 24px;
+  background: linear-gradient(135deg, rgba(26, 26, 46, 0.95), rgba(42, 42, 78, 0.95));
+  border: 2px solid var(--event-color);
+  border-radius: 16px;
+  box-shadow: 0 0 30px var(--event-glow), 0 10px 40px rgba(0, 0, 0, 0.5);
+  z-index: 1000;
+  min-width: 320px;
+  max-width: 90vw;
+}
+
+.event-announcement-icon {
+  font-size: 48px;
+  animation: announcement-bounce 1s ease-in-out infinite;
+}
+
+@keyframes announcement-bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-5px); }
+}
+
+.event-announcement-content {
+  flex: 1;
+}
+
+.event-announcement-title {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.7);
+  font-weight: 600;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+}
+
+.event-announcement-name {
+  font-size: 24px;
+  font-weight: 900;
+  margin-bottom: 6px;
+}
+
+.event-announcement-desc {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.8);
+  margin-bottom: 10px;
+  line-height: 1.4;
+}
+
+.event-announcement-bonus {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.bonus-item {
+  padding: 4px 10px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #f1c40f;
+}
+
+.event-announcement-duration {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.event-announcement-rarity {
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: bold;
+  text-transform: uppercase;
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+}
+
+.rarity-badge-common {
+  background: linear-gradient(135deg, #95a5a6, #7f8c8d);
+  color: #fff;
+}
+
+.rarity-badge-rare {
+  background: linear-gradient(135deg, #3498db, #2980b9);
+  color: #fff;
+}
+
+.rarity-badge-epic {
+  background: linear-gradient(135deg, #9b59b6, #8e44ad);
+  color: #fff;
+}
+
+.rarity-badge-legendary {
+  background: linear-gradient(135deg, #f1c40f, #f39c12);
+  color: #000;
+  animation: legendary-glow 2s ease-in-out infinite;
+}
+
+@keyframes legendary-glow {
+  0%, 100% { box-shadow: 0 0 10px rgba(241, 196, 15, 0.5); }
+  50% { box-shadow: 0 0 25px rgba(241, 196, 15, 0.8); }
+}
+
+.rarity-common { color: #95a5a6; }
+.rarity-rare { color: #3498db; }
+.rarity-epic { color: #9b59b6; }
+.rarity-legendary { 
+  color: #f1c40f; 
+  text-shadow: 0 0 10px rgba(241, 196, 15, 0.8);
+  animation: legendary-text 2s ease-in-out infinite;
+}
+
+@keyframes legendary-text {
+  0%, 100% { filter: brightness(1); }
+  50% { filter: brightness(1.3); }
+}
+
+.announcement-enter-active {
+  animation: announcement-in 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+.announcement-leave-active {
+  animation: announcement-out 0.4s ease-in;
+}
+
+@keyframes announcement-in {
+  0% { opacity: 0; transform: translateX(-50%) translateY(-30px) scale(0.8); }
+  100% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+}
+
+@keyframes announcement-out {
+  0% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+  100% { opacity: 0; transform: translateX(-50%) translateY(-20px) scale(0.9); }
+}
+
+.event-panel-toggle {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, rgba(155, 89, 182, 0.9), rgba(142, 68, 173, 0.9));
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  color: #fff;
+  font-size: 24px;
+  cursor: pointer;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+  transition: all 0.3s ease;
+}
+
+.event-panel-toggle:hover {
+  transform: scale(1.1);
+  box-shadow: 0 6px 20px rgba(155, 89, 182, 0.5);
+}
+
+.event-panel-toggle .event-icon {
+  font-size: 22px;
+}
+
+.event-count-badge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 10px;
+  background: #e74c3c;
+  color: #fff;
+  font-size: 11px;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+.event-panel-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 200;
+}
+
+.event-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 380px;
+  max-width: 90vw;
+  height: 100vh;
+  background: linear-gradient(180deg, #1a1a2e 0%, #16213e 100%);
+  border-left: 2px solid rgba(155, 89, 182, 0.3);
+  z-index: 201;
+  overflow-y: auto;
+  box-shadow: -10px 0 30px rgba(0, 0, 0, 0.5);
+}
+
+.event-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  position: sticky;
+  top: 0;
+  background: rgba(26, 26, 46, 0.95);
+  backdrop-filter: blur(10px);
+  z-index: 10;
+}
+
+.event-panel-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: bold;
+  color: #fff;
+}
+
+.close-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  color: #fff;
+  font-size: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.close-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  transform: rotate(90deg);
+}
+
+.event-panel-actions {
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.refresh-btn {
+  padding: 10px 16px;
+  background: linear-gradient(135deg, #2ecc71, #27ae60);
+  border: none;
+  border-radius: 10px;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.refresh-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(46, 204, 113, 0.4);
+}
+
+.next-refresh {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.5);
+  text-align: center;
+}
+
+.event-list {
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.empty-events {
+  text-align: center;
+  padding: 40px 20px;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 14px;
+}
+
+.event-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1.5px solid rgba(255, 255, 255, 0.08);
+  border-left: 4px solid var(--event-color);
+  border-radius: 12px;
+  padding: 16px;
+  transition: all 0.3s ease;
+}
+
+.event-card:hover {
+  background: rgba(255, 255, 255, 0.06);
+  transform: translateX(-4px);
+  box-shadow: 0 4px 15px var(--event-glow);
+}
+
+.event-card-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.event-card-icon {
+  font-size: 36px;
+}
+
+.event-card-info {
+  flex: 1;
+}
+
+.event-card-name {
+  font-size: 16px;
+  font-weight: bold;
+  margin-bottom: 4px;
+}
+
+.event-card-rarity {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: bold;
+  text-transform: uppercase;
+}
+
+.event-card-desc {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.7);
+  margin-bottom: 12px;
+  line-height: 1.4;
+}
+
+.event-card-effects {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.effect-item {
+  padding: 4px 10px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.event-card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.affected-stations,
+.event-timer {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.event-timer {
+  font-weight: 600;
+  color: #f39c12;
+}
+
+.slide-right-enter-active {
+  animation: slide-in-right 0.3s ease-out;
+}
+
+.slide-right-leave-active {
+  animation: slide-out-right 0.3s ease-in;
+}
+
+@keyframes slide-in-right {
+  0% { transform: translateX(100%); opacity: 0; }
+  100% { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes slide-out-right {
+  0% { transform: translateX(0); opacity: 1; }
+  100% { transform: translateX(100%); opacity: 0; }
+}
+
+@media (max-width: 480px) {
+  .city-event-announcement {
+    top: 80px;
+    min-width: 280px;
+    padding: 16px;
+  }
+
+  .event-announcement-icon {
+    font-size: 36px;
+  }
+
+  .event-announcement-name {
+    font-size: 20px;
+  }
+
+  .event-panel {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .event-panel-toggle {
+    top: 15px;
+    right: 15px;
+    width: 44px;
+    height: 44px;
+    font-size: 20px;
   }
 }
 </style>

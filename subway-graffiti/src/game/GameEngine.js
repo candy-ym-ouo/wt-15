@@ -4,6 +4,7 @@ import { audioManager } from './AudioManager.js'
 import { scoreManager } from './ScoreManager.js'
 import { profileManager } from './ProfileManager.js'
 import { battlePassManager } from './BattlePassManager.js'
+import { cityEventManager } from './CityEventManager.js'
 import { MapScene } from './MapScene.js'
 import { GraffitiGame } from './GraffitiGame.js'
 import { PatrolAvoid } from './PatrolAvoid.js'
@@ -35,6 +36,7 @@ export class GameEngine {
     this.currentPhase = 0
     this.difficulty = 'normal'
     this.currentDifficultyParams = null
+    this.currentStationEffects = null
 
     this._pendingPhaseResult = null
     this._waitingForReplay = false
@@ -89,6 +91,24 @@ export class GameEngine {
     })
 
     this.app.ticker.maxFPS = 60
+
+    cityEventManager.init({
+      onEventStarted: (event) => {
+        if (this.callbacks.onCityEventStarted) {
+          this.callbacks.onCityEventStarted(event)
+        }
+      },
+      onEventExpired: (event) => {
+        if (this.callbacks.onCityEventExpired) {
+          this.callbacks.onCityEventExpired(event)
+        }
+      },
+      onEventsCleared: () => {
+        if (this.callbacks.onCityEventsCleared) {
+          this.callbacks.onCityEventsCleared()
+        }
+      }
+    })
 
     this._setupScenes()
     this._setupTicker()
@@ -181,6 +201,10 @@ export class GameEngine {
   }
 
   showMap() {
+    cityEventManager.checkAndRefreshEvents()
+    if (this.callbacks.onCityEventsUpdated) {
+      this.callbacks.onCityEventsUpdated(cityEventManager.getActiveEvents())
+    }
     this._fadeTransition(() => {
       this._hideAllScenes()
       this.mapScene.show()
@@ -285,9 +309,26 @@ export class GameEngine {
     this.currentPhase = 0
     this.stationStartScore = scoreManager.currentScore
     this.currentDifficultyParams = this.computeDifficultyParams()
+
+    const stationEffects = cityEventManager.getCombinedEffectsForStation(station.id)
+    this.currentStationEffects = stationEffects
+
     const stationScoreMultiplier = (station.graffiti && station.graffiti.scoreMultiplier) || 1
-    scoreManager.setScoreMultiplier(this.currentDifficultyParams.scoreMultiplier * stationScoreMultiplier)
+    const eventScoreMultiplier = stationEffects.scoreMultiplier || 1
+    const patrolScoreMultiplier = (station.patrol && station.patrol.scoreMultiplier) || 1
+    const totalMultiplier = this.currentDifficultyParams.scoreMultiplier *
+      stationScoreMultiplier *
+      eventScoreMultiplier *
+      patrolScoreMultiplier
+
+    scoreManager.setScoreMultiplier(totalMultiplier)
+    scoreManager.setCityEventEffects(stationEffects)
     scoreManager.startStation(station)
+
+    if (this.callbacks.onStationEffectsApplied) {
+      this.callbacks.onStationEffectsApplied(stationEffects, station.id)
+    }
+
     this._startNextPhase()
   }
 
@@ -314,6 +355,7 @@ export class GameEngine {
         this.state = GameState.GRAFFITI
         scoreManager.setPhaseType('graffiti')
         this.graffitiGame.setDifficulty(this.currentDifficultyParams.shrinkSpeedMultiplier)
+        this.graffitiGame.setCityEventEffects(this.currentStationEffects)
         this.graffitiGame.start(station)
       } else if (phase === 'patrol') {
         this.state = GameState.PATROL
@@ -322,6 +364,7 @@ export class GameEngine {
           this.currentDifficultyParams.patrolRangeMultiplier,
           this.currentDifficultyParams.extraGuardSpeed
         )
+        this.patrolGame.setCityEventEffects(this.currentStationEffects)
         this.patrolGame.start(station)
       }
 
@@ -528,8 +571,32 @@ export class GameEngine {
     }
   }
 
+  getCityEventManager() {
+    return cityEventManager
+  }
+
+  getActiveCityEvents() {
+    return cityEventManager.getActiveEvents()
+  }
+
+  getStationCityEvents(stationId) {
+    return cityEventManager.getEventsForStation(stationId)
+  }
+
+  getTimeUntilNextEventRefresh() {
+    return cityEventManager.getTimeUntilNextRefresh()
+  }
+
+  refreshCityEvents() {
+    cityEventManager.triggerManualRefresh()
+    if (this.callbacks.onCityEventsUpdated) {
+      this.callbacks.onCityEventsUpdated(cityEventManager.getActiveEvents())
+    }
+  }
+
   destroy() {
     window.removeEventListener('resize', this._onResize)
+    cityEventManager.destroy()
     if (this.mapScene) this.mapScene.destroy()
     if (this.graffitiGame) this.graffitiGame.destroy()
     if (this.patrolGame) this.patrolGame.destroy()

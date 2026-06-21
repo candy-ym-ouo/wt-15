@@ -11,7 +11,7 @@ class AudioManager {
     this.enabled = true
     this.musicNodes = []
     this.currentMusic = null
-    this._voiceTypes = ['click', 'unlock', 'station', 'milestone', 'trainArrival']
+    this._voiceTypes = ['click', 'unlock', 'station', 'milestone', 'trainArrival', 'cityEventStart', 'cityEventEnd']
   }
 
   init() {
@@ -171,6 +171,34 @@ class AudioManager {
             this.playTone(highFreq, config.duration * 1.5, config.type, 0.4, category)
           }, 400)
         }
+        break
+      }
+      case 'cityEventStart': {
+        const rarity = details?.rarity || 'common'
+        const rarityFreqs = {
+          common: [392, 523],
+          rare: [392, 523, 659],
+          epic: [392, 523, 659, 784],
+          legendary: [392, 523, 659, 784, 988]
+        }
+        const notes = rarityFreqs[rarity] || rarityFreqs.common
+        notes.forEach((freq, i) => {
+          setTimeout(() => this.playTone(freq, 0.15, 'sine', 0.35, category), i * 100)
+        })
+        setTimeout(() => {
+          this.playTone(notes[notes.length - 1] * 1.5, 0.3, 'sine', 0.3, category)
+        }, notes.length * 100)
+        break
+      }
+      case 'cityEventEnd': {
+        const freq = details?.freq || 440
+        this.playTone(freq, 0.2, 'triangle', 0.25, category)
+        setTimeout(() => this.playTone(freq * 0.75, 0.3, 'triangle', 0.2, category), 150)
+        break
+      }
+      case 'cityEventActive': {
+        const freq = details?.freq || 330
+        this.playTone(freq, 0.1, 'sine', 0.08, 'sfx')
         break
       }
     }

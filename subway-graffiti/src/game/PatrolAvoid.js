@@ -29,6 +29,7 @@ export class PatrolAvoid {
     this.bgDecorations = null
     this.currentLine = null
     this.disengageEffects = []
+    this.cityEventEffects = null
     this.setup()
   }
 
@@ -37,11 +38,39 @@ export class PatrolAvoid {
     this.extraGuardSpeed = extraGuardSpeed || 0
   }
 
-  getStationConfig(station, key, defaultValue) {
-    if (station && station.patrol && station.patrol[key] !== undefined) {
-      return station.patrol[key]
+  setCityEventEffects(effects) {
+    this.cityEventEffects = effects || null
+  }
+
+  _applyEventEffects(value, key, baseValue) {
+    if (!this.cityEventEffects?.patrol) return value
+
+    const eventConfig = this.cityEventEffects.patrol
+
+    if (eventConfig[key + 'Multiplier'] !== undefined) {
+      return value * eventConfig[key + 'Multiplier']
     }
-    return GAME_CONFIG.patrol[key] !== undefined ? GAME_CONFIG.patrol[key] : defaultValue
+
+    if (eventConfig[key + 'Add'] !== undefined) {
+      return Math.max(0, value + eventConfig[key + 'Add'])
+    }
+
+    if (eventConfig[key] !== undefined && key === 'laserEnabled') {
+      return eventConfig[key]
+    }
+
+    return value
+  }
+
+  getStationConfig(station, key, defaultValue) {
+    let value = defaultValue
+    if (station && station.patrol && station.patrol[key] !== undefined) {
+      value = station.patrol[key]
+    } else if (GAME_CONFIG.patrol[key] !== undefined) {
+      value = GAME_CONFIG.patrol[key]
+    }
+
+    return this._applyEventEffects(value, key, defaultValue)
   }
 
   getFeedbackText(type) {
@@ -462,7 +491,11 @@ export class PatrolAvoid {
     guard.addChild(body, hat, badge)
 
     const baseGuardSpeed = this.getStationConfig(this.station, 'guardSpeed', GAME_CONFIG.patrol.guardSpeed)
-    guard.baseSpeed = (baseGuardSpeed + this.extraGuardSpeed) * (0.8 + Math.random() * 0.4)
+    let guardSpeed = (baseGuardSpeed + this.extraGuardSpeed) * (0.8 + Math.random() * 0.4)
+    if (this.cityEventEffects?.patrol?.chaseSpeedMultiplier) {
+      guard.chaseSpeedMultiplier = this.cityEventEffects.patrol.chaseSpeedMultiplier
+    }
+    guard.baseSpeed = guardSpeed
     guard.speed = guard.baseSpeed
     guard.angle = Math.random() * Math.PI * 2
     guard.visionAngle = Math.random() * Math.PI * 2
@@ -1001,9 +1034,12 @@ export class PatrolAvoid {
         const dist = Math.sqrt(dx * dx + dy * dy)
 
         if (dist > 5) {
-          const speedMult = guard.isFlanking
+          let speedMult = guard.isFlanking
             ? (GAME_CONFIG.patrol.flankSpeedMultiplier || 1.3)
             : (GAME_CONFIG.patrol.chaseSpeedMultiplier || 1.6)
+          if (guard.chaseSpeedMultiplier) {
+            speedMult *= guard.chaseSpeedMultiplier
+          }
           const chaseSpeed = guard.baseSpeed * speedMult
           const move = Math.min(chaseSpeed * delta, dist)
           guard.x += (dx / dist) * move

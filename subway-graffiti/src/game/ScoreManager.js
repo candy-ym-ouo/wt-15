@@ -33,6 +33,7 @@ class ScoreManager {
     this.stationScores = {}
     this.difficulty = 'normal'
     this.scoreMultiplier = 1
+    this.cityEventEffects = null
 
     this.totalMilestones = 0
     this.totalMilestoneBonus = 0
@@ -371,6 +372,34 @@ class ScoreManager {
     this.scoreMultiplier = multiplier
   }
 
+  setCityEventEffects(effects) {
+    this.cityEventEffects = effects || null
+  }
+
+  getCityEventEffects() {
+    return this.cityEventEffects
+  }
+
+  _applyCityEventScoreModifiers(type, basePoints) {
+    if (!this.cityEventEffects?.graffiti) return basePoints
+
+    const graffitiEffects = this.cityEventEffects.graffiti
+
+    if (type === 'perfect' && graffitiEffects.perfectScoreMultiplier) {
+      return Math.floor(basePoints * graffitiEffects.perfectScoreMultiplier)
+    }
+    if (type === 'good' && graffitiEffects.goodScoreMultiplier) {
+      return Math.floor(basePoints * graffitiEffects.goodScoreMultiplier)
+    }
+
+    return basePoints
+  }
+
+  _applyCityEventComboBonus(baseMultiplier) {
+    if (!this.cityEventEffects?.graffiti?.comboBonusMultiplier) return baseMultiplier
+    return baseMultiplier * this.cityEventEffects.graffiti.comboBonusMultiplier
+  }
+
   addScore(type, extra = {}) {
     let points = 0
     const comboConfig = GAME_CONFIG.comboSystem
@@ -380,6 +409,7 @@ class ScoreManager {
     switch (type) {
       case 'perfect':
         points = GAME_CONFIG.graffiti.perfectScore
+        points = this._applyCityEventScoreModifiers('perfect', points)
         this.perfectCount++
         this.stationPerfectCount++
         this.currentPerfectStreak++
@@ -422,6 +452,7 @@ class ScoreManager {
 
       case 'good':
         points = GAME_CONFIG.graffiti.goodScore
+        points = this._applyCityEventScoreModifiers('good', points)
         this.combo++
         this.goodCount++
         this.stationGoodCount++
@@ -548,7 +579,9 @@ class ScoreManager {
     }
 
     if (this.combo > 1 && points > 0) {
-      points = Math.floor(points * (1 + this.combo * 0.1))
+      let comboMultiplier = 1 + this.combo * 0.1
+      comboMultiplier = this._applyCityEventComboBonus(comboMultiplier)
+      points = Math.floor(points * comboMultiplier)
     }
 
     if (points > 0 && this.scoreMultiplier > 1) {
