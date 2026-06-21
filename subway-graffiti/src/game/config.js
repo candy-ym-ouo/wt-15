@@ -350,6 +350,41 @@ export const LINES = [
     id: 1,
     name: '1号线 - 红',
     color: '#e94560',
+    theme: {
+      name: '复古工业风',
+      description: '老城区红砖旧巷，充满历史韵味',
+      wall: {
+        type: 'brick',
+        baseColor: '#8b4513',
+        brickColor: '#a0522d',
+        mortarColor: '#654321',
+        brickWidth: 80,
+        brickHeight: 40,
+        texture: 'rough',
+        decorations: ['graffiti_tag', 'poster', 'crack']
+      },
+      patrol: {
+        type: 'street',
+        bgColor: '#1a1a2e',
+        gridColor: '#2a2a4e',
+        groundColor: '#2c2c3e',
+        accentColor: '#e94560',
+        atmosphere: 'night',
+        decorations: ['streetlight', 'fire_hydrant', 'manhole']
+      },
+      ui: {
+        primary: '#e94560',
+        secondary: '#ff6b6b',
+        accent: '#f39c12',
+        gradient: 'linear-gradient(135deg, #e94560 0%, #ff6b6b 100%)',
+        glowColor: 'rgba(233, 69, 96, 0.4)'
+      },
+      map: {
+        bgColor: '#0d0d1a',
+        lineGlow: 'rgba(233, 69, 96, 0.3)',
+        stationPulse: '#ff6b6b'
+      }
+    },
     stations: [
       {
         id: 's1-1', name: '起点站', x: 100, y: 300, unlocked: true, isBranch: false,
@@ -469,6 +504,41 @@ export const LINES = [
     id: 2,
     name: '2号线 - 蓝',
     color: '#3498db',
+    theme: {
+      name: '现代科技风',
+      description: '新城区玻璃幕墙，充满未来感',
+      wall: {
+        type: 'glass',
+        baseColor: '#1a3a5c',
+        panelColor: '#2c5282',
+        frameColor: '#4a90d9',
+        panelWidth: 100,
+        panelHeight: 120,
+        texture: 'smooth',
+        decorations: ['neon_sign', 'reflection', 'grid_line']
+      },
+      patrol: {
+        type: 'metro',
+        bgColor: '#0a1929',
+        gridColor: '#1e3a5f',
+        groundColor: '#0f2744',
+        accentColor: '#3498db',
+        atmosphere: 'cyberpunk',
+        decorations: ['hologram', 'tech_panel', 'energy_bar']
+      },
+      ui: {
+        primary: '#3498db',
+        secondary: '#5dade2',
+        accent: '#00ffcc',
+        gradient: 'linear-gradient(135deg, #3498db 0%, #00ffcc 100%)',
+        glowColor: 'rgba(52, 152, 219, 0.4)'
+      },
+      map: {
+        bgColor: '#0a1929',
+        lineGlow: 'rgba(52, 152, 219, 0.3)',
+        stationPulse: '#5dade2'
+      }
+    },
     stations: [
       {
         id: 's2-1', name: '北站', x: 100, y: 700, unlocked: true, isBranch: false,

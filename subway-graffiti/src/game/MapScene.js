@@ -21,11 +21,15 @@ export class MapScene {
   setup() {
     this.app.stage.addChild(this.container)
 
-    const bg = new PIXI.Graphics()
-    bg.beginFill(0x0a0a1a, 0.95)
-    bg.drawRect(0, 0, GAME_CONFIG.width, GAME_CONFIG.height)
-    bg.endFill()
-    this.container.addChild(bg)
+    this.bg = new PIXI.Graphics()
+    this.container.addChild(this.bg)
+
+    this.themeDecorations = new PIXI.Container()
+    this.container.addChild(this.themeDecorations)
+
+    this.lineGlowLayers = []
+    this.drawBackground()
+    this.drawThemeDecorations()
 
     const title = new PIXI.Text('地铁线路图', {
       fontFamily: 'Arial',
@@ -56,21 +60,89 @@ export class MapScene {
     this.createLegend()
   }
 
+  drawBackground() {
+    this.bg.clear()
+    
+    const gradient = this.bg.createLinearGradient
+    this.bg.beginFill(0x0a0a1a, 0.95)
+    this.bg.drawRect(0, 0, GAME_CONFIG.width, GAME_CONFIG.height)
+    this.bg.endFill()
+
+    for (let i = 0; i < 50; i++) {
+      const x = Math.random() * GAME_CONFIG.width
+      const y = Math.random() * GAME_CONFIG.height
+      const size = Math.random() * 2 + 0.5
+      this.bg.beginFill(0xffffff, Math.random() * 0.3 + 0.1)
+      this.bg.drawCircle(x, y, size)
+      this.bg.endFill()
+    }
+  }
+
+  drawThemeDecorations() {
+    this.themeDecorations.removeChildren()
+
+    LINES.forEach((line, lineIdx) => {
+      const theme = line.theme
+      const lineColor = parseInt(line.color.replace('#', '0x'))
+      
+      const decorations = new PIXI.Container()
+      decorations.alpha = 0.15
+      
+      const centerY = lineIdx === 0 ? 350 : 900
+      
+      for (let i = 0; i < 8; i++) {
+        const deco = new PIXI.Graphics()
+        const x = 80 + i * 90 + Math.random() * 20
+        const y = centerY + (Math.random() - 0.5) * 200
+        const size = 15 + Math.random() * 25
+        
+        if (theme.wall.type === 'brick') {
+          deco.beginFill(lineColor, 0.3)
+          deco.drawRoundedRect(x - size/2, y - size/3, size, size * 0.6, 3)
+          deco.endFill()
+        } else {
+          deco.beginFill(lineColor, 0.2)
+          deco.drawRect(x - size/2, y - size/2, size, size)
+          deco.endFill()
+          deco.lineStyle(1, lineColor, 0.4)
+          deco.drawRect(x - size/2, y - size/2, size, size)
+          deco.endFill()
+        }
+        
+        decorations.addChild(deco)
+      }
+      
+      this.themeDecorations.addChild(decorations)
+    })
+  }
+
   drawLines() {
     LINES.forEach(line => {
+      const lineColor = parseInt(line.color.replace('#', '0x'))
+      const theme = line.theme
+      
+      const glowGraphics = new PIXI.Graphics()
       const mainGraphics = new PIXI.Graphics()
       const branchGraphics = new PIXI.Graphics()
-
-      const lineColor = parseInt(line.color.replace('#', '0x'))
 
       line.stations.forEach(station => {
         if (station.unlockCondition && station.unlockCondition.type === 'score') {
           const prereqStation = line.stations.find(s => s.id === station.unlockCondition.prerequisite)
           if (prereqStation) {
             const g = station.isBranch ? branchGraphics : mainGraphics
+            const glowG = station.isBranch ? branchGraphics : glowGraphics
+            
             if (station.isBranch) {
               g.lineStyle(4, 0x9b59b6, 0.7)
             } else {
+              glowG.lineStyle(14, lineColor, 0.15)
+              glowG.moveTo(prereqStation.x, prereqStation.y)
+              glowG.lineTo(station.x, station.y)
+              
+              glowG.lineStyle(10, lineColor, 0.25)
+              glowG.moveTo(prereqStation.x, prereqStation.y)
+              glowG.lineTo(station.x, station.y)
+              
               g.lineStyle(6, lineColor, 0.8)
             }
             g.moveTo(prereqStation.x, prereqStation.y)
@@ -79,8 +151,11 @@ export class MapScene {
         }
       })
 
+      this.container.addChild(glowGraphics)
       this.container.addChild(mainGraphics)
       this.container.addChild(branchGraphics)
+      
+      this.lineGlowLayers.push({ line, glow: glowGraphics, main: mainGraphics })
     })
   }
 
@@ -240,10 +315,10 @@ export class MapScene {
   createTrain() {
     this.train = new PIXI.Container()
 
-    const body = new PIXI.Graphics()
-    body.beginFill(0xe94560)
-    body.drawRoundedRect(-30, -18, 60, 36, 8)
-    body.endFill()
+    this.trainBody = new PIXI.Graphics()
+    this.trainBody.beginFill(0xe94560)
+    this.trainBody.drawRoundedRect(-30, -18, 60, 36, 8)
+    this.trainBody.endFill()
 
     const stripe = new PIXI.Graphics()
     stripe.beginFill(0xffffff, 0.3)
@@ -260,7 +335,7 @@ export class MapScene {
     window2.drawRoundedRect(10, -12, 14, 10, 2)
     window2.endFill()
 
-    this.train.addChild(body, stripe, window1, window2)
+    this.train.addChild(this.trainBody, stripe, window1, window2)
 
     const firstStation = LINES[0].stations[0]
     this.train.x = firstStation.x
@@ -268,6 +343,15 @@ export class MapScene {
     this.train.scale.set(1.2)
 
     this.container.addChild(this.train)
+  }
+
+  updateTrainColor(line) {
+    if (!this.trainBody || !line) return
+    const lineColor = parseInt(line.color.replace('#', '0x'))
+    this.trainBody.clear()
+    this.trainBody.beginFill(lineColor)
+    this.trainBody.drawRoundedRect(-30, -18, 60, 36, 8)
+    this.trainBody.endFill()
   }
 
   createLegend() {
@@ -358,6 +442,8 @@ export class MapScene {
     this.isTransitioning = false
     this.currentLineIndex = LINES.indexOf(line)
     this.currentStationIndex = idx
+    
+    this.updateTrainColor(line)
 
     if (!scoreManager.unlockedStations.includes(station.id)) {
       scoreManager.unlockedStations.push(station.id)

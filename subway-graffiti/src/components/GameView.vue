@@ -1,13 +1,14 @@
 <script setup>import { ref, onMounted, onUnmounted, computed, reactive, watch } from 'vue';
 import { GameEngine, GameState } from '@/game/GameEngine.js';
 import { scoreManager } from '@/game/ScoreManager.js';
-import { GAME_CONFIG } from '@/game/config.js';
+import { GAME_CONFIG, LINES } from '@/game/config.js';
 import { audioManager } from '@/game/AudioManager.js';
 const canvasRef = ref(null);
 const containerRef = ref(null);
 let engine = null;
 const currentState = ref(GameState.MENU);
 const phaseInfo = ref(null);
+const currentLine = ref(null);
 const score = ref(0);
 const combo = ref(0);
 const promptText = ref('');
@@ -29,6 +30,21 @@ const scoreTrend = ref([]);
 const missSourceStats = ref({ timeout: 0, early: 0, late: 0 });
 const caughtStats = ref({ locations: {}, sources: {} });
 const statsTab = ref('overview');
+
+const currentTheme = computed(() => {
+  if (currentLine.value?.theme) {
+    return currentLine.value.theme;
+  }
+  return {
+    ui: {
+      primary: '#e94560',
+      secondary: '#ff6b6b',
+      accent: '#f39c12',
+      gradient: 'linear-gradient(135deg, #e94560 0%, #ff6b6b 100%)',
+      glowColor: 'rgba(233, 69, 96, 0.4)'
+    }
+  };
+});
 
 const currentPromptConfig = computed(() => scoreManager.getSkinPrompt());
 const skins = computed(() => {
@@ -179,6 +195,9 @@ function onStateChange(state, data) {
  currentState.value = state;
  if (state === GameState.GRAFFITI || state === GameState.PATROL) {
  phaseInfo.value = data;
+ if (data?.line) {
+   currentLine.value = data.line;
+ }
  }
  else if (state === GameState.GAME_OVER) {
  gameResult.value = data;
@@ -186,6 +205,12 @@ function onStateChange(state, data) {
  }
  else if (state === GameState.STATION_COMPLETE) {
  stationResult.value = data;
+ if (data?.line) {
+   currentLine.value = data.line;
+ }
+ }
+ else if (state === GameState.MAP) {
+ currentLine.value = null;
  }
 }
 function onTick() {
@@ -320,14 +345,14 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="game-container" ref="containerRef">
+  <div class="game-container" ref="containerRef" :style="{ '--line-primary': currentTheme.ui.primary, '--line-secondary': currentTheme.ui.secondary, '--line-accent': currentTheme.ui.accent, '--line-glow': currentTheme.ui.glowColor }">
     <canvas ref="canvasRef"></canvas>
 
     <div class="ui-overlay">
       <div v-if="currentState === GameState.GRAFFITI || currentState === GameState.PATROL" class="hud">
         <div class="hud-item">
           <div class="hud-label">得分</div>
-          <div class="hud-value">{{ score }}</div>
+          <div class="hud-value" :style="{ color: currentTheme.ui.primary, textShadow: `0 0 10px ${currentTheme.ui.glowColor}` }">{{ score }}</div>
         </div>
         <div v-if="phaseInfo" class="hud-item" style="text-align: center;">
           <div class="hud-label">{{ phaseInfo.station?.name || '站点' }}</div>
@@ -340,11 +365,11 @@ onUnmounted(() => {
         </div>
         <div class="hud-item" style="text-align: right;">
           <div class="hud-label">最高</div>
-          <div class="hud-value">{{ stats.highScore }}</div>
+          <div class="hud-value" :style="{ color: currentTheme.ui.primary }">{{ stats.highScore }}</div>
         </div>
       </div>
 
-      <div v-if="combo > 1 && (currentState === GameState.GRAFFITI || currentState === GameState.PATROL)" class="combo-display">
+      <div v-if="combo > 1 && (currentState === GameState.GRAFFITI || currentState === GameState.PATROL)" class="combo-display" :style="{ color: currentTheme.ui.accent, textShadow: `0 0 15px ${currentTheme.ui.glowColor}` }">
         {{ combo }} COMBO
       </div>
 
@@ -886,14 +911,14 @@ onUnmounted(() => {
       </div>
 
       <div v-if="currentState === GameState.STATION_COMPLETE" class="screen">
-        <div class="screen-title" style="font-size: 36px;">站点完成!</div>
+        <div class="screen-title" style="font-size: 36px; background: linear-gradient(135deg, #f1c40f, var(--line-primary)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">站点完成!</div>
         <div class="screen-subtitle">{{ stationResult?.station?.name || '站点' }}</div>
-        <div v-if="stationResult?.station?.feedback?.complete" style="text-align: center; color: #2ecc71; font-size: 18px; margin-top: 10px; opacity: 0.9;">
+        <div v-if="stationResult?.station?.feedback?.complete" style="text-align: center; color: var(--line-accent); font-size: 18px; margin-top: 10px; opacity: 0.9;">
           ✨ {{ stationResult.station.feedback.complete }}
         </div>
 
         <div class="screen-content">
-          <div v-if="stationResult?.evaluation" style="background: linear-gradient(135deg, rgba(241, 196, 15, 0.15), rgba(233, 69, 96, 0.1)); border-radius: 16px; padding: 20px; margin-bottom: 16px; border: 2px solid rgba(241, 196, 15, 0.3);">
+          <div v-if="stationResult?.evaluation" :style="{ background: `linear-gradient(135deg, rgba(241, 196, 15, 0.15), ${currentTheme.ui.glowColor})`, borderColor: `${currentTheme.ui.primary}4d` }" style="border-radius: 16px; padding: 20px; margin-bottom: 16px; border: 2px solid rgba(241, 196, 15, 0.3);">
             <div style="text-align: center; margin-bottom: 12px;">
               <div style="font-size: 14px; opacity: 0.7; margin-bottom: 4px;">站点评价</div>
               <div class="star-rating">
@@ -904,7 +929,7 @@ onUnmounted(() => {
                   :class="{ active: i <= stationResult.evaluation.stars, empty: i > stationResult.evaluation.stars }"
                 >★</span>
               </div>
-              <div style="font-size: 24px; font-weight: 900; margin-top: 8px; background: linear-gradient(135deg, #f1c40f, #e94560); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">
+              <div style="font-size: 24px; font-weight: 900; margin-top: 8px; background: linear-gradient(135deg, #f1c40f, var(--line-primary)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">
                 {{ stationResult.evaluation.rank }} · {{ stationResult.evaluation.score }}分
               </div>
             </div>
@@ -938,10 +963,10 @@ onUnmounted(() => {
             </div>
           </div>
 
-          <div style="background: linear-gradient(135deg, rgba(46, 204, 113, 0.1), rgba(52, 152, 219, 0.1)); border-radius: 16px; padding: 24px; border: 2px solid rgba(46, 204, 113, 0.3);">
+          <div :style="{ background: `linear-gradient(135deg, ${currentTheme.ui.glowColor}, rgba(52, 152, 219, 0.1))`, borderColor: `${currentTheme.ui.primary}4d` }" style="border-radius: 16px; padding: 24px; border: 2px solid rgba(46, 204, 113, 0.3);">
             <div style="text-align: center;">
               <div style="font-size: 16px; opacity: 0.7; margin-bottom: 8px;">当前得分</div>
-              <div style="font-size: 56px; font-weight: 900; color: #2ecc71; text-shadow: 0 0 30px rgba(46, 204, 113, 0.4);">
+              <div :style="{ color: currentTheme.ui.primary, textShadow: `0 0 30px ${currentTheme.ui.glowColor}` }" style="font-size: 56px; font-weight: 900;">
                 {{ score.toLocaleString() }}
               </div>
             </div>
@@ -963,7 +988,7 @@ onUnmounted(() => {
             </div>
           </div>
 
-          <button class="btn btn-primary" style="width: 100%;" @click="continueAfterStation">
+          <button class="btn btn-primary" :style="{ background: currentTheme.ui.gradient }" style="width: 100%;" @click="continueAfterStation">
             🗺️ 前往下一站
           </button>
 

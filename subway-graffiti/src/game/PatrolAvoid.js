@@ -1,5 +1,5 @@
 import * as PIXI from 'pixi.js'
-import { GAME_CONFIG } from './config.js'
+import { GAME_CONFIG, LINES } from './config.js'
 import { scoreManager } from './ScoreManager.js'
 import { audioManager } from './AudioManager.js'
 
@@ -25,6 +25,8 @@ export class PatrolAvoid {
     this.shieldEffect = null
     this.riskIndicators = []
     this.lastSafeZone = null
+    this.bgDecorations = null
+    this.currentLine = null
     this.setup()
   }
 
@@ -58,21 +60,16 @@ export class PatrolAvoid {
   setup() {
     this.app.stage.addChild(this.container)
 
-    const bg = new PIXI.Graphics()
-    bg.beginFill(0x1a1a2e)
-    bg.drawRect(0, 0, GAME_CONFIG.width, GAME_CONFIG.height)
-    bg.endFill()
-    this.container.addChild(bg)
+    this.bg = new PIXI.Graphics()
+    this.container.addChild(this.bg)
+    
+    this.bgGrid = new PIXI.Container()
+    this.container.addChild(this.bgGrid)
+    
+    this.bgDecorations = new PIXI.Container()
+    this.container.addChild(this.bgDecorations)
 
-    for (let x = 0; x < GAME_CONFIG.width; x += 100) {
-      for (let y = 0; y < GAME_CONFIG.height; y += 100) {
-        const tile = new PIXI.Graphics()
-        tile.lineStyle(1, 0x2a2a4e, 0.5)
-        tile.drawRect(x, y, 100, 100)
-        tile.endFill()
-        this.container.addChild(tile)
-      }
-    }
+    this.drawBackground()
 
     this.createSafeZones()
 
@@ -129,6 +126,155 @@ export class PatrolAvoid {
     this.dangerFlash.drawRect(0, 0, GAME_CONFIG.width, GAME_CONFIG.height)
     this.dangerFlash.endFill()
     this.container.addChild(this.dangerFlash)
+  }
+
+  drawBackground(line = null) {
+    const theme = line?.theme
+    const patrolConfig = theme?.patrol
+    
+    this.bg.clear()
+    this.bgGrid.removeChildren()
+    this.bgDecorations.removeChildren()
+    
+    const bgColor = patrolConfig ? parseInt(patrolConfig.bgColor.replace('#', '0x')) : 0x1a1a2e
+    const gridColor = patrolConfig ? parseInt(patrolConfig.gridColor.replace('#', '0x')) : 0x2a2a4e
+    const groundColor = patrolConfig ? parseInt(patrolConfig.groundColor.replace('#', '0x')) : 0x2c2c3e
+    const accentColor = patrolConfig ? parseInt(patrolConfig.accentColor.replace('#', '0x')) : 0xe94560
+    
+    this.bg.beginFill(bgColor)
+    this.bg.drawRect(0, 0, GAME_CONFIG.width, GAME_CONFIG.height)
+    this.bg.endFill()
+    
+    const gridSize = 100
+    for (let x = 0; x < GAME_CONFIG.width; x += gridSize) {
+      for (let y = 0; y < GAME_CONFIG.height; y += gridSize) {
+        const tile = new PIXI.Graphics()
+        tile.lineStyle(1, gridColor, 0.5)
+        tile.drawRect(x, y, gridSize, gridSize)
+        tile.endFill()
+        this.bgGrid.addChild(tile)
+      }
+    }
+    
+    if (patrolConfig && patrolConfig.type === 'metro') {
+      for (let i = 0; i < 6; i++) {
+        const panel = new PIXI.Graphics()
+        const px = 60 + (i % 3) * 250
+        const py = 180 + Math.floor(i / 3) * 400 + Math.random() * 100
+        const pw = 80 + Math.random() * 60
+        const ph = 120 + Math.random() * 80
+        
+        panel.beginFill(accentColor, 0.08)
+        panel.lineStyle(2, accentColor, 0.2)
+        panel.drawRoundedRect(px, py, pw, ph, 6)
+        panel.endFill()
+        
+        for (let j = 0; j < 4; j++) {
+          const bar = new PIXI.Graphics()
+          bar.beginFill(accentColor, 0.15 + Math.random() * 0.15)
+          bar.drawRect(px + 8, py + 10 + j * 25, pw - 16, 8)
+          bar.endFill()
+          this.bgDecorations.addChild(bar)
+        }
+        
+        this.bgDecorations.addChild(panel)
+      }
+      
+      for (let i = 0; i < 4; i++) {
+        const energyBar = new PIXI.Graphics()
+        const ex = 100 + i * 180
+        const ey = 250 + Math.random() * 600
+        const ew = 8
+        const eh = 60 + Math.random() * 80
+        
+        energyBar.beginFill(groundColor)
+        energyBar.drawRoundedRect(ex, ey, ew, eh, 4)
+        energyBar.endFill()
+        
+        const fillHeight = eh * (0.3 + Math.random() * 0.7)
+        energyBar.beginFill(accentColor, 0.6)
+        energyBar.drawRoundedRect(ex, ey + eh - fillHeight, ew, fillHeight, 4)
+        energyBar.endFill()
+        
+        this.bgDecorations.addChild(energyBar)
+      }
+      
+      for (let i = 0; i < 3; i++) {
+        const hologram = new PIXI.Text('◈', {
+          fontFamily: 'Arial',
+          fontSize: 40 + Math.random() * 30,
+          fill: accentColor,
+          alpha: 0.15 + Math.random() * 0.1
+        })
+        hologram.x = 100 + Math.random() * (GAME_CONFIG.width - 200)
+        hologram.y = 200 + Math.random() * (GAME_CONFIG.height - 400)
+        this.bgDecorations.addChild(hologram)
+      }
+      
+    } else {
+      for (let i = 0; i < 4; i++) {
+        const streetLight = new PIXI.Graphics()
+        const sx = 100 + i * 200
+        const sy = 150 + Math.random() * 200
+        
+        streetLight.lineStyle(4, 0x444455)
+        streetLight.moveTo(sx, sy)
+        streetLight.lineTo(sx, sy + 100)
+        streetLight.endFill()
+        
+        streetLight.beginFill(accentColor, 0.3)
+        streetLight.drawCircle(sx, sy, 25)
+        streetLight.endFill()
+        
+        streetLight.beginFill(0xffffaa, 0.6)
+        streetLight.drawCircle(sx, sy, 12)
+        streetLight.endFill()
+        
+        this.bgDecorations.addChild(streetLight)
+      }
+      
+      for (let i = 0; i < 3; i++) {
+        const manhole = new PIXI.Graphics()
+        const mx = 150 + i * 250 + Math.random() * 50
+        const my = 400 + Math.random() * 500
+        
+        manhole.lineStyle(3, 0x333344, 0.6)
+        manhole.drawCircle(mx, my, 30)
+        manhole.endFill()
+        
+        manhole.lineStyle(2, 0x444455, 0.4)
+        manhole.drawCircle(mx, my, 22)
+        manhole.endFill()
+        
+        this.bgDecorations.addChild(manhole)
+      }
+      
+      for (let i = 0; i < 2; i++) {
+        const hydrant = new PIXI.Graphics()
+        const hx = 200 + i * 400
+        const hy = 500 + Math.random() * 300
+        
+        hydrant.beginFill(0xcc3333, 0.7)
+        hydrant.drawRoundedRect(hx - 10, hy - 20, 20, 35, 4)
+        hydrant.endFill()
+        
+        hydrant.beginFill(0xaa2222, 0.7)
+        hydrant.drawRoundedRect(hx - 15, hy - 25, 30, 10, 3)
+        hydrant.endFill()
+        
+        this.bgDecorations.addChild(hydrant)
+      }
+    }
+  }
+
+  getLineByStation(station) {
+    if (!station) return LINES[0]
+    for (const line of LINES) {
+      if (line.stations.some(s => s.id === station.id)) {
+        return line
+      }
+    }
+    return LINES[0]
   }
 
   createSafeZones() {
@@ -375,9 +521,12 @@ export class PatrolAvoid {
     this.spawnTimer = 1500
     this.laserTimer = 3000
     this.station = station || null
+    this.currentLine = this.getLineByStation(station)
     this.startTime = Date.now()
     this.riskIndicators = []
     this.lastSafeZone = null
+    
+    this.drawBackground(this.currentLine)
 
     this.safeZones.forEach(zone => {
       zone.onCooldown = false

@@ -261,6 +261,7 @@ export class GameEngine {
     this.state = GameState.STATION_COMPLETE
     this.callbacks.onStateChange(this.state, {
       station: this.currentStation,
+      line: this.currentLine,
       stationsCompleted: this.stationsCompleted,
       difficulty: this.difficulty,
       nextDifficultyParams: this.difficulty === 'hard' ? this.computeDifficultyParams() : null,

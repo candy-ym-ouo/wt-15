@@ -1,5 +1,5 @@
 import * as PIXI from 'pixi.js'
-import { GAME_CONFIG } from './config.js'
+import { GAME_CONFIG, LINES } from './config.js'
 import { scoreManager } from './ScoreManager.js'
 import { audioManager } from './AudioManager.js'
 
@@ -16,12 +16,14 @@ export class GraffitiGame {
     this.duration = 30
     this.isRunning = false
     this.wall = null
+    this.wallDecorations = null
     this.graffitiMarks = []
     this.shrinkSpeedMultiplier = 1
     this.shakeTime = 0
     this.shakeIntensity = 0
     this.shockwaves = []
     this.milestoneParticles = []
+    this.currentLine = null
     this.setup()
   }
 
@@ -56,26 +58,12 @@ export class GraffitiGame {
     this.app.stage.addChild(this.container)
 
     this.wall = new PIXI.Graphics()
-    this.wall.beginFill(0x2c3e50)
-    this.wall.drawRect(0, 100, GAME_CONFIG.width, GAME_CONFIG.height - 300)
-    this.wall.endFill()
-
-    for (let x = 0; x < GAME_CONFIG.width; x += 80) {
-      for (let y = 100; y < GAME_CONFIG.height - 300; y += 40) {
-        this.wall.lineStyle(2, 0x1a252f, 0.8)
-        this.wall.moveTo(x, y)
-        this.wall.lineTo(x + 80, y)
-      }
-    }
-    for (let y = 100; y < GAME_CONFIG.height - 300; y += 40) {
-      for (let x = 0; x < GAME_CONFIG.width; x += 80) {
-        const offset = (Math.floor((y - 100) / 40) % 2) * 40
-        this.wall.lineStyle(2, 0x1a252f, 0.8)
-        this.wall.moveTo(x + offset, y)
-        this.wall.lineTo(x + offset, y + 40)
-      }
-    }
     this.container.addChild(this.wall)
+    
+    this.wallDecorations = new PIXI.Container()
+    this.container.addChild(this.wallDecorations)
+
+    this.drawWall()
 
     this.promptText = new PIXI.Text('', {
       fontFamily: 'Arial',
@@ -103,6 +91,137 @@ export class GraffitiGame {
     this.wall.mask = this.progressMask
   }
 
+  drawWall(line = null) {
+    const theme = line?.theme
+    const wallConfig = theme?.wall
+    
+    this.wall.clear()
+    this.wallDecorations.removeChildren()
+    
+    const wallTop = 100
+    const wallBottom = GAME_CONFIG.height - 300
+    const wallHeight = wallBottom - wallTop
+    
+    if (wallConfig && wallConfig.type === 'glass') {
+      const baseColor = parseInt(wallConfig.baseColor.replace('#', '0x'))
+      const panelColor = parseInt(wallConfig.panelColor.replace('#', '0x'))
+      const frameColor = parseInt(wallConfig.frameColor.replace('#', '0x'))
+      const panelWidth = wallConfig.panelWidth || 100
+      const panelHeight = wallConfig.panelHeight || 120
+      
+      this.wall.beginFill(baseColor)
+      this.wall.drawRect(0, wallTop, GAME_CONFIG.width, wallHeight)
+      this.wall.endFill()
+      
+      for (let y = wallTop; y < wallBottom; y += panelHeight) {
+        for (let x = 0; x < GAME_CONFIG.width; x += panelWidth) {
+          const shade = Math.random() * 0.2 + 0.8
+          this.wall.beginFill(panelColor, shade)
+          this.wall.drawRect(x + 2, y + 2, panelWidth - 4, panelHeight - 4)
+          this.wall.endFill()
+          
+          this.wall.lineStyle(2, frameColor, 0.6)
+          this.wall.drawRect(x, y, panelWidth, panelHeight)
+          this.wall.endFill()
+        }
+      }
+      
+      for (let i = 0; i < 5; i++) {
+        const reflection = new PIXI.Graphics()
+        const rx = Math.random() * GAME_CONFIG.width
+        const ry = wallTop + Math.random() * wallHeight * 0.5
+        const rw = 30 + Math.random() * 50
+        const rh = 80 + Math.random() * 120
+        
+        reflection.beginFill(0xffffff, 0.05 + Math.random() * 0.05)
+        reflection.drawRoundedRect(rx, ry, rw, rh, 5)
+        reflection.endFill()
+        
+        this.wallDecorations.addChild(reflection)
+      }
+      
+      for (let i = 0; i < 3; i++) {
+        const neon = new PIXI.Text('▮▮▮', {
+          fontFamily: 'Arial',
+          fontSize: 24 + Math.random() * 20,
+          fill: parseInt(theme.ui.accent.replace('#', '0x')),
+          alpha: 0.3 + Math.random() * 0.3
+        })
+        neon.x = 50 + Math.random() * (GAME_CONFIG.width - 150)
+        neon.y = wallTop + 50 + Math.random() * (wallHeight - 150)
+        this.wallDecorations.addChild(neon)
+      }
+      
+    } else {
+      const brickColor = wallConfig ? parseInt(wallConfig.brickColor.replace('#', '0x')) : 0xa0522d
+      const mortarColor = wallConfig ? parseInt(wallConfig.mortarColor.replace('#', '0x')) : 0x654321
+      const brickWidth = wallConfig?.brickWidth || 80
+      const brickHeight = wallConfig?.brickHeight || 40
+      const baseColor = wallConfig ? parseInt(wallConfig.baseColor.replace('#', '0x')) : 0x8b4513
+      
+      this.wall.beginFill(baseColor)
+      this.wall.drawRect(0, wallTop, GAME_CONFIG.width, wallHeight)
+      this.wall.endFill()
+      
+      for (let x = 0; x < GAME_CONFIG.width; x += brickWidth) {
+        for (let y = wallTop; y < wallBottom; y += brickHeight) {
+          this.wall.lineStyle(2, mortarColor, 0.8)
+          this.wall.moveTo(x, y)
+          this.wall.lineTo(x + brickWidth, y)
+        }
+      }
+      for (let y = wallTop; y < wallBottom; y += brickHeight) {
+        for (let x = 0; x < GAME_CONFIG.width; x += brickWidth) {
+          const offset = (Math.floor((y - wallTop) / brickHeight) % 2) * (brickWidth / 2)
+          this.wall.lineStyle(2, mortarColor, 0.8)
+          this.wall.moveTo(x + offset, y)
+          this.wall.lineTo(x + offset, y + brickHeight)
+        }
+      }
+      
+      for (let i = 0; i < 8; i++) {
+        const stain = new PIXI.Graphics()
+        const sx = Math.random() * GAME_CONFIG.width
+        const sy = wallTop + Math.random() * wallHeight
+        const sr = 20 + Math.random() * 40
+        
+        stain.beginFill(0x000000, 0.05 + Math.random() * 0.1)
+        stain.drawCircle(sx, sy, sr)
+        stain.endFill()
+        
+        this.wallDecorations.addChild(stain)
+      }
+      
+      for (let i = 0; i < 3; i++) {
+        const poster = new PIXI.Graphics()
+        const px = 80 + Math.random() * (GAME_CONFIG.width - 200)
+        const py = wallTop + 80 + Math.random() * (wallHeight - 200)
+        const pw = 60 + Math.random() * 40
+        const ph = 80 + Math.random() * 60
+        
+        poster.beginFill(0xffffff, 0.6)
+        poster.drawRect(px, py, pw, ph)
+        poster.endFill()
+        
+        poster.lineStyle(1, 0x333333, 0.5)
+        poster.drawRect(px, py, pw, ph)
+        poster.endFill()
+        
+        this.wallDecorations.addChild(poster)
+      }
+    }
+  }
+
+  getLineByStation(station) {
+    if (!station) return LINES[0]
+    for (const line of LINES) {
+      if (line.stations.some(s => s.id === station.id)) {
+        return line
+      }
+    }
+    return LINES[0]
+  }
+
   start(station) {
     this.isRunning = true
     this.gameTime = 0
@@ -110,12 +229,16 @@ export class GraffitiGame {
     this.targets = []
     this.particles = []
     this.station = station || null
+    this.currentLine = this.getLineByStation(station)
     this.startTime = Date.now()
+    
+    this.drawWall(this.currentLine)
+    
     this.graffitiMarks.forEach(m => this.container.removeChild(m))
     this.graffitiMarks = []
     this.container.visible = true
     const startText = (station && station.feedback && station.feedback.start) || '开始!'
-    const color = station ? parseInt((station.color || '#e94560').replace('#', '0x')) : 0xe94560
+    const color = station ? parseInt((station.color || (this.currentLine?.color) || '#e94560').replace('#', '0x')) : 0xe94560
     this.showPrompt(startText, color)
   }
 
