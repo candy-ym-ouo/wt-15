@@ -1,6 +1,7 @@
 import { GAME_CONFIG, LINES, BATTLE_PASS_CONFIG } from './config.js'
 import { profileManager } from './ProfileManager.js'
 import { battlePassManager } from './BattlePassManager.js'
+import { graffitiWorkshop } from './GraffitiWorkshop.js'
 
 const SAVE_VERSION = 3
 
@@ -157,6 +158,7 @@ class ScoreManager {
         this.totalPreserveTriggered = saved.totalPreserveTriggered || 0
       }
       battlePassManager.load()
+      graffitiWorkshop.load()
       this._syncBattlePassSkins()
     } catch (e) {
       console.warn('读取存档失败:', e)
@@ -200,6 +202,7 @@ class ScoreManager {
         this._resetProfileData()
       }
       battlePassManager.loadProfile(profileId)
+      graffitiWorkshop.loadProfile(profileId)
       this._syncBattlePassSkins()
       this._resetAllTemporaryState()
     } catch (e) {
@@ -405,11 +408,15 @@ class ScoreManager {
     const comboConfig = GAME_CONFIG.comboSystem
     this.rescueResult = null
     this.justRescued = false
+    const customAttr = this.getSkinCustomAttributes()
 
     switch (type) {
       case 'perfect':
         points = GAME_CONFIG.graffiti.perfectScore
         points = this._applyCityEventScoreModifiers('perfect', points)
+        if (customAttr.perfectBonus && customAttr.perfectBonus > 0) {
+          points = Math.floor(points * (1 + customAttr.perfectBonus))
+        }
         this.perfectCount++
         this.stationPerfectCount++
         this.currentPerfectStreak++
@@ -453,6 +460,9 @@ class ScoreManager {
       case 'good':
         points = GAME_CONFIG.graffiti.goodScore
         points = this._applyCityEventScoreModifiers('good', points)
+        if (customAttr.goodScoreBonus && customAttr.goodScoreBonus > 0) {
+          points = Math.floor(points * (1 + customAttr.goodScoreBonus))
+        }
         this.combo++
         this.goodCount++
         this.stationGoodCount++
@@ -581,11 +591,18 @@ class ScoreManager {
     if (this.combo > 1 && points > 0) {
       let comboMultiplier = 1 + this.combo * 0.1
       comboMultiplier = this._applyCityEventComboBonus(comboMultiplier)
+      if (customAttr.comboBonus && customAttr.comboBonus > 0) {
+        comboMultiplier += customAttr.comboBonus
+      }
       points = Math.floor(points * comboMultiplier)
     }
 
     if (points > 0 && this.scoreMultiplier > 1) {
       points = Math.floor(points * this.scoreMultiplier)
+    }
+
+    if (points > 0 && customAttr.scoreMultiplier && customAttr.scoreMultiplier > 1) {
+      points = Math.floor(points * customAttr.scoreMultiplier)
     }
 
     this.currentScore += points
@@ -1058,12 +1075,16 @@ class ScoreManager {
 
     this._syncBattlePassSkins()
     this.checkStationUnlocks()
+    graffitiWorkshop.checkUnlocks(this.totalScore)
   }
 
   _findSkinById(skinId) {
     let skin = GAME_CONFIG.skins.find(s => s.id === skinId)
     if (!skin) {
       skin = BATTLE_PASS_CONFIG.battlePassSkins.find(s => s.id === skinId)
+    }
+    if (!skin) {
+      skin = graffitiWorkshop.getCustomSkinById(skinId)
     }
     return skin
   }
@@ -1072,20 +1093,33 @@ class ScoreManager {
     const regular = GAME_CONFIG.skins.map(s => ({
       ...s,
       unlocked: this.unlockedSkins.includes(s.id),
-      type: 'regular'
+      type: 'regular',
+      isCustom: false
     }))
     const bp = BATTLE_PASS_CONFIG.battlePassSkins.map(s => ({
       ...s,
       unlocked: this.unlockedSkins.includes(s.id),
       type: 'battlePass',
-      premium: s.premium || false
+      premium: s.premium || false,
+      isCustom: false
     }))
-    return [...regular, ...bp]
+    const custom = graffitiWorkshop.getCustomSkins().map(s => ({
+      ...s,
+      unlocked: true,
+      type: 'custom',
+      isCustom: true
+    }))
+    return [...regular, ...bp, ...custom]
   }
 
   selectSkin(id) {
-    if (this.unlockedSkins.includes(id)) {
+    if (this.unlockedSkins.includes(id) || graffitiWorkshop.isCustomSkin(id)) {
       this.selectedSkin = id
+      if (graffitiWorkshop.isCustomSkin(id)) {
+        graffitiWorkshop.selectCustomSkin(id)
+      } else {
+        graffitiWorkshop.selectCustomSkin(null)
+      }
       this.save()
       return true
     }
@@ -1130,6 +1164,35 @@ class ScoreManager {
   getSkinAudio() {
     const effects = this.getSkinEffects()
     return effects.audio
+  }
+
+  getSkinCustomAttributes() {
+    const skin = this._findSkinById(this.selectedSkin)
+    if (skin && skin.effects && skin.effects.custom) {
+      return skin.effects.custom
+    }
+    return {
+      dripChance: 0.1,
+      colorVibrancy: 1.0,
+      glowIntensity: 1.0,
+      rainbow: false,
+      metallic: false,
+      chrome: false,
+      scoreMultiplier: 1.0,
+      perfectRadiusBonus: 0,
+      comboBonus: 0,
+      goodScoreBonus: 0,
+      perfectBonus: 0
+    }
+  }
+
+  getSkinAudioMilestone() {
+    const audio = this.getSkinAudio()
+    return audio.milestone || { baseFreq: 523, duration: 0.12, type: 'sine' }
+  }
+
+  isCustomSkinActive() {
+    return graffitiWorkshop.isCustomSkin(this.selectedSkin)
   }
 
   getNextSkin() {

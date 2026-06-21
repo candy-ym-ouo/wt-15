@@ -337,7 +337,9 @@ export class GraffitiGame {
     target.radius = this.getStationConfig(this.station, 'targetRadius', GAME_CONFIG.graffiti.targetRadius)
     const baseShrinkSpeed = this.getStationConfig(this.station, 'shrinkSpeed', GAME_CONFIG.graffiti.shrinkSpeed)
     target.shrinkSpeed = baseShrinkSpeed * this.shrinkSpeedMultiplier * (0.8 + Math.random() * 0.4)
-    target.perfectRadius = this.getStationConfig(this.station, 'perfectRadius', GAME_CONFIG.graffiti.perfectRadius)
+    const customAttr = scoreManager.getSkinCustomAttributes()
+    const basePerfectRadius = this.getStationConfig(this.station, 'perfectRadius', GAME_CONFIG.graffiti.perfectRadius)
+    target.perfectRadius = basePerfectRadius + (customAttr.perfectRadiusBonus || 0)
 
     const colorStr = scoreManager.getSkinColor()
     const colorNum = parseInt(colorStr.replace('#', '0x'))
@@ -558,8 +560,10 @@ export class GraffitiGame {
 
   createGraffitiMark(x, y, resultType = 'good') {
     const particleConfig = scoreManager.getSkinParticles()
+    const customAttr = scoreManager.getSkinCustomAttributes()
     const colors = particleConfig.colors
     const isPerfect = resultType === 'perfect'
+    const vibrancy = customAttr.colorVibrancy || 1
 
     const markContainer = new PIXI.Container()
     markContainer.x = x
@@ -568,25 +572,43 @@ export class GraffitiGame {
     markContainer.scale.set(0.3)
 
     const baseRotation = Math.random() * Math.PI * 2
-    const baseScale = isPerfect ? 1.2 : 0.85
+    const baseScale = (isPerfect ? 1.2 : 0.85) * (vibrancy > 1.2 ? 1.1 : 1)
 
-    const mainColorStr = colors[Math.floor(Math.random() * colors.length)]
-    const mainColorNum = parseInt(mainColorStr.replace('#', '0x'))
-    const accentColorStr = colors[Math.floor(Math.random() * colors.length)]
-    const accentColorNum = parseInt(accentColorStr.replace('#', '0x'))
+    const rainbowColors = ['#ff0000', '#ff8800', '#ffee00', '#00ff00', '#0088ff', '#8800ff', '#ff00ff']
+    const getColor = (isMain) => {
+      if (customAttr.rainbow) {
+        return parseInt(rainbowColors[Math.floor(Math.random() * rainbowColors.length)].replace('#', '0x'))
+      }
+      const colorStr = isMain
+        ? colors[Math.floor(Math.random() * colors.length)]
+        : colors[Math.floor(Math.random() * colors.length)]
+      let colorNum = parseInt(colorStr.replace('#', '0x'))
+      if (vibrancy > 1 && vibrancy <= 2) {
+        const boost = Math.floor((vibrancy - 1) * 60)
+        const r = Math.min(255, ((colorNum >> 16) & 255) + boost)
+        const g = Math.min(255, ((colorNum >> 8) & 255) + boost)
+        const b = Math.min(255, (colorNum & 255) + boost)
+        colorNum = (r << 16) | (g << 8) | b
+      }
+      return colorNum
+    }
+
+    const mainColorNum = getColor(true)
+    const accentColorNum = getColor(false)
 
     const layerCount = isPerfect ? 4 : 2
     for (let i = layerCount - 1; i >= 0; i--) {
       const layer = new PIXI.Graphics()
       const layerScale = baseScale * (1 - i * 0.15)
-      const alpha = isPerfect ? (0.35 + i * 0.15) : (0.5 + i * 0.2)
+      let alpha = isPerfect ? (0.35 + i * 0.15) : (0.5 + i * 0.2)
+      alpha = Math.min(1, alpha * (0.8 + vibrancy * 0.2))
       const color = i % 2 === 0 ? mainColorNum : accentColorNum
       const offsetX = (Math.random() - 0.5) * 8 * (i + 1)
       const offsetY = (Math.random() - 0.5) * 8 * (i + 1)
 
       const shapes = [...particleConfig.shapes, 'tag', 'bubble', 'splash']
       const shape = shapes[Math.floor(Math.random() * shapes.length)]
-      const sizeMultiplier = isPerfect ? 1.3 : 1
+      const sizeMultiplier = (isPerfect ? 1.3 : 1) * (customAttr.chrome ? 1.15 : 1)
 
       layer.beginFill(color, alpha)
 
@@ -616,8 +638,24 @@ export class GraffitiGame {
       }
       layer.endFill()
 
+      if (customAttr.metallic || customAttr.chrome) {
+        const metalHighlight = new PIXI.Graphics()
+        const hlColor = customAttr.chrome ? 0xffffff : 0xffe55c
+        const hlAlpha = customAttr.chrome ? 0.5 : 0.3
+        metalHighlight.beginFill(hlColor, hlAlpha)
+        metalHighlight.drawEllipse(
+          offsetX - 8 * layerScale,
+          offsetY - 10 * layerScale,
+          8 * layerScale * sizeMultiplier,
+          4 * layerScale * sizeMultiplier
+        )
+        metalHighlight.endFill()
+        markContainer.addChild(metalHighlight)
+      }
+
       if (i === 0 && isPerfect) {
-        layer.lineStyle(3, 0xffffff, 0.6)
+        const outlineColor = customAttr.chrome ? 0xffffff : customAttr.metallic ? 0xffd700 : 0xffffff
+        layer.lineStyle(3, outlineColor, customAttr.glowIntensity > 1 ? 0.8 : 0.6)
         const outlineSize = (28 + Math.random() * 10) * layerScale * sizeMultiplier
         if (shape === 'star') {
           this.drawStar(layer, offsetX, offsetY, 5, outlineSize, outlineSize * 0.48)
@@ -638,27 +676,47 @@ export class GraffitiGame {
     }
 
     if (isPerfect) {
+      const hlColor = customAttr.chrome ? 0xffffff : customAttr.metallic ? 0xffd700 : 0xffffff
       const highlight = new PIXI.Graphics()
-      highlight.beginFill(0xffffff, 0.5)
+      highlight.beginFill(hlColor, 0.5)
       highlight.drawCircle(-8 * baseScale, -10 * baseScale, 6 * baseScale)
       highlight.endFill()
       markContainer.addChild(highlight)
 
       const highlight2 = new PIXI.Graphics()
-      highlight2.beginFill(0xffffff, 0.3)
+      highlight2.beginFill(hlColor, 0.3)
       highlight2.drawCircle(10 * baseScale, 5 * baseScale, 4 * baseScale)
       highlight2.endFill()
       markContainer.addChild(highlight2)
+
+      if (customAttr.rainbow || customAttr.chrome) {
+        for (let r = 0; r < 3; r++) {
+          const rainbowHl = new PIXI.Graphics()
+          const rc = rainbowColors[Math.floor(Math.random() * rainbowColors.length)]
+          rainbowHl.beginFill(parseInt(rc.replace('#', '0x')), 0.25 + Math.random() * 0.2)
+          rainbowHl.drawCircle(
+            (Math.random() - 0.5) * 30 * baseScale,
+            (Math.random() - 0.5) * 30 * baseScale,
+            3 + Math.random() * 5 * baseScale
+          )
+          rainbowHl.endFill()
+          markContainer.addChild(rainbowHl)
+        }
+      }
     }
 
-    if (isPerfect || Math.random() > 0.4) {
-      const dripCount = isPerfect ? 2 + Math.floor(Math.random() * 2) : 1
+    const dripChance = customAttr.dripChance || 0.1
+    const shouldDrip = isPerfect || Math.random() < dripChance * 4
+    if (shouldDrip) {
+      const dripBaseCount = isPerfect ? 2 + Math.floor(Math.random() * 2) : 1
+      const dripCount = dripBaseCount + (dripChance > 0.15 ? Math.floor(Math.random() * 2) : 0)
       for (let d = 0; d < dripCount; d++) {
+        if (!isPerfect && Math.random() > dripChance * 6) continue
         const drip = new PIXI.Graphics()
         const dripX = (Math.random() - 0.5) * 30 * baseScale
         const dripY = 15 * baseScale + Math.random() * 10 * baseScale
         const dripWidth = 3 + Math.random() * 5
-        const dripHeight = 10 + Math.random() * 25
+        const dripHeight = (10 + Math.random() * 25) * (dripChance > 0.15 ? 1.3 : 1)
         const dripColor = Math.random() > 0.5 ? mainColorNum : accentColorNum
         drip.beginFill(dripColor, 0.7)
         drip.moveTo(dripX - dripWidth / 2, dripY)

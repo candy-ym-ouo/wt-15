@@ -1121,6 +1121,272 @@ export const CITY_EVENTS = {
   }
 }
 
+export const GRAFFITI_WORKSHOP = {
+  sprayCans: [
+    {
+      id: 'spray_basic_blue',
+      name: '基础蓝',
+      color: '#3498db',
+      category: 'basic',
+      rarity: 'common',
+      unlockScore: 0,
+      attributes: { particleBoost: 0, colorVibrancy: 1.0, dripChance: 0.1 },
+      description: '入门级喷漆，标准蓝色'
+    },
+    {
+      id: 'spray_basic_red',
+      name: '基础红',
+      color: '#e74c3c',
+      category: 'basic',
+      rarity: 'common',
+      unlockScore: 0,
+      attributes: { particleBoost: 0, colorVibrancy: 1.0, dripChance: 0.1 },
+      description: '入门级喷漆，标准红色'
+    },
+    {
+      id: 'spray_basic_green',
+      name: '基础绿',
+      color: '#2ecc71',
+      category: 'basic',
+      rarity: 'common',
+      unlockScore: 0,
+      attributes: { particleBoost: 0, colorVibrancy: 1.0, dripChance: 0.1 },
+      description: '入门级喷漆，标准绿色'
+    },
+    {
+      id: 'spray_basic_yellow',
+      name: '基础黄',
+      color: '#f1c40f',
+      category: 'basic',
+      rarity: 'common',
+      unlockScore: 500,
+      attributes: { particleBoost: 0, colorVibrancy: 1.0, dripChance: 0.1 },
+      description: '入门级喷漆，标准黄色'
+    },
+    {
+      id: 'spray_basic_purple',
+      name: '基础紫',
+      color: '#9b59b6',
+      category: 'basic',
+      rarity: 'common',
+      unlockScore: 500,
+      attributes: { particleBoost: 0, colorVibrancy: 1.0, dripChance: 0.1 },
+      description: '入门级喷漆，标准紫色'
+    },
+    {
+      id: 'spray_neon_cyan',
+      name: '霓虹青',
+      color: '#00ffcc',
+      category: 'neon',
+      rarity: 'rare',
+      unlockScore: 3000,
+      attributes: { particleBoost: 5, colorVibrancy: 1.5, dripChance: 0.15, glowIntensity: 1.3 },
+      description: '霓虹系列，赛博朋克青蓝色'
+    },
+    {
+      id: 'spray_neon_magenta',
+      name: '霓虹品红',
+      color: '#ff00ff',
+      category: 'neon',
+      rarity: 'rare',
+      unlockScore: 3000,
+      attributes: { particleBoost: 5, colorVibrancy: 1.5, dripChance: 0.15, glowIntensity: 1.3 },
+      description: '霓虹系列，梦幻品红色'
+    },
+    {
+      id: 'spray_neon_lime',
+      name: '霓虹柠绿',
+      color: '#aaff00',
+      category: 'neon',
+      rarity: 'rare',
+      unlockScore: 5000,
+      attributes: { particleBoost: 8, colorVibrancy: 1.6, dripChance: 0.15, glowIntensity: 1.4 },
+      description: '霓虹系列，荧光柠檬绿'
+    },
+    {
+      id: 'spray_metal_gold',
+      name: '金属金',
+      color: '#ffd700',
+      category: 'metallic',
+      rarity: 'epic',
+      unlockScore: 15000,
+      attributes: { particleBoost: 12, colorVibrancy: 1.8, dripChance: 0.08, metallic: true, scoreBonus: 0.05 },
+      description: '金属系列，闪耀金色'
+    },
+    {
+      id: 'spray_metal_silver',
+      name: '金属银',
+      color: '#c0c0c0',
+      category: 'metallic',
+      rarity: 'epic',
+      unlockScore: 15000,
+      attributes: { particleBoost: 12, colorVibrancy: 1.8, dripChance: 0.08, metallic: true, scoreBonus: 0.05 },
+      description: '金属系列，银色光泽'
+    },
+    {
+      id: 'spray_metal_bronze',
+      name: '金属铜',
+      color: '#cd7f32',
+      category: 'metallic',
+      rarity: 'epic',
+      unlockScore: 10000,
+      attributes: { particleBoost: 10, colorVibrancy: 1.7, dripChance: 0.08, metallic: true, scoreBonus: 0.03 },
+      description: '金属系列，复古铜色'
+    },
+    {
+      id: 'spray_legendary_rainbow',
+      name: '彩虹传说',
+      color: '#ffffff',
+      category: 'legendary',
+      rarity: 'legendary',
+      unlockScore: 50000,
+      attributes: { particleBoost: 20, colorVibrancy: 2.0, dripChance: 0.2, rainbow: true, scoreBonus: 0.1, comboBonus: 0.05 },
+      description: '传说级喷漆，七色流转'
+    },
+    {
+      id: 'spray_legendary_chrome',
+      name: '幻彩铬',
+      color: '#e8e8e8',
+      category: 'legendary',
+      rarity: 'legendary',
+      unlockScore: 80000,
+      attributes: { particleBoost: 25, colorVibrancy: 2.2, dripChance: 0.05, metallic: true, chrome: true, scoreBonus: 0.15, perfectBonus: 0.1 },
+      description: '传说级喷漆，镜面铬合金'
+    }
+  ],
+
+  patterns: [
+    {
+      id: 'pattern_tag_simple',
+      name: '简约签名',
+      shape: 'tag',
+      complexity: 1,
+      rarity: 'common',
+      unlockScore: 0,
+      layers: 1,
+      attributes: { perfectRadiusBonus: 0, scoreMultiplier: 1.0 },
+      compatibleShapes: ['tag'],
+      description: '最基础的涂鸦签名'
+    },
+    {
+      id: 'pattern_bubble_round',
+      name: '圆润泡泡',
+      shape: 'bubble',
+      complexity: 1,
+      rarity: 'common',
+      unlockScore: 0,
+      layers: 2,
+      attributes: { perfectRadiusBonus: 2, scoreMultiplier: 1.0 },
+      compatibleShapes: ['bubble', 'circle'],
+      description: '经典圆润泡泡字'
+    },
+    {
+      id: 'pattern_wildstyle',
+      name: '狂野风格',
+      shape: 'wildstyle',
+      complexity: 3,
+      rarity: 'rare',
+      unlockScore: 5000,
+      layers: 4,
+      attributes: { perfectRadiusBonus: 4, scoreMultiplier: 1.05, comboBonus: 0.02 },
+      compatibleShapes: ['tag', 'bubble', 'wildstyle'],
+      description: '复杂交错的狂野涂鸦风'
+    },
+    {
+      id: 'pattern_3d_block',
+      name: '3D立体',
+      shape: '3d',
+      complexity: 3,
+      rarity: 'rare',
+      unlockScore: 8000,
+      layers: 5,
+      attributes: { perfectRadiusBonus: 5, scoreMultiplier: 1.08 },
+      compatibleShapes: ['bubble', '3d', 'block'],
+      description: '立体透视效果'
+    },
+    {
+      id: 'pattern_stencil_art',
+      name: '模板艺术',
+      shape: 'stencil',
+      complexity: 2,
+      rarity: 'rare',
+      unlockScore: 3000,
+      layers: 2,
+      attributes: { perfectRadiusBonus: 3, scoreMultiplier: 1.03 },
+      compatibleShapes: ['stencil', 'star', 'heart'],
+      description: '简洁有力的模板图案'
+    },
+    {
+      id: 'pattern_character_cartoon',
+      name: '卡通角色',
+      shape: 'character',
+      complexity: 4,
+      rarity: 'epic',
+      unlockScore: 20000,
+      layers: 6,
+      attributes: { perfectRadiusBonus: 6, scoreMultiplier: 1.1, particleBoost: 5 },
+      compatibleShapes: ['character', 'bubble', 'star'],
+      description: '可爱卡通角色设计'
+    },
+    {
+      id: 'pattern_abstract_geo',
+      name: '几何抽象',
+      shape: 'abstract',
+      complexity: 3,
+      rarity: 'epic',
+      unlockScore: 15000,
+      layers: 5,
+      attributes: { perfectRadiusBonus: 5, scoreMultiplier: 1.08, goodScoreBonus: 0.1 },
+      compatibleShapes: ['diamond', 'hexagon', 'abstract'],
+      description: '现代几何抽象艺术'
+    },
+    {
+      id: 'pattern_mural_master',
+      name: '大师壁画',
+      shape: 'mural',
+      complexity: 5,
+      rarity: 'legendary',
+      unlockScore: 60000,
+      layers: 8,
+      attributes: { perfectRadiusBonus: 10, scoreMultiplier: 1.2, comboBonus: 0.05, particleBoost: 15 },
+      compatibleShapes: ['mural', 'wildstyle', '3d', 'character'],
+      description: '传说级壁画杰作'
+    }
+  ],
+
+  patternShapes: {
+    tag: { name: '签名体', baseLayers: 1, defaultSize: 1 },
+    bubble: { name: '泡泡字', baseLayers: 2, defaultSize: 1.1 },
+    wildstyle: { name: '狂野体', baseLayers: 4, defaultSize: 1.2 },
+    '3d': { name: '3D立体', baseLayers: 5, defaultSize: 1.15 },
+    stencil: { name: '模板', baseLayers: 2, defaultSize: 0.9 },
+    character: { name: '角色', baseLayers: 6, defaultSize: 1.3 },
+    abstract: { name: '抽象', baseLayers: 5, defaultSize: 1.1 },
+    mural: { name: '壁画', baseLayers: 8, defaultSize: 1.5 },
+    star: { name: '星形', baseLayers: 1, defaultSize: 1 },
+    heart: { name: '心形', baseLayers: 1, defaultSize: 1 },
+    diamond: { name: '菱形', baseLayers: 1, defaultSize: 1 },
+    hexagon: { name: '六边形', baseLayers: 1, defaultSize: 1 },
+    circle: { name: '圆形', baseLayers: 1, defaultSize: 1 },
+    splash: { name: '泼溅', baseLayers: 3, defaultSize: 1.2 },
+    block: { name: '方块字', baseLayers: 3, defaultSize: 1.1 }
+  },
+
+  maxCustomSkins: 10,
+  maxSpraysPerCustomSkin: 4,
+  maxPatternsPerCustomSkin: 3,
+
+  attributeCalculation: {
+    particleBoostPerLevel: 2,
+    scoreBonusPerRarity: { common: 0, rare: 0.03, epic: 0.06, legendary: 0.1 },
+    perfectRadiusBonusCap: 10,
+    comboBonusCap: 0.15,
+    scoreMultiplierCap: 1.3
+  },
+
+  rarityOrder: ['common', 'rare', 'epic', 'legendary']
+}
+
 export const LINES = [
   {
     id: 1,
