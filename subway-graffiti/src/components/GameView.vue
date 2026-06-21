@@ -2,11 +2,12 @@
 import { GameEngine, GameState } from '@/game/GameEngine.js';
 import { scoreManager } from '@/game/ScoreManager.js';
 import { profileManager } from '@/game/ProfileManager.js';
-import { GAME_CONFIG, LINES, BATTLE_PASS_CONFIG, CITY_EVENTS } from '@/game/config.js';
+import { GAME_CONFIG, LINES, BATTLE_PASS_CONFIG, CITY_EVENTS, QUEST_LINES } from '@/game/config.js';
 import { cityEventManager } from '@/game/CityEventManager.js';
 import { audioManager } from '@/game/AudioManager.js';
 import { battlePassManager } from '@/game/BattlePassManager.js';
 import { graffitiWorkshop } from '@/game/GraffitiWorkshop.js';
+import { questManager } from '@/game/QuestManager.js';
 import ReplayView from './ReplayView.vue';
 import GraffitiWorkshopView from './GraffitiWorkshop.vue';
 const canvasRef = ref(null);
@@ -45,6 +46,157 @@ const arrivalData = ref(null);
 const showReplay = ref(false);
 const currentReplayData = ref(null);
 const comboState = reactive(scoreManager.getComboState());
+
+const currentCutscene = ref(null);
+const cutsceneData = ref(null);
+const currentChapterComplete = ref(null);
+const chapterCompleteReward = ref(null);
+
+const questSummary = reactive({
+  totalChapters: 0,
+  completedChapters: 0,
+  totalQuests: 0,
+  completedQuests: 0,
+  percent: 0,
+  nextQuest: null,
+  activeQuest: null
+});
+
+const chapters = ref([]);
+const selectedChapterId = ref(null);
+const selectedChapterQuests = ref([]);
+const showChaptersScreen = ref(false);
+const questTab = ref('chapters');
+const hasUnclaimedQuestRewards = ref(false);
+
+function refreshQuestSummary() {
+  Object.assign(questSummary, questManager.getQuestSummary());
+  const allChapters = questManager.getAllChapters();
+  chapters.value = allChapters;
+  let hasUnclaimed = false;
+  for (const ch of allChapters) {
+    const quests = questManager.getQuestsForChapter(ch.id);
+    for (const q of quests) {
+      if (q.completed && !q.claimed) {
+        hasUnclaimed = true;
+      }
+    }
+  }
+  hasUnclaimedQuestRewards.value = hasUnclaimed;
+}
+
+function selectChapter(chapterId) {
+  audioManager.playSFX('click');
+  selectedChapterId.value = chapterId;
+  selectedChapterQuests.value = questManager.getQuestsForChapter(chapterId);
+}
+
+function showQuestScreen() {
+  audioManager.playSFX('click');
+  refreshQuestSummary();
+  showChaptersScreen.value = true;
+  if (!selectedChapterId.value && chapters.value.length > 0) {
+    const firstUnlocked = chapters.value.find(ch => ch.unlocked);
+    if (firstUnlocked) {
+      selectChapter(firstUnlocked.id);
+    }
+  }
+  currentState.value = GameState.MENU;
+}
+
+function closeQuestScreen() {
+  audioManager.playSFX('click');
+  showChaptersScreen.value = false;
+}
+
+function startQuestFromUI(questId) {
+  audioManager.playSFX('click');
+  const result = engine.startQuest(questId);
+  if (result.success) {
+    showGamePrompt(`开始任务: ${result.quest.name}`, '#2ecc71');
+  } else {
+    showGamePrompt('无法开始任务', '#e74c3c');
+  }
+}
+
+function claimQuestRewardFromUI(questId) {
+  audioManager.playSFX('click');
+  const result = engine.claimQuestReward(questId);
+  if (result.success) {
+    refreshQuestSummary();
+    if (selectedChapterId.value) {
+      selectedChapterQuests.value = questManager.getQuestsForChapter(selectedChapterId.value);
+    }
+    const rewardMsgs = [];
+    if (result.rewards.score) rewardMsgs.push(`+${result.rewards.score} 分`);
+    if (result.rewards.battlePassExp) rewardMsgs.push(`+${result.rewards.battlePassExp} EXP`);
+    if (result.rewards.message) rewardMsgs.push(result.rewards.message);
+    showGamePrompt(rewardMsgs.join(' · ') || '奖励已领取!', '#2ecc71');
+    refreshStats();
+    refreshBattlePassSummary();
+  } else {
+    showGamePrompt('领取失败', '#e74c3c');
+  }
+}
+
+function closeCutscene() {
+  audioManager.playSFX('click');
+  engine.closeCutscene();
+  currentCutscene.value = null;
+  cutsceneData.value = null;
+  refreshQuestSummary();
+}
+
+function continueAfterChapterComplete() {
+  audioManager.playSFX('click');
+  engine.continueAfterChapterComplete();
+  currentChapterComplete.value = null;
+  chapterCompleteReward.value = null;
+  refreshQuestSummary();
+  refreshStats();
+  refreshBattlePassSummary();
+}
+
+function getQuestTypeName(type) {
+  return QUEST_LINES.questTypes[type]?.name || type;
+}
+
+function getQuestTypeDesc(type) {
+  return QUEST_LINES.questTypes[type]?.description || '';
+}
+
+function getQuestTargetText(quest) {
+  const t = quest.target;
+  switch (quest.type) {
+    case 'station_clear':
+    case 'station_score': {
+      const st = findStationById(t.stationId);
+      return `${st?.name || t.stationId} 得分 ≥ ${t.minScore}`;
+    }
+    case 'station_combo': {
+      const st = findStationById(t.stationId);
+      return `${st?.name || t.stationId} 连击 ≥ ${t.combo}`;
+    }
+    case 'combo_target':
+      return `全局最大连击 ≥ ${t.combo}`;
+    case 'stars_collect':
+      return `累计收集 ${t.totalStars} 颗星`;
+    case 'perfect_station':
+      return '零失误零被抓完成任意站点';
+    case 'multi_station':
+      return `通关 ${t.stationIds.length} 个站点（得分 ≥ ${t.minScore || 0}）`;
+    default:
+      return '完成任务目标';
+  }
+}
+
+function findStationById(stationId) {
+  for (const line of LINES) {
+    const st = line.stations.find(s => s.id === stationId);
+    if (st) return st;
+  }
+  return null;
+}
 
 const activeCityEvents = ref([]);
 const showCityEventAnnouncement = ref(false);
@@ -584,6 +736,15 @@ function onStateChange(state, data) {
  else if (state === GameState.SEASON_PASS) {
    refreshBattlePassSummary();
  }
+ else if (state === GameState.CUTSCENE) {
+   cutsceneData.value = data?.cutscene || null;
+   currentCutscene.value = data?.cutscene || null;
+ }
+ else if (state === GameState.CHAPTER_COMPLETE) {
+   currentChapterComplete.value = data?.chapter || null;
+   chapterCompleteReward.value = data?.reward || null;
+ }
+ refreshQuestSummary();
 }
 function onTick() {
  score.value = scoreManager.currentScore;
@@ -864,6 +1025,7 @@ onMounted(async () => {
  onStationEffectsApplied
  });
  await engine.init();
+ refreshQuestSummary();
 });
 onUnmounted(() => {
  if (_cityEventUpdateInterval.value) {
@@ -1311,6 +1473,10 @@ onUnmounted(() => {
             <button class="btn btn-secondary battle-pass-btn" @click="showSeasonPassScreen">
               🎖️ 通行证
               <span v-if="battlePassHasUnclaimedRewards" class="btn-notification-dot"></span>
+            </button>
+            <button class="btn btn-secondary" @click="showQuestScreen" style="position: relative;">
+              📜 委托剧情
+              <span v-if="hasUnclaimedQuestRewards" class="btn-notification-dot" style="background: #f39c12;"></span>
             </button>
             <button class="btn btn-secondary" @click="showProfilesScreen">
               👤 档案
@@ -2142,6 +2308,50 @@ onUnmounted(() => {
             </div>
           </div>
 
+          <div v-if="stationResult?.quest" class="earnings-section" style="background: linear-gradient(135deg, rgba(233, 69, 96, 0.08), rgba(243, 156, 18, 0.08));">
+            <div class="earnings-section-title">
+              <span class="earnings-icon">📜</span>
+              <span>委托剧情</span>
+            </div>
+
+            <div v-if="stationResult.quest.completedQuests && stationResult.quest.completedQuests.length > 0" style="margin-bottom: 12px;">
+              <div
+                v-for="quest in stationResult.quest.completedQuests"
+                :key="quest.id"
+                class="quest-complete-item"
+              >
+                <div style="display: flex; align-items: center; gap: 10px;">
+                  <div class="quest-complete-icon">✅</div>
+                  <div>
+                    <div class="quest-complete-name">{{ quest.name }}</div>
+                    <div class="quest-complete-desc">{{ quest.description }}</div>
+                  </div>
+                </div>
+                <button
+                  v-if="!quest.claimed"
+                  class="btn btn-small btn-primary"
+                  @click="claimQuestRewardFromUI(quest.id)"
+                >
+                  领取奖励
+                </button>
+                <span v-else class="quest-claimed-badge">已领取</span>
+              </div>
+            </div>
+
+            <div v-if="stationResult.quest.summary" style="background: rgba(255,255,255,0.05); border-radius: 12px; padding: 12px 16px;">
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                <div style="font-weight: 600;">剧情进度</div>
+                <div style="color: #f39c12; font-weight: 700;">{{ stationResult.quest.summary.completedQuests }}/{{ stationResult.quest.summary.totalQuests }} 任务 · {{ stationResult.quest.summary.percent }}%</div>
+              </div>
+              <div class="progress-bar">
+                <div class="progress-fill" :style="{ width: stationResult.quest.summary.percent + '%', background: 'linear-gradient(90deg, #e94560, #f39c12)' }"></div>
+              </div>
+              <div v-if="stationResult.quest.summary.nextQuest" style="margin-top: 10px; font-size: 13px; opacity: 0.8;">
+                下一个任务: <span style="color: #fff; font-weight: 600;">{{ stationResult.quest.summary.nextQuest.name }}</span>
+              </div>
+            </div>
+          </div>
+
           <div style="text-align: center; margin: 16px 0; opacity: 0.7;">
             累计星星: {{ scoreManager.getTotalStars() }}/{{ scoreManager.getMaxStars() }}
           </div>
@@ -2714,6 +2924,233 @@ onUnmounted(() => {
 
       <transition name="slide-right">
         <div v-if="showEventPanel" class="event-panel-overlay" @click="toggleEventPanel"></div>
+      </transition>
+
+      <transition name="slide-up">
+        <div v-if="showChaptersScreen" class="chapters-modal-overlay" @click.self="closeQuestScreen">
+          <div class="chapters-modal" @click.stop>
+            <div class="chapters-modal-header">
+              <div>
+                <div class="chapters-modal-title">📜 委托剧情</div>
+                <div class="chapters-modal-subtitle">
+                  进度 {{ questSummary.completedChapters }}/{{ questSummary.totalChapters }} 章节 · {{ questSummary.completedQuests }}/{{ questSummary.totalQuests }} 任务 · {{ questSummary.percent }}%
+                </div>
+              </div>
+              <button class="modal-close-btn" @click="closeQuestScreen">✕</button>
+            </div>
+
+            <div class="chapters-modal-progress">
+              <div class="progress-bar large">
+                <div class="progress-fill" :style="{ width: questSummary.percent + '%', background: 'linear-gradient(90deg, #e94560, #f39c12)' }"></div>
+              </div>
+            </div>
+
+            <div class="chapters-list">
+              <div
+                v-for="chapter in chapters"
+                :key="chapter.id"
+                class="chapter-card"
+                :class="{
+                  locked: !chapter.unlocked,
+                  selected: selectedChapterId === chapter.id,
+                  completed: chapter.completed
+                }"
+                @click="chapter.unlocked && selectChapter(chapter.id)"
+              >
+                <div class="chapter-card-icon" :style="{ background: chapter.color }">
+                  {{ chapter.icon }}
+                </div>
+                <div class="chapter-card-info">
+                  <div class="chapter-card-name">{{ chapter.name }}</div>
+                  <div class="chapter-card-desc">{{ chapter.description }}</div>
+                  <div class="chapter-card-progress-text">
+                    {{ chapter.progress.completed }}/{{ chapter.progress.total }} 任务 · {{ chapter.progress.percent }}%
+                  </div>
+                  <div class="progress-bar small">
+                    <div class="progress-fill" :style="{ width: chapter.progress.percent + '%', background: chapter.color }"></div>
+                  </div>
+                </div>
+                <div class="chapter-card-status">
+                  <span v-if="!chapter.unlocked" class="status-locked">🔒</span>
+                  <span v-else-if="chapter.completed" class="status-completed">✓</span>
+                  <span v-else class="status-available">›</span>
+                </div>
+              </div>
+            </div>
+
+            <div v-if="selectedChapterId && selectedChapterQuests.length > 0" class="quests-list">
+              <div class="quests-list-title">任务列表</div>
+              <div
+                v-for="quest in selectedChapterQuests"
+                :key="quest.id"
+                class="quest-card"
+                :class="{
+                  completed: quest.completed,
+                  claimed: quest.claimed,
+                  unavailable: !quest.available
+                }"
+              >
+                <div class="quest-card-header">
+                  <div class="quest-card-type" :title="getQuestTypeDesc(quest.type)">
+                    {{ getQuestTypeName(quest.type) }}
+                  </div>
+                  <div v-if="quest.completed && !quest.claimed" class="quest-card-reward-badge">
+                    🎁 待领取
+                  </div>
+                  <div v-else-if="quest.claimed" class="quest-card-claimed-badge">
+                    ✓ 已领取
+                  </div>
+                  <div v-else-if="!quest.available" class="quest-card-locked-badge">
+                    🔒 未解锁
+                  </div>
+                </div>
+
+                <div class="quest-card-name">{{ quest.name }}</div>
+                <div class="quest-card-desc">{{ quest.description }}</div>
+                <div class="quest-card-target">{{ getQuestTargetText(quest) }}</div>
+
+                <div class="quest-card-progress">
+                  <div class="progress-bar">
+                    <div
+                      class="progress-fill"
+                      :class="{ 'progress-success': quest.progress.completed }"
+                      :style="{
+                        width: quest.progress.percent + '%',
+                        background: quest.progress.completed
+                          ? 'linear-gradient(90deg, #2ecc71, #27ae60)'
+                          : 'linear-gradient(90deg, #3498db, #2980b9)'
+                      }"
+                    ></div>
+                  </div>
+                  <div class="quest-progress-text">
+                    {{ quest.progress.current }}/{{ quest.progress.total }} ({{ quest.progress.percent }}%)
+                  </div>
+                </div>
+
+                <div class="quest-card-rewards">
+                  <div class="quest-rewards-label">奖励:</div>
+                  <div class="quest-rewards-list">
+                    <span v-if="quest.rewards?.score" class="quest-reward-item">💰 +{{ quest.rewards.score }}</span>
+                    <span v-if="quest.rewards?.battlePassExp" class="quest-reward-item">🎖️ +{{ quest.rewards.battlePassExp }} EXP</span>
+                    <span v-if="quest.rewards?.unlockStations?.length" class="quest-reward-item">🚇 解锁站点</span>
+                    <span v-if="quest.rewards?.unlockSkins?.length" class="quest-reward-item">👕 解锁皮肤</span>
+                    <span v-if="quest.rewards?.unlockSpray" class="quest-reward-item">🎨 解锁喷漆</span>
+                    <span v-if="quest.rewards?.unlockPattern" class="quest-reward-item">✨ 解锁图案</span>
+                    <span v-if="quest.rewards?.unlockChapter" class="quest-reward-item">📖 解锁章节</span>
+                  </div>
+                </div>
+
+                <div class="quest-card-actions">
+                  <button
+                    v-if="quest.completed && !quest.claimed"
+                    class="btn btn-primary btn-small"
+                    @click="claimQuestRewardFromUI(quest.id)"
+                  >
+                    🎁 领取奖励
+                  </button>
+                  <button
+                    v-else-if="quest.available && !quest.completed"
+                    class="btn btn-secondary btn-small"
+                    @click="startQuestFromUI(quest.id)"
+                  >
+                    🚀 开始任务
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <button class="btn btn-outline" style="width: 100%; margin-top: 16px;" @click="closeQuestScreen">
+              关闭
+            </button>
+          </div>
+        </div>
+      </transition>
+
+      <transition name="fade">
+        <div v-if="currentState === GameState.CUTSCENE && cutsceneData" class="cutscene-overlay">
+          <div class="cutscene-dialog" :class="`cutscene-${cutsceneData.type}`">
+            <div class="cutscene-type-label">
+              {{ cutsceneData.type === 'start' ? '📜 任务开始' : '🎉 任务完成' }}
+            </div>
+
+            <div class="cutscene-title">{{ cutsceneData.title }}</div>
+
+            <div class="cutscene-content">
+              <div class="cutscene-avatar">{{ cutsceneData.avatar || '💬' }}</div>
+              <div class="cutscene-text-area">
+                <div class="cutscene-speaker">{{ cutsceneData.speaker || '神秘人物' }}</div>
+                <div class="cutscene-text">
+                  <span v-for="(line, idx) in cutsceneData.text.split('\n')" :key="idx">
+                    {{ line }}<br>
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <button class="btn btn-primary cutscene-continue-btn" @click="closeCutscene">
+              继续 →
+            </button>
+          </div>
+        </div>
+      </transition>
+
+      <transition name="fade">
+        <div v-if="currentState === GameState.CHAPTER_COMPLETE && currentChapterComplete" class="cutscene-overlay">
+          <div class="cutscene-dialog chapter-complete-dialog">
+            <div class="cutscene-type-label" style="background: linear-gradient(135deg, #f1c40f, #e94560);">
+              🏆 章节完成!
+            </div>
+
+            <div class="chapter-complete-icon">{{ currentChapterComplete.icon }}</div>
+            <div class="cutscene-title">{{ currentChapterComplete.name }}</div>
+
+            <div v-if="chapterCompleteReward" class="chapter-reward-section">
+              <div v-if="chapterCompleteReward.title" class="chapter-reward-title">
+                ✨ {{ chapterCompleteReward.title }}
+              </div>
+              <div v-if="chapterCompleteReward.text" class="chapter-reward-text">
+                <span v-for="(line, idx) in chapterCompleteReward.text.split('\n')" :key="idx">
+                  {{ line }}<br>
+                </span>
+              </div>
+
+              <div v-if="chapterCompleteReward.rewards" class="chapter-rewards-list">
+                <div class="chapter-rewards-title">获得奖励:</div>
+                <div class="chapter-rewards-grid">
+                  <div v-if="chapterCompleteReward.rewards.score" class="chapter-reward-big-item">
+                    <span class="cr-icon">💰</span>
+                    <span class="cr-label">累计分数</span>
+                    <span class="cr-value">+{{ chapterCompleteReward.rewards.score }}</span>
+                  </div>
+                  <div v-if="chapterCompleteReward.rewards.battlePassExp" class="chapter-reward-big-item">
+                    <span class="cr-icon">🎖️</span>
+                    <span class="cr-label">通行证经验</span>
+                    <span class="cr-value">+{{ chapterCompleteReward.rewards.battlePassExp }}</span>
+                  </div>
+                  <div v-if="chapterCompleteReward.rewards.unlockSpray" class="chapter-reward-big-item">
+                    <span class="cr-icon">🎨</span>
+                    <span class="cr-label">解锁喷漆</span>
+                    <span class="cr-value">获得新喷漆</span>
+                  </div>
+                  <div v-if="chapterCompleteReward.rewards.unlockPattern" class="chapter-reward-big-item">
+                    <span class="cr-icon">✨</span>
+                    <span class="cr-label">解锁图案</span>
+                    <span class="cr-value">获得新图案</span>
+                  </div>
+                  <div v-if="chapterCompleteReward.rewards.title" class="chapter-reward-big-item">
+                    <span class="cr-icon">🎖️</span>
+                    <span class="cr-label">获得称号</span>
+                    <span class="cr-value">{{ chapterCompleteReward.rewards.title }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <button class="btn btn-primary cutscene-continue-btn" :style="{ background: 'linear-gradient(135deg, #f1c40f, #e94560)' }" @click="continueAfterChapterComplete">
+              太棒了! →
+            </button>
+          </div>
+        </div>
       </transition>
     </div>
   </div>
@@ -5377,6 +5814,589 @@ onUnmounted(() => {
     width: 44px;
     height: 44px;
     font-size: 20px;
+  }
+}
+
+.slide-up-enter-active,
+.slide-up-leave-active {
+  transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.slide-up-enter-from,
+.slide-up-leave-to {
+  opacity: 0;
+  transform: translateY(50px);
+}
+
+.chapters-modal-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.85);
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  backdrop-filter: blur(8px);
+}
+
+.chapters-modal {
+  width: 100%;
+  max-width: 560px;
+  max-height: 90vh;
+  overflow-y: auto;
+  background: linear-gradient(180deg, #1a1a2e 0%, #16213e 100%);
+  border-radius: 24px;
+  border: 2px solid rgba(233, 69, 96, 0.3);
+  padding: 24px;
+  box-shadow: 0 20px 60px rgba(233, 69, 96, 0.2);
+}
+
+.chapters-modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.chapters-modal-title {
+  font-size: 28px;
+  font-weight: 900;
+  background: linear-gradient(135deg, #e94560, #f39c12);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.chapters-modal-subtitle {
+  font-size: 13px;
+  opacity: 0.7;
+  margin-top: 4px;
+}
+
+.modal-close-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  font-size: 18px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.modal-close-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  transform: rotate(90deg);
+}
+
+.chapters-modal-progress {
+  margin-bottom: 20px;
+}
+
+.progress-bar.large {
+  height: 10px;
+}
+.progress-bar.small {
+  height: 6px;
+}
+
+.chapters-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.chapter-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 14px;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.chapter-card:hover:not(.locked) {
+  background: rgba(255, 255, 255, 0.08);
+  transform: translateX(4px);
+}
+.chapter-card.selected {
+  border-color: rgba(233, 69, 96, 0.5);
+  background: rgba(233, 69, 96, 0.1);
+}
+.chapter-card.locked {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.chapter-card.completed {
+  border-color: rgba(46, 204, 113, 0.3);
+}
+
+.chapter-card-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  flex-shrink: 0;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.chapter-card-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.chapter-card-name {
+  font-size: 16px;
+  font-weight: 700;
+  margin-bottom: 2px;
+}
+
+.chapter-card-desc {
+  font-size: 12px;
+  opacity: 0.6;
+  margin-bottom: 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chapter-card-progress-text {
+  font-size: 12px;
+  opacity: 0.8;
+  margin-bottom: 4px;
+}
+
+.chapter-card-status {
+  flex-shrink: 0;
+  font-size: 20px;
+  opacity: 0.7;
+}
+.chapter-card-status .status-completed {
+  color: #2ecc71;
+  opacity: 1;
+}
+
+.quests-list {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 16px;
+  padding: 16px;
+}
+
+.quests-list-title {
+  font-size: 15px;
+  font-weight: 700;
+  margin-bottom: 12px;
+  opacity: 0.9;
+}
+
+.quest-card {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  padding: 14px;
+  margin-bottom: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  transition: all 0.2s;
+}
+.quest-card:last-child {
+  margin-bottom: 0;
+}
+.quest-card.completed {
+  border-color: rgba(46, 204, 113, 0.3);
+  background: rgba(46, 204, 113, 0.05);
+}
+.quest-card.claimed {
+  opacity: 0.6;
+}
+.quest-card.unavailable {
+  opacity: 0.5;
+}
+
+.quest-card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.quest-card-type {
+  font-size: 11px;
+  padding: 3px 8px;
+  background: rgba(52, 152, 219, 0.2);
+  color: #3498db;
+  border-radius: 6px;
+  font-weight: 600;
+}
+
+.quest-card-reward-badge {
+  font-size: 11px;
+  padding: 3px 8px;
+  background: rgba(243, 156, 18, 0.2);
+  color: #f39c12;
+  border-radius: 6px;
+  font-weight: 600;
+  animation: pulse 1.5s infinite;
+}
+
+.quest-card-claimed-badge {
+  font-size: 11px;
+  padding: 3px 8px;
+  background: rgba(46, 204, 113, 0.2);
+  color: #2ecc71;
+  border-radius: 6px;
+  font-weight: 600;
+}
+
+.quest-card-locked-badge {
+  font-size: 11px;
+  padding: 3px 8px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #999;
+  border-radius: 6px;
+  font-weight: 600;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+.quest-card-name {
+  font-size: 15px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.quest-card-desc {
+  font-size: 12px;
+  opacity: 0.6;
+  margin-bottom: 6px;
+}
+
+.quest-card-target {
+  font-size: 12px;
+  color: #3498db;
+  margin-bottom: 10px;
+}
+
+.quest-card-progress {
+  margin-bottom: 10px;
+}
+
+.quest-progress-text {
+  font-size: 11px;
+  opacity: 0.7;
+  margin-top: 4px;
+  text-align: right;
+}
+
+.progress-success {
+  background: linear-gradient(90deg, #2ecc71, #27ae60) !important;
+}
+
+.quest-card-rewards {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+
+.quest-rewards-label {
+  font-size: 12px;
+  opacity: 0.6;
+}
+
+.quest-rewards-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.quest-reward-item {
+  font-size: 11px;
+  padding: 3px 8px;
+  background: rgba(243, 156, 18, 0.15);
+  color: #f39c12;
+  border-radius: 4px;
+  font-weight: 600;
+}
+
+.quest-card-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.btn.btn-small {
+  padding: 6px 14px;
+  font-size: 13px;
+  border-radius: 8px;
+}
+
+.quest-complete-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  background: rgba(46, 204, 113, 0.08);
+  border: 1px solid rgba(46, 204, 113, 0.2);
+  border-radius: 10px;
+  margin-bottom: 8px;
+}
+
+.quest-complete-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(46, 204, 113, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.quest-complete-name {
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.quest-complete-desc {
+  font-size: 12px;
+  opacity: 0.6;
+  margin-top: 2px;
+}
+
+.quest-claimed-badge {
+  font-size: 12px;
+  color: #2ecc71;
+  font-weight: 600;
+  opacity: 0.8;
+}
+
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
+.cutscene-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.9);
+  z-index: 300;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  backdrop-filter: blur(10px);
+}
+
+.cutscene-dialog {
+  width: 100%;
+  max-width: 480px;
+  background: linear-gradient(180deg, #1a1a2e 0%, #0f0f1a 100%);
+  border-radius: 24px;
+  border: 2px solid rgba(233, 69, 96, 0.4);
+  padding: 28px;
+  text-align: center;
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.5);
+  animation: cutscenePop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes cutscenePop {
+  0% { transform: scale(0.8); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.cutscene-dialog.cutscene-complete {
+  border-color: rgba(46, 204, 113, 0.4);
+}
+
+.chapter-complete-dialog {
+  border-color: rgba(241, 196, 15, 0.5);
+  box-shadow: 0 30px 80px rgba(241, 196, 15, 0.15);
+}
+
+.cutscene-type-label {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 5px 14px;
+  background: linear-gradient(135deg, #e94560, #f39c12);
+  border-radius: 20px;
+  margin-bottom: 16px;
+  letter-spacing: 1px;
+}
+
+.cutscene-title {
+  font-size: 26px;
+  font-weight: 900;
+  margin-bottom: 20px;
+  background: linear-gradient(135deg, #e94560, #f39c12);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.cutscene-content {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  text-align: left;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 14px;
+  padding: 16px;
+  margin-bottom: 20px;
+}
+
+.cutscene-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, rgba(233, 69, 96, 0.3), rgba(243, 156, 18, 0.3));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  flex-shrink: 0;
+}
+
+.cutscene-text-area {
+  flex: 1;
+}
+
+.cutscene-speaker {
+  font-size: 13px;
+  color: #f39c12;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.cutscene-text {
+  font-size: 15px;
+  line-height: 1.7;
+  opacity: 0.9;
+  white-space: pre-wrap;
+}
+
+.cutscene-continue-btn {
+  width: 100%;
+  padding: 14px !important;
+  font-size: 16px !important;
+  font-weight: 700;
+  border-radius: 12px;
+}
+
+.chapter-complete-icon {
+  width: 72px;
+  height: 72px;
+  border-radius: 20px;
+  background: linear-gradient(135deg, rgba(241, 196, 15, 0.3), rgba(233, 69, 96, 0.3));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 36px;
+  margin: 0 auto 16px;
+  box-shadow: 0 8px 24px rgba(241, 196, 15, 0.2);
+}
+
+.chapter-reward-section {
+  margin-bottom: 20px;
+}
+
+.chapter-reward-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #f1c40f;
+  margin-bottom: 8px;
+}
+
+.chapter-reward-text {
+  font-size: 13px;
+  line-height: 1.7;
+  opacity: 0.8;
+  margin-bottom: 16px;
+  white-space: pre-wrap;
+}
+
+.chapter-rewards-list {
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 14px;
+  padding: 16px;
+}
+
+.chapter-rewards-title {
+  font-size: 13px;
+  font-weight: 600;
+  opacity: 0.7;
+  margin-bottom: 12px;
+  text-align: left;
+}
+
+.chapter-rewards-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.chapter-reward-big-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 12px;
+  background: rgba(243, 156, 18, 0.1);
+  border: 1px solid rgba(243, 156, 18, 0.2);
+  border-radius: 10px;
+}
+
+.cr-icon {
+  font-size: 22px;
+}
+
+.cr-label {
+  font-size: 11px;
+  opacity: 0.6;
+}
+
+.cr-value {
+  font-size: 13px;
+  font-weight: 700;
+  color: #f39c12;
+}
+
+@media (max-width: 500px) {
+  .chapters-modal {
+    padding: 18px;
+  }
+  .chapters-modal-title {
+    font-size: 22px;
+  }
+  .chapter-card-icon {
+    width: 40px;
+    height: 40px;
+    font-size: 20px;
+  }
+  .cutscene-dialog {
+    padding: 20px;
+  }
+  .cutscene-title {
+    font-size: 22px;
+  }
+  .chapter-complete-icon {
+    width: 60px;
+    height: 60px;
+    font-size: 28px;
   }
 }
 </style>
