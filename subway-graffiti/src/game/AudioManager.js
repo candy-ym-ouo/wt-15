@@ -11,7 +11,7 @@ class AudioManager {
     this.enabled = true
     this.musicNodes = []
     this.currentMusic = null
-    this._voiceTypes = ['click', 'unlock', 'station', 'milestone']
+    this._voiceTypes = ['click', 'unlock', 'station', 'milestone', 'trainArrival']
   }
 
   init() {
@@ -141,6 +141,13 @@ class AudioManager {
       case 'station':
         this.playTone(392, 0.1, 'sine', 0.3, category)
         setTimeout(() => this.playTone(523, 0.15, 'sine', 0.25, category), 80)
+        break
+      case 'trainArrival':
+        this.playTone(220, 0.4, 'sawtooth', 0.2, category)
+        setTimeout(() => this.playTone(330, 0.3, 'sawtooth', 0.15, category), 200)
+        setTimeout(() => this.playTone(440, 0.15, 'sine', 0.25, category), 400)
+        setTimeout(() => this.playTone(523, 0.2, 'sine', 0.2, category), 500)
+        setTimeout(() => this.playTone(659, 0.3, 'sine', 0.15, category), 600)
         break
       case 'combo': {
         const config = audioConfig.combo

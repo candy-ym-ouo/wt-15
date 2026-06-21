@@ -7,15 +7,6 @@ export const GAME_CONFIG = {
   warningColor: 0xf39c12,
   successColor: 0x2ecc71,
 
-  comboMilestones: [
-    { combo: 10, bonusScore: 200, name: '初露锋芒', tier: 1, color: '#3498db' },
-    { combo: 20, bonusScore: 500, name: '渐入佳境', tier: 2, color: '#2ecc71' },
-    { combo: 30, bonusScore: 1000, name: '行云流水', tier: 3, color: '#f39c12' },
-    { combo: 50, bonusScore: 2500, name: '炉火纯青', tier: 4, color: '#e74c3c' },
-    { combo: 75, bonusScore: 5000, name: '登峰造极', tier: 5, color: '#9b59b6' },
-    { combo: 100, bonusScore: 10000, name: '封神之作', tier: 6, color: '#f1c40f' }
-  ],
-
   graffiti: {
     targetRadius: 50,
     perfectRadius: 20,
@@ -33,13 +24,7 @@ export const GAME_CONFIG = {
     spawnInterval: 4000,
     maxGuards: 3,
     caughtPenalty: 500,
-    safeZoneRadius: 80,
-    safeZoneCooldown: 5,
-    shieldDuration: 3,
-    riskWarningDistance: 150,
-    dangerColor: 0xff4444,
-    cooldownColor: 0x7f8c8d,
-    shieldColor: 0x3498db
+    safeZoneRadius: 80
   },
 
   map: {
@@ -77,19 +62,7 @@ export const GAME_CONFIG = {
           perfect: { type: 'sine', baseFreq: 880, harmonic: 1320, duration: 0.1 },
           good: { type: 'sine', baseFreq: 660, duration: 0.12 },
           miss: { type: 'sawtooth', baseFreq: 200, duration: 0.2 },
-          combo: { type: 'triangle', baseFreq: 440, duration: 0.08 },
-          milestone: { type: 'sine', baseFreq: 523, duration: 0.15 }
-        },
-        milestone: {
-          particles: {
-            shapes: ['star', 'circle', 'heart'],
-            colors: ['#3498db', '#2980b9', '#1abc9c', '#ffffff'],
-            gravity: 200,
-            spread: 800,
-            count: { 1: 40, 2: 60, 3: 80, 4: 120, 5: 160, 6: 250 },
-            trail: true
-          },
-          screenShake: { 1: 5, 2: 8, 3: 12, 4: 18, 5: 25, 6: 35 }
+          combo: { type: 'triangle', baseFreq: 440, duration: 0.08 }
         }
       }
     },
@@ -121,19 +94,7 @@ export const GAME_CONFIG = {
           perfect: { type: 'sawtooth', baseFreq: 920, harmonic: 1380, duration: 0.12 },
           good: { type: 'sawtooth', baseFreq: 690, duration: 0.14 },
           miss: { type: 'sawtooth', baseFreq: 180, duration: 0.25 },
-          combo: { type: 'sawtooth', baseFreq: 480, duration: 0.1 },
-          milestone: { type: 'sawtooth', baseFreq: 440, duration: 0.18 }
-        },
-        milestone: {
-          particles: {
-            shapes: ['star', 'circle', 'diamond'],
-            colors: ['#e74c3c', '#f39c12', '#e67e22', '#d35400', '#ffffff'],
-            gravity: 100,
-            spread: 900,
-            count: { 1: 50, 2: 75, 3: 100, 4: 150, 5: 200, 6: 300 },
-            trail: true
-          },
-          screenShake: { 1: 8, 2: 12, 3: 18, 4: 25, 5: 35, 6: 45 }
+          combo: { type: 'sawtooth', baseFreq: 480, duration: 0.1 }
         }
       }
     },
@@ -165,19 +126,7 @@ export const GAME_CONFIG = {
           perfect: { type: 'square', baseFreq: 960, harmonic: 1440, duration: 0.08 },
           good: { type: 'square', baseFreq: 720, duration: 0.1 },
           miss: { type: 'square', baseFreq: 220, duration: 0.18 },
-          combo: { type: 'square', baseFreq: 520, duration: 0.06 },
-          milestone: { type: 'square', baseFreq: 494, duration: 0.12 }
-        },
-        milestone: {
-          particles: {
-            shapes: ['circle', 'circle', 'diamond'],
-            colors: ['#2ecc71', '#00ff88', '#00ffcc', '#00ffff', '#ffffff'],
-            gravity: 0,
-            spread: 1000,
-            count: { 1: 45, 2: 70, 3: 95, 4: 140, 5: 190, 6: 280 },
-            trail: true
-          },
-          screenShake: { 1: 6, 2: 10, 3: 15, 4: 22, 5: 30, 6: 40 }
+          combo: { type: 'square', baseFreq: 520, duration: 0.06 }
         }
       }
     },
@@ -209,19 +158,7 @@ export const GAME_CONFIG = {
           perfect: { type: 'triangle', baseFreq: 1000, harmonic: 1500, duration: 0.15 },
           good: { type: 'triangle', baseFreq: 750, duration: 0.16 },
           miss: { type: 'triangle', baseFreq: 190, duration: 0.22 },
-          combo: { type: 'triangle', baseFreq: 500, duration: 0.12 },
-          milestone: { type: 'triangle', baseFreq: 466, duration: 0.18 }
-        },
-        milestone: {
-          particles: {
-            shapes: ['heart', 'star', 'diamond'],
-            colors: ['#9b59b6', '#8e44ad', '#e84393', '#ffd700', '#ffffff'],
-            gravity: 150,
-            spread: 700,
-            count: { 1: 42, 2: 65, 3: 90, 4: 130, 5: 180, 6: 260 },
-            trail: false
-          },
-          screenShake: { 1: 5, 2: 9, 3: 14, 4: 20, 5: 28, 6: 38 }
+          combo: { type: 'triangle', baseFreq: 500, duration: 0.12 }
         }
       }
     },
@@ -253,19 +190,7 @@ export const GAME_CONFIG = {
           perfect: { type: 'sine', baseFreq: 1040, harmonic: 1560, duration: 0.1 },
           good: { type: 'sine', baseFreq: 780, duration: 0.12 },
           miss: { type: 'sine', baseFreq: 210, duration: 0.2 },
-          combo: { type: 'sine', baseFreq: 560, duration: 0.09 },
-          milestone: { type: 'sine', baseFreq: 554, duration: 0.14 }
-        },
-        milestone: {
-          particles: {
-            shapes: ['star', 'diamond', 'circle'],
-            colors: ['#f1c40f', '#f39c12', '#e67e22', '#ffffff', '#ffd700'],
-            gravity: 80,
-            spread: 850,
-            count: { 1: 55, 2: 85, 3: 115, 4: 170, 5: 230, 6: 350 },
-            trail: true
-          },
-          screenShake: { 1: 7, 2: 11, 3: 16, 4: 24, 5: 33, 6: 42 }
+          combo: { type: 'sine', baseFreq: 560, duration: 0.09 }
         }
       }
     },
@@ -297,19 +222,7 @@ export const GAME_CONFIG = {
           perfect: { type: 'sine', baseFreq: 1100, harmonic: 1650, duration: 0.12 },
           good: { type: 'sine', baseFreq: 825, duration: 0.14 },
           miss: { type: 'sine', baseFreq: 230, duration: 0.2 },
-          combo: { type: 'sine', baseFreq: 600, duration: 0.1 },
-          milestone: { type: 'sine', baseFreq: 587, duration: 0.16 }
-        },
-        milestone: {
-          particles: {
-            shapes: ['star', 'circle', 'heart', 'diamond'],
-            colors: ['#e84393', '#9b59b6', '#3498db', '#2ecc71', '#ffffff', '#f1c40f'],
-            gravity: 50,
-            spread: 1100,
-            count: { 1: 60, 2: 90, 3: 120, 4: 180, 5: 250, 6: 400 },
-            trail: true
-          },
-          screenShake: { 1: 10, 2: 15, 3: 20, 4: 30, 5: 40, 6: 50 }
+          combo: { type: 'sine', baseFreq: 600, duration: 0.1 }
         }
       }
     }
@@ -318,8 +231,7 @@ export const GAME_CONFIG = {
   audio: {
     masterVolume: 0.7,
     sfxVolume: 0.8,
-    musicVolume: 0.4,
-    voiceVolume: 0.7
+    musicVolume: 0.4
   },
 
   difficulty: {
@@ -351,41 +263,6 @@ export const LINES = [
     id: 1,
     name: '1号线 - 红',
     color: '#e94560',
-    theme: {
-      name: '复古工业风',
-      description: '老城区红砖旧巷，充满历史韵味',
-      wall: {
-        type: 'brick',
-        baseColor: '#8b4513',
-        brickColor: '#a0522d',
-        mortarColor: '#654321',
-        brickWidth: 80,
-        brickHeight: 40,
-        texture: 'rough',
-        decorations: ['graffiti_tag', 'poster', 'crack']
-      },
-      patrol: {
-        type: 'street',
-        bgColor: '#1a1a2e',
-        gridColor: '#2a2a4e',
-        groundColor: '#2c2c3e',
-        accentColor: '#e94560',
-        atmosphere: 'night',
-        decorations: ['streetlight', 'fire_hydrant', 'manhole']
-      },
-      ui: {
-        primary: '#e94560',
-        secondary: '#ff6b6b',
-        accent: '#f39c12',
-        gradient: 'linear-gradient(135deg, #e94560 0%, #ff6b6b 100%)',
-        glowColor: 'rgba(233, 69, 96, 0.4)'
-      },
-      map: {
-        bgColor: '#0d0d1a',
-        lineGlow: 'rgba(233, 69, 96, 0.3)',
-        stationPulse: '#ff6b6b'
-      }
-    },
     stations: [
       {
         id: 's1-1', name: '起点站', x: 100, y: 300, unlocked: true, isBranch: false,
@@ -505,41 +382,6 @@ export const LINES = [
     id: 2,
     name: '2号线 - 蓝',
     color: '#3498db',
-    theme: {
-      name: '现代科技风',
-      description: '新城区玻璃幕墙，充满未来感',
-      wall: {
-        type: 'glass',
-        baseColor: '#1a3a5c',
-        panelColor: '#2c5282',
-        frameColor: '#4a90d9',
-        panelWidth: 100,
-        panelHeight: 120,
-        texture: 'smooth',
-        decorations: ['neon_sign', 'reflection', 'grid_line']
-      },
-      patrol: {
-        type: 'metro',
-        bgColor: '#0a1929',
-        gridColor: '#1e3a5f',
-        groundColor: '#0f2744',
-        accentColor: '#3498db',
-        atmosphere: 'cyberpunk',
-        decorations: ['hologram', 'tech_panel', 'energy_bar']
-      },
-      ui: {
-        primary: '#3498db',
-        secondary: '#5dade2',
-        accent: '#00ffcc',
-        gradient: 'linear-gradient(135deg, #3498db 0%, #00ffcc 100%)',
-        glowColor: 'rgba(52, 152, 219, 0.4)'
-      },
-      map: {
-        bgColor: '#0a1929',
-        lineGlow: 'rgba(52, 152, 219, 0.3)',
-        stationPulse: '#5dade2'
-      }
-    },
     stations: [
       {
         id: 's2-1', name: '北站', x: 100, y: 700, unlocked: true, isBranch: false,

@@ -95,8 +95,7 @@ export class GameEngine {
 
     this.graffitiGame = new GraffitiGame(this.app, {
       onScoreUpdate: (points, type) => this._onScoreUpdate(points, type),
-      onComplete: () => this._onPhaseComplete(),
-      onMilestone: (milestone, bonusPoints) => this._onMilestone(milestone, bonusPoints)
+      onComplete: () => this._onPhaseComplete()
     })
 
     this.patrolGame = new PatrolAvoid(this.app, {
@@ -173,9 +172,6 @@ export class GameEngine {
   showMap() {
     this._fadeTransition(() => {
       this._hideAllScenes()
-      if (this.currentLine) {
-        this.mapScene.setCurrentLine(this.currentLine)
-      }
       this.mapScene.show()
       this.state = GameState.MAP
       this.callbacks.onStateChange(this.state)
@@ -200,7 +196,6 @@ export class GameEngine {
     this.currentDifficultyParams = this.computeDifficultyParams()
     const stationScoreMultiplier = (station.graffiti && station.graffiti.scoreMultiplier) || 1
     scoreManager.setScoreMultiplier(this.currentDifficultyParams.scoreMultiplier * stationScoreMultiplier)
-    scoreManager.startStation(station)
     this._startNextPhase()
   }
 
@@ -243,9 +238,7 @@ export class GameEngine {
     }, 400)
   }
 
-  _onPhaseComplete(phaseResult = {}) {
-    const phase = this.phaseOrder[this.currentPhase]
-    scoreManager.endPhase(phase, phaseResult)
+  _onPhaseComplete() {
     this.currentPhase++
     setTimeout(() => {
       this._startNextPhase()
@@ -254,7 +247,6 @@ export class GameEngine {
 
   _onStationComplete() {
     this.stationsCompleted++
-    const evaluation = scoreManager.endStation()
 
     const stationScore = scoreManager.currentScore - (this.stationStartScore || 0)
     const isNewStationHigh = scoreManager.setStationScore(this.currentStation.id, stationScore)
@@ -264,14 +256,12 @@ export class GameEngine {
     this.state = GameState.STATION_COMPLETE
     this.callbacks.onStateChange(this.state, {
       station: this.currentStation,
-      line: this.currentLine,
       stationsCompleted: this.stationsCompleted,
       difficulty: this.difficulty,
       nextDifficultyParams: this.difficulty === 'hard' ? this.computeDifficultyParams() : null,
       stationScore,
       isNewStationHigh,
-      newUnlocks,
-      evaluation
+      newUnlocks
     })
   }
 
@@ -289,12 +279,6 @@ export class GameEngine {
   _onScoreUpdate(points, type) {
     if (this.callbacks.onScoreUpdate) {
       this.callbacks.onScoreUpdate(points, type)
-    }
-  }
-
-  _onMilestone(milestone, bonusPoints) {
-    if (this.callbacks.onMilestone) {
-      this.callbacks.onMilestone(milestone, bonusPoints)
     }
   }
 
@@ -355,14 +339,6 @@ export class GameEngine {
       audioManager.resume()
       audioManager.startMusic()
     }
-  }
-
-  setVolume(type, value) {
-    audioManager.setVolume(type, value)
-  }
-
-  getVolume(type) {
-    return audioManager.getVolume(type)
   }
 
   destroy() {

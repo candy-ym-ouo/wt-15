@@ -34,6 +34,8 @@ const scoreTrend = ref([]);
 const missSourceStats = ref({ timeout: 0, early: 0, late: 0 });
 const caughtStats = ref({ locations: {}, sources: {} });
 const statsTab = ref('overview');
+const showArrival = ref(false);
+const arrivalData = ref(null);
 
 const currentTheme = computed(() => {
   if (currentLine.value?.theme) {
@@ -222,14 +224,22 @@ function onTick() {
  combo.value = scoreManager.combo;
 }
 function onMilestone(milestone, bonusPoints) {
- currentMilestone.value = milestone;
- milestoneBonus.value = bonusPoints;
- score.value = scoreManager.currentScore;
- combo.value = scoreManager.combo;
- showMilestone.value = true;
- setTimeout(() => {
-   showMilestone.value = false;
- }, 1500 + milestone.tier * 200);
+  currentMilestone.value = milestone;
+  milestoneBonus.value = bonusPoints;
+  score.value = scoreManager.currentScore;
+  combo.value = scoreManager.combo;
+  showMilestone.value = true;
+  setTimeout(() => {
+    showMilestone.value = false;
+  }, 1500 + milestone.tier * 200);
+}
+function onTrainArrival(station, line) {
+  arrivalData.value = { station, line };
+  currentLine.value = line;
+  showArrival.value = true;
+  setTimeout(() => {
+    showArrival.value = false;
+  }, 2800);
 }
 function startGame(difficulty = 'normal') {
   if (!engine) {
@@ -369,7 +379,8 @@ onMounted(async () => {
  onScoreUpdate,
  onStateChange,
  onTick,
- onMilestone
+ onMilestone,
+ onTrainArrival
  });
  await engine.init();
 });
@@ -421,6 +432,26 @@ onUnmounted(() => {
           </div>
           <div class="milestone-rays" :class="`rays-tier-${currentMilestone.tier}`">
             <div v-for="i in 12" :key="i" class="ray" :style="{ '--ray-index': i }"></div>
+          </div>
+        </div>
+      </transition>
+
+      <transition name="arrival">
+        <div v-if="showArrival && arrivalData" class="arrival-overlay" :style="{ '--arrival-color': arrivalData.line?.color || '#e94560' }">
+          <div class="arrival-card">
+            <div class="arrival-icon">🚇</div>
+            <div class="arrival-line-name">{{ arrivalData.line?.name }}</div>
+            <div class="arrival-station-name">{{ arrivalData.station?.name }}</div>
+            <div class="arrival-status">列车进站</div>
+            <div v-if="arrivalData.station?.feedback?.start" class="arrival-feedback">
+              💬 {{ arrivalData.station.feedback.start }}
+            </div>
+            <div class="arrival-progress-bar">
+              <div class="arrival-progress-fill"></div>
+            </div>
+          </div>
+          <div class="arrival-particles">
+            <div v-for="i in 8" :key="i" class="arrival-particle" :style="{ '--particle-idx': i }"></div>
           </div>
         </div>
       </transition>
@@ -1383,5 +1414,188 @@ onUnmounted(() => {
   opacity: 0;
   transform: translateY(10px) scale(0.95);
   transform-origin: bottom right;
+}
+
+.arrival-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 70;
+  --arrival-color: #e94560;
+}
+
+.arrival-card {
+  position: relative;
+  z-index: 2;
+  background: linear-gradient(135deg, rgba(0,0,0,0.92), rgba(30,30,60,0.96));
+  border: 3px solid var(--arrival-color);
+  border-radius: 28px;
+  padding: 36px 56px;
+  text-align: center;
+  box-shadow: 0 0 60px var(--arrival-color), 0 0 120px rgba(0,0,0,0.5);
+  backdrop-filter: blur(12px);
+  min-width: 320px;
+}
+
+.arrival-icon {
+  font-size: 40px;
+  margin-bottom: 8px;
+  animation: arrivalBounce 0.6s ease;
+}
+
+.arrival-line-name {
+  font-size: 14px;
+  color: var(--arrival-color);
+  letter-spacing: 3px;
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+
+.arrival-station-name {
+  font-size: 40px;
+  font-weight: 900;
+  color: #fff;
+  letter-spacing: 4px;
+  text-shadow: 0 0 20px var(--arrival-color);
+  margin-bottom: 8px;
+  animation: arrivalSlideIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.arrival-status {
+  font-size: 16px;
+  color: var(--arrival-color);
+  font-weight: 700;
+  letter-spacing: 6px;
+  text-transform: uppercase;
+  margin-bottom: 12px;
+  animation: arrivalPulse 1s ease infinite;
+}
+
+.arrival-feedback {
+  font-size: 13px;
+  color: rgba(255,255,255,0.85);
+  margin-top: 8px;
+  padding: 10px 16px;
+  background: rgba(255,255,255,0.06);
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.1);
+  line-height: 1.5;
+  animation: arrivalFadeIn 0.5s ease 0.3s both;
+}
+
+.arrival-progress-bar {
+  margin-top: 16px;
+  height: 4px;
+  background: rgba(255,255,255,0.1);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.arrival-progress-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, var(--arrival-color), #fff);
+  border-radius: 2px;
+  animation: arrivalProgress 2.8s ease forwards;
+}
+
+.arrival-particles {
+  position: absolute;
+  width: 500px;
+  height: 500px;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 1;
+  pointer-events: none;
+}
+
+.arrival-particle {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 8px;
+  height: 8px;
+  background: var(--arrival-color);
+  border-radius: 50%;
+  opacity: 0;
+  box-shadow: 0 0 10px var(--arrival-color);
+  animation: arrivalParticle 1.5s ease-out calc(var(--particle-idx) * 0.1s) both;
+}
+
+@keyframes arrivalBounce {
+  0% { transform: scale(0.3) translateY(20px); opacity: 0; }
+  50% { transform: scale(1.2) translateY(-5px); }
+  70% { transform: scale(0.95) translateY(2px); }
+  100% { transform: scale(1) translateY(0); opacity: 1; }
+}
+
+@keyframes arrivalSlideIn {
+  0% { transform: translateX(-30px); opacity: 0; }
+  60% { transform: translateX(5px); }
+  100% { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes arrivalPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+@keyframes arrivalFadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes arrivalProgress {
+  0% { width: 0%; }
+  20% { width: 40%; }
+  80% { width: 80%; }
+  100% { width: 100%; }
+}
+
+@keyframes arrivalParticle {
+  0% {
+    transform: translate(-50%, -50%) scale(0);
+    opacity: 0;
+  }
+  20% {
+    opacity: 1;
+    transform: translate(
+      calc(-50% + cos(calc(var(--particle-idx) * 45deg)) * 80px),
+      calc(-50% + sin(calc(var(--particle-idx) * 45deg)) * 80px)
+    ) scale(1.2);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(
+      calc(-50% + cos(calc(var(--particle-idx) * 45deg)) * 180px),
+      calc(-50% + sin(calc(var(--particle-idx) * 45deg)) * 180px)
+    ) scale(0);
+  }
+}
+
+.arrival-enter-active {
+  animation: arrivalOverlayEnter 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.arrival-leave-active {
+  animation: arrivalOverlayLeave 0.4s ease-in;
+}
+
+@keyframes arrivalOverlayEnter {
+  0% { opacity: 0; transform: scale(0.5); }
+  60% { opacity: 1; transform: scale(1.05); }
+  100% { transform: scale(1); }
+}
+
+@keyframes arrivalOverlayLeave {
+  0% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(1.2) translateY(-20px); }
 }
 </style>
