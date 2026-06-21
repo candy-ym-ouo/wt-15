@@ -400,6 +400,10 @@ onUnmounted(() => {
               <span class="stat-value">{{ stats.highScore }}</span>
             </div>
             <div class="stat-row">
+              <span class="stat-label">⭐ 收集星星</span>
+              <span class="stat-value" style="color: #f1c40f;">{{ scoreManager.getTotalStars() }}/{{ scoreManager.getMaxStars() }}</span>
+            </div>
+            <div class="stat-row">
               <span class="stat-label">🎨 累计得分</span>
               <span class="stat-value">{{ stats.totalScore }}</span>
             </div>
@@ -889,6 +893,51 @@ onUnmounted(() => {
         </div>
 
         <div class="screen-content">
+          <div v-if="stationResult?.evaluation" style="background: linear-gradient(135deg, rgba(241, 196, 15, 0.15), rgba(233, 69, 96, 0.1)); border-radius: 16px; padding: 20px; margin-bottom: 16px; border: 2px solid rgba(241, 196, 15, 0.3);">
+            <div style="text-align: center; margin-bottom: 12px;">
+              <div style="font-size: 14px; opacity: 0.7; margin-bottom: 4px;">站点评价</div>
+              <div class="star-rating">
+                <span
+                  v-for="i in 5"
+                  :key="i"
+                  class="star"
+                  :class="{ active: i <= stationResult.evaluation.stars, empty: i > stationResult.evaluation.stars }"
+                >★</span>
+              </div>
+              <div style="font-size: 24px; font-weight: 900; margin-top: 8px; background: linear-gradient(135deg, #f1c40f, #e94560); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">
+                {{ stationResult.evaluation.rank }} · {{ stationResult.evaluation.score }}分
+              </div>
+            </div>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 13px;">
+              <div class="eval-detail-row">
+                <span class="eval-detail-label">🎯 命中率</span>
+                <span class="eval-detail-value">{{ stationResult.evaluation.details.hitRate }}%</span>
+              </div>
+              <div class="eval-detail-row">
+                <span class="eval-detail-label">🔥 最大连击</span>
+                <span class="eval-detail-value">{{ stationResult.evaluation.details.combo }}</span>
+              </div>
+              <div class="eval-detail-row">
+                <span class="eval-detail-label">❌ 失误</span>
+                <span class="eval-detail-value" :class="stationResult.evaluation.details.misses > 0 ? 'text-red' : 'text-green'">{{ stationResult.evaluation.details.misses }}次</span>
+              </div>
+              <div class="eval-detail-row">
+                <span class="eval-detail-label">🚨 被抓</span>
+                <span class="eval-detail-value" :class="stationResult.evaluation.details.caught > 0 ? 'text-red' : 'text-green'">{{ stationResult.evaluation.details.caught }}次</span>
+              </div>
+            </div>
+            
+            <div v-if="stationResult.evaluation.details.perfectBonus > 0" style="margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.1); text-align: center;">
+              <span style="color: #f1c40f; font-size: 12px;">
+                ✨ 额外奖励: 
+                <span v-if="stationResult.evaluation.details.hasNoMisses">零失误+10</span>
+                <span v-if="stationResult.evaluation.details.hasNoMisses && stationResult.evaluation.details.hasNoCatches">、</span>
+                <span v-if="stationResult.evaluation.details.hasNoCatches">零被抓+5</span>
+              </span>
+            </div>
+          </div>
+
           <div style="background: linear-gradient(135deg, rgba(46, 204, 113, 0.1), rgba(52, 152, 219, 0.1)); border-radius: 16px; padding: 24px; border: 2px solid rgba(46, 204, 113, 0.3);">
             <div style="text-align: center;">
               <div style="font-size: 16px; opacity: 0.7; margin-bottom: 8px;">当前得分</div>
@@ -991,5 +1040,76 @@ onUnmounted(() => {
     opacity: 0;
     transform: translate(-50%, -60%) scale(0.8);
   }
+}
+
+.star-rating {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.star-rating .star {
+  font-size: 36px;
+  transition: all 0.3s ease;
+  filter: drop-shadow(0 0 8px rgba(241, 196, 15, 0.5));
+}
+
+.star-rating .star.active {
+  color: #f1c40f;
+  animation: starPop 0.5s ease forwards;
+  opacity: 0;
+}
+
+.star-rating .star.active:nth-child(1) { animation-delay: 0.1s; }
+.star-rating .star.active:nth-child(2) { animation-delay: 0.2s; }
+.star-rating .star.active:nth-child(3) { animation-delay: 0.3s; }
+.star-rating .star.active:nth-child(4) { animation-delay: 0.4s; }
+.star-rating .star.active:nth-child(5) { animation-delay: 0.5s; }
+
+.star-rating .star.empty {
+  color: #333344;
+  opacity: 0.5;
+}
+
+@keyframes starPop {
+  0% {
+    opacity: 0;
+    transform: scale(0) rotate(-180deg);
+  }
+  50% {
+    transform: scale(1.3) rotate(10deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
+  }
+}
+
+.eval-detail-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+}
+
+.eval-detail-label {
+  opacity: 0.8;
+  font-size: 13px;
+}
+
+.eval-detail-value {
+  font-weight: bold;
+  font-size: 14px;
+}
+
+.text-green {
+  color: #2ecc71;
+}
+
+.text-red {
+  color: #ff4444;
 }
 </style>

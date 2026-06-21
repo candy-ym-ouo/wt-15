@@ -42,6 +42,7 @@ class ScoreManager {
         this.selectedSkin = saved.selectedSkin || 'default'
         this.unlockedStations = saved.unlockedStations || ['s1-1', 's2-1']
         this.stationScores = saved.stationScores || {}
+        this.stationEvaluations = saved.stationEvaluations || {}
         this.gameHistory = saved.gameHistory || []
       }
     } catch (e) {
@@ -64,6 +65,7 @@ class ScoreManager {
         selectedSkin: this.selectedSkin,
         unlockedStations: this.unlockedStations,
         stationScores: this.stationScores,
+        stationEvaluations: this.stationEvaluations,
         gameHistory: this.gameHistory.slice(-50)
       }
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
@@ -249,9 +251,10 @@ class ScoreManager {
       id: station.id,
       name: station.name,
       startScore: this.currentScore,
+      startTime: Date.now(),
       phases: [],
-      graffiti: { score: 0, perfect: 0, good: 0, miss: 0, milestoneBonus: 0 },
-      patrol: { score: 0, caught: 0 }
+      graffiti: { score: 0, perfect: 0, good: 0, miss: 0, milestoneBonus: 0, duration: 0 },
+      patrol: { score: 0, caught: 0, duration: 0 }
     }
   }
 
@@ -261,9 +264,16 @@ class ScoreManager {
     const phaseData = {
       type: phaseType,
       score: this.currentScore - station.startScore - station.phases.reduce((sum, p) => sum + p.score, 0),
+      duration: phaseResult.duration || 0,
       ...phaseResult
     }
     station.phases.push(phaseData)
+    
+    if (phaseType === 'graffiti') {
+      station.graffiti.duration = phaseResult.duration || 0
+    } else if (phaseType === 'patrol') {
+      station.patrol.duration = phaseResult.duration || 0
+    }
 
     if (phaseType === 'graffiti') {
       station.graffiti.score = phaseData.score
@@ -287,20 +297,100 @@ class ScoreManager {
     }
   }
 
+  evaluateStation(stationData, stationConfig) {
+    const graffiti = stationData.graffiti
+    const patrol = stationData.patrol
+    
+    const totalHits = graffiti.perfect + graffiti.good
+    const totalAttempts = totalHits + graffiti.miss
+    const hitRate = totalAttempts > 0 ? totalHits / totalAttempts : 0
+    
+    const baseDuration = (stationConfig?.graffiti?.duration || 30) * 1000
+    const graffitiDuration = graffiti.duration || baseDuration
+    const timeEfficiency = Math.max(0, 1 - Math.max(0, graffitiDuration - baseDuration) / baseDuration)
+    
+    const difficultyMultiplier = stationConfig?.graffiti?.scoreMultiplier || 1
+    const expectedCombo = Math.floor(10 * difficultyMultiplier)
+    const comboRatio = Math.min(1, (stationData.maxCombo || 0) / expectedCombo)
+    
+    const hasNoMisses = graffiti.miss === 0
+    const hasNoCatches = patrol.caught === 0
+    const perfectBonus = (hasNoMisses ? 10 : 0) + (hasNoCatches ? 5 : 0)
+    
+    const hitRateScore = hitRate * 40
+    const comboScore = comboRatio * 25
+    const missPenalty = Math.min(20, graffiti.miss * 2 + patrol.caught * 3)
+    const missScore = Math.max(0, 20 - missPenalty)
+    const timeScore = timeEfficiency * 15
+    
+    const totalScore = Math.min(100, Math.max(0, hitRateScore + comboScore + missScore + timeScore + perfectBonus))
+    
+    let stars = 1
+    if (totalScore >= 90) stars = 5
+    else if (totalScore >= 75) stars = 4
+    else if (totalScore >= 60) stars = 3
+    else if (totalScore >= 40) stars = 2
+    
+    let rank = '新手'
+    if (stars === 5) rank = '传奇'
+    else if (stars === 4) rank = '大师'
+    else if (stars === 3) rank = '熟练'
+    else if (stars === 2) rank = '入门'
+    
+    return {
+      score: Math.round(totalScore),
+      stars,
+      rank,
+      details: {
+        hitRate: Math.round(hitRate * 100),
+        combo: stationData.maxCombo || 0,
+        misses: graffiti.miss,
+        caught: patrol.caught,
+        timeEfficiency: Math.round(timeEfficiency * 100),
+        hasNoMisses,
+        hasNoCatches,
+        hitRateScore: Math.round(hitRateScore),
+        comboScore: Math.round(comboScore),
+        missScore: Math.round(missScore),
+        timeScore: Math.round(timeScore),
+        perfectBonus
+      }
+    }
+  }
+
   endStation() {
     if (!this.currentGameData || !this.currentGameData.currentStation) return
     const station = this.currentGameData.currentStation
     station.endScore = this.currentScore
     station.totalScore = station.endScore - station.startScore
+    station.duration = Date.now() - station.startTime
+    
+    const stationConfig = this._findStationById(station.id)
+    const evaluation = this.evaluateStation({
+      ...station,
+      maxCombo: this.currentGameData.maxCombo
+    }, stationConfig)
+    
+    if (!this.stationEvaluations) {
+      this.stationEvaluations = {}
+    }
+    const prevEval = this.stationEvaluations[station.id]
+    if (!prevEval || evaluation.score > prevEval.score) {
+      this.stationEvaluations[station.id] = evaluation
+    }
+    
     this.currentGameData.stations.push({
       id: station.id,
       name: station.name,
       score: station.totalScore,
+      duration: station.duration,
       graffiti: station.graffiti,
       patrol: station.patrol,
-      phases: station.phases
+      phases: station.phases,
+      evaluation
     })
     this.currentGameData.currentStation = null
+    return evaluation
   }
 
   endGame() {
@@ -346,6 +436,28 @@ class ScoreManager {
       return true
     }
     return false
+  }
+
+  getStationEvaluation(stationId) {
+    return this.stationEvaluations?.[stationId] || null
+  }
+
+  getStationStars(stationId) {
+    const evalData = this.getStationEvaluation(stationId)
+    return evalData?.stars || 0
+  }
+
+  getTotalStars() {
+    if (!this.stationEvaluations) return 0
+    return Object.values(this.stationEvaluations).reduce((sum, e) => sum + (e.stars || 0), 0)
+  }
+
+  getMaxStars() {
+    let count = 0
+    for (const line of LINES) {
+      count += line.stations.length * 5
+    }
+    return count
   }
 
   isStationUnlocked(station) {

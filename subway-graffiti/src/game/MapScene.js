@@ -164,6 +164,21 @@ export class MapScene {
           scoreLabel.anchor.set(0.5)
           scoreLabel.y = (idx % 2 === 0 ? 50 : -50) + 20
           stationContainer.addChild(scoreLabel)
+          
+          const stationStars = scoreManager.getStationStars(station.id)
+          if (stationStars > 0) {
+            const starsText = '★'.repeat(stationStars) + '☆'.repeat(5 - stationStars)
+            const starsLabel = new PIXI.Text(starsText, {
+              fontFamily: 'Arial',
+              fontSize: 14,
+              fill: 0xf1c40f,
+              stroke: 0x000000,
+              strokeThickness: 2
+            })
+            starsLabel.anchor.set(0.5)
+            starsLabel.y = (idx % 2 === 0 ? 50 : -50) + 36
+            stationContainer.addChild(starsLabel)
+          }
         }
 
         if (!isUnlocked) {
@@ -453,6 +468,21 @@ export class MapScene {
           scoreLabel.anchor.set(0.5)
           scoreLabel.y = (idx % 2 === 0 ? 50 : -50) + 20
           stationContainer.addChild(scoreLabel)
+          
+          const stationStars = scoreManager.getStationStars(station.id)
+          if (stationStars > 0) {
+            const starsText = '★'.repeat(stationStars) + '☆'.repeat(5 - stationStars)
+            const starsLabel = new PIXI.Text(starsText, {
+              fontFamily: 'Arial',
+              fontSize: 14,
+              fill: 0xf1c40f,
+              stroke: 0x000000,
+              strokeThickness: 2
+            })
+            starsLabel.anchor.set(0.5)
+            starsLabel.y = (idx % 2 === 0 ? 50 : -50) + 36
+            stationContainer.addChild(starsLabel)
+          }
         }
 
         if (!isUnlocked) {

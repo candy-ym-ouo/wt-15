@@ -240,9 +240,9 @@ export class GameEngine {
     }, 400)
   }
 
-  _onPhaseComplete() {
+  _onPhaseComplete(phaseResult = {}) {
     const phase = this.phaseOrder[this.currentPhase]
-    scoreManager.endPhase(phase)
+    scoreManager.endPhase(phase, phaseResult)
     this.currentPhase++
     setTimeout(() => {
       this._startNextPhase()
@@ -251,7 +251,7 @@ export class GameEngine {
 
   _onStationComplete() {
     this.stationsCompleted++
-    scoreManager.endStation()
+    const evaluation = scoreManager.endStation()
 
     const stationScore = scoreManager.currentScore - (this.stationStartScore || 0)
     const isNewStationHigh = scoreManager.setStationScore(this.currentStation.id, stationScore)
@@ -266,7 +266,8 @@ export class GameEngine {
       nextDifficultyParams: this.difficulty === 'hard' ? this.computeDifficultyParams() : null,
       stationScore,
       isNewStationHigh,
-      newUnlocks
+      newUnlocks,
+      evaluation
     })
   }
 

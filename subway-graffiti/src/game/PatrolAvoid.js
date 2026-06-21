@@ -375,6 +375,7 @@ export class PatrolAvoid {
     this.spawnTimer = 1500
     this.laserTimer = 3000
     this.station = station || null
+    this.startTime = Date.now()
     this.riskIndicators = []
     this.lastSafeZone = null
 
@@ -573,7 +574,8 @@ export class PatrolAvoid {
 
     if (this.gameTime >= this.duration && !this.isCaught) {
       this.isRunning = false
-      this.callbacks.onComplete()
+      const duration = Date.now() - this.startTime
+      this.callbacks.onComplete({ duration })
     }
   }
 
@@ -941,7 +943,8 @@ export class PatrolAvoid {
         requestAnimationFrame(flash)
       } else {
         setTimeout(() => {
-          this.callbacks.onComplete()
+          const duration = Date.now() - this.startTime
+          this.callbacks.onComplete({ duration, caught: true })
         }, 1000)
       }
     }

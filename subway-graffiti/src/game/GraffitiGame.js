@@ -110,6 +110,7 @@ export class GraffitiGame {
     this.targets = []
     this.particles = []
     this.station = station || null
+    this.startTime = Date.now()
     this.graffitiMarks.forEach(m => this.container.removeChild(m))
     this.graffitiMarks = []
     this.container.visible = true
@@ -722,7 +723,8 @@ export class GraffitiGame {
 
     if (this.gameTime >= this.duration) {
       this.isRunning = false
-      this.callbacks.onComplete()
+      const duration = Date.now() - this.startTime
+      this.callbacks.onComplete({ duration })
     }
   }
 
