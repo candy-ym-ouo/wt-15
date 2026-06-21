@@ -234,7 +234,10 @@ export class GraffitiGame {
     
     this.drawWall(this.currentLine)
     
-    this.graffitiMarks.forEach(m => this.container.removeChild(m))
+    this.graffitiMarks.forEach(m => {
+      this.container.removeChild(m)
+      m.destroy({ children: true })
+    })
     this.graffitiMarks = []
     this.container.visible = true
     const startText = (station && station.feedback && station.feedback.start) || '开始!'
@@ -378,7 +381,7 @@ export class GraffitiGame {
     this.createParticles(target.x, target.y, result === 'miss' ? color : null, count)
 
     if (result !== 'miss') {
-      this.createGraffitiMark(target.x, target.y)
+      this.createGraffitiMark(target.x, target.y, result)
 
       const milestone = scoreManager.checkComboMilestone()
       if (milestone) {
@@ -449,58 +452,227 @@ export class GraffitiGame {
     g.lineTo(cx, cy - size)
   }
 
-  createGraffitiMark(x, y) {
+  createGraffitiMark(x, y, resultType = 'good') {
     const particleConfig = scoreManager.getSkinParticles()
     const colors = particleConfig.colors
-    const colorStr = colors[Math.floor(Math.random() * colors.length)]
-    const colorNum = parseInt(colorStr.replace('#', '0x'))
+    const isPerfect = resultType === 'perfect'
 
-    const mark = new PIXI.Graphics()
-    mark.beginFill(colorNum, 0.7)
+    const markContainer = new PIXI.Container()
+    markContainer.x = x
+    markContainer.y = y
+    markContainer.alpha = 0
+    markContainer.scale.set(0.3)
 
-    const shapes = [...particleConfig.shapes, 'tag']
-    const shape = shapes[Math.floor(Math.random() * shapes.length)]
+    const baseRotation = Math.random() * Math.PI * 2
+    const baseScale = isPerfect ? 1.2 : 0.85
 
-    switch (shape) {
-      case 'star':
-        this.drawStar(mark, 0, 0, 5, 25 + Math.random() * 15, 12)
-        break
-      case 'circle':
-        mark.drawCircle(0, 0, 20 + Math.random() * 15)
-        break
-      case 'heart':
-        this.drawHeart(mark, 0, 0, 20)
-        break
-      case 'diamond':
-        this.drawDiamond(mark, 0, 0, 25)
-        break
-      case 'tag':
-      default:
-        mark.drawRoundedRect(-30, -15, 60, 30, 8)
-        break
+    const mainColorStr = colors[Math.floor(Math.random() * colors.length)]
+    const mainColorNum = parseInt(mainColorStr.replace('#', '0x'))
+    const accentColorStr = colors[Math.floor(Math.random() * colors.length)]
+    const accentColorNum = parseInt(accentColorStr.replace('#', '0x'))
+
+    const layerCount = isPerfect ? 4 : 2
+    for (let i = layerCount - 1; i >= 0; i--) {
+      const layer = new PIXI.Graphics()
+      const layerScale = baseScale * (1 - i * 0.15)
+      const alpha = isPerfect ? (0.35 + i * 0.15) : (0.5 + i * 0.2)
+      const color = i % 2 === 0 ? mainColorNum : accentColorNum
+      const offsetX = (Math.random() - 0.5) * 8 * (i + 1)
+      const offsetY = (Math.random() - 0.5) * 8 * (i + 1)
+
+      const shapes = [...particleConfig.shapes, 'tag', 'bubble', 'splash']
+      const shape = shapes[Math.floor(Math.random() * shapes.length)]
+      const sizeMultiplier = isPerfect ? 1.3 : 1
+
+      layer.beginFill(color, alpha)
+
+      switch (shape) {
+        case 'star':
+          this.drawStar(layer, offsetX, offsetY, 5, (25 + Math.random() * 15) * layerScale * sizeMultiplier, 12 * layerScale * sizeMultiplier)
+          break
+        case 'circle':
+          layer.drawCircle(offsetX, offsetY, (20 + Math.random() * 15) * layerScale * sizeMultiplier)
+          break
+        case 'heart':
+          this.drawHeart(layer, offsetX, offsetY, 20 * layerScale * sizeMultiplier)
+          break
+        case 'diamond':
+          this.drawDiamond(layer, offsetX, offsetY, 25 * layerScale * sizeMultiplier)
+          break
+        case 'bubble':
+          this.drawBubble(layer, offsetX, offsetY, (30 + Math.random() * 20) * layerScale * sizeMultiplier)
+          break
+        case 'splash':
+          this.drawSplash(layer, offsetX, offsetY, (25 + Math.random() * 15) * layerScale * sizeMultiplier)
+          break
+        case 'tag':
+        default:
+          layer.drawRoundedRect(-30 * layerScale * sizeMultiplier + offsetX, -15 * layerScale * sizeMultiplier + offsetY, 60 * layerScale * sizeMultiplier, 30 * layerScale * sizeMultiplier, 8 * layerScale * sizeMultiplier)
+          break
+      }
+      layer.endFill()
+
+      if (i === 0 && isPerfect) {
+        layer.lineStyle(3, 0xffffff, 0.6)
+        const outlineSize = (28 + Math.random() * 10) * layerScale * sizeMultiplier
+        if (shape === 'star') {
+          this.drawStar(layer, offsetX, offsetY, 5, outlineSize, outlineSize * 0.48)
+        } else if (shape === 'circle' || shape === 'bubble') {
+          layer.drawCircle(offsetX, offsetY, outlineSize)
+        } else if (shape === 'heart') {
+          this.drawHeart(layer, offsetX, offsetY, outlineSize * 0.9)
+        } else if (shape === 'diamond') {
+          this.drawDiamond(layer, offsetX, offsetY, outlineSize)
+        } else if (shape === 'splash') {
+          this.drawSplash(layer, offsetX, offsetY, outlineSize)
+        } else {
+          layer.drawRoundedRect(-32 * layerScale * sizeMultiplier + offsetX, -17 * layerScale * sizeMultiplier + offsetY, 64 * layerScale * sizeMultiplier, 34 * layerScale * sizeMultiplier, 10 * layerScale * sizeMultiplier)
+        }
+      }
+
+      markContainer.addChild(layer)
     }
-    mark.endFill()
 
-    mark.rotation = Math.random() * Math.PI * 2
-    mark.x = x
-    mark.y = y
-    mark.alpha = 0
-    mark.scale.set(0.5)
+    if (isPerfect) {
+      const highlight = new PIXI.Graphics()
+      highlight.beginFill(0xffffff, 0.5)
+      highlight.drawCircle(-8 * baseScale, -10 * baseScale, 6 * baseScale)
+      highlight.endFill()
+      markContainer.addChild(highlight)
 
-    this.container.addChildAt(mark, 1)
-    this.graffitiMarks.push(mark)
+      const highlight2 = new PIXI.Graphics()
+      highlight2.beginFill(0xffffff, 0.3)
+      highlight2.drawCircle(10 * baseScale, 5 * baseScale, 4 * baseScale)
+      highlight2.endFill()
+      markContainer.addChild(highlight2)
+    }
+
+    if (isPerfect || Math.random() > 0.4) {
+      const dripCount = isPerfect ? 2 + Math.floor(Math.random() * 2) : 1
+      for (let d = 0; d < dripCount; d++) {
+        const drip = new PIXI.Graphics()
+        const dripX = (Math.random() - 0.5) * 30 * baseScale
+        const dripY = 15 * baseScale + Math.random() * 10 * baseScale
+        const dripWidth = 3 + Math.random() * 5
+        const dripHeight = 10 + Math.random() * 25
+        const dripColor = Math.random() > 0.5 ? mainColorNum : accentColorNum
+        drip.beginFill(dripColor, 0.7)
+        drip.moveTo(dripX - dripWidth / 2, dripY)
+        drip.quadraticCurveTo(dripX - dripWidth / 2, dripY + dripHeight * 0.7, dripX, dripY + dripHeight)
+        drip.quadraticCurveTo(dripX + dripWidth / 2, dripY + dripHeight * 0.7, dripX + dripWidth / 2, dripY)
+        drip.endFill()
+        drip.beginFill(dripColor, 0.9)
+        drip.drawCircle(dripX, dripY + dripHeight, dripWidth * 0.8)
+        drip.endFill()
+        markContainer.addChildAt(drip, 0)
+      }
+    }
+
+    if (isPerfect) {
+      const splatterCount = 3 + Math.floor(Math.random() * 3)
+      for (let s = 0; s < splatterCount; s++) {
+        const splatter = new PIXI.Graphics()
+        const angle = Math.random() * Math.PI * 2
+        const dist = 20 + Math.random() * 25
+        const sx = Math.cos(angle) * dist * baseScale
+        const sy = Math.sin(angle) * dist * baseScale
+        const splatterColor = Math.random() > 0.5 ? mainColorNum : accentColorNum
+        splatter.beginFill(splatterColor, 0.4 + Math.random() * 0.3)
+        const dots = 3 + Math.floor(Math.random() * 4)
+        for (let d = 0; d < dots; d++) {
+          const dotAngle = Math.random() * Math.PI * 2
+          const dotDist = Math.random() * 8
+          const dotSize = 1 + Math.random() * 3
+          splatter.drawCircle(sx + Math.cos(dotAngle) * dotDist, sy + Math.sin(dotAngle) * dotDist, dotSize)
+        }
+        splatter.endFill()
+        markContainer.addChildAt(splatter, 0)
+      }
+    }
+
+    if (isPerfect || Math.random() > 0.5) {
+      const labelText = isPerfect ? 'PERFECT' : 'GOOD'
+      const labelColor = isPerfect ? mainColorNum : 0xffffff
+      const fontSize = isPerfect ? 18 : 14
+
+      const labelBg = new PIXI.Graphics()
+      labelBg.beginFill(0x000000, 0.6)
+      const labelWidth = fontSize * (labelText.length * 0.6 + 0.5)
+      const labelHeight = fontSize + 8
+      labelBg.drawRoundedRect(-labelWidth / 2, -labelHeight / 2, labelWidth, labelHeight, 6)
+      labelBg.endFill()
+      labelBg.y = isPerfect ? -35 * baseScale : -28 * baseScale
+      markContainer.addChild(labelBg)
+
+      const label = new PIXI.Text(labelText, {
+        fontFamily: 'Arial Black',
+        fontSize: fontSize,
+        fontWeight: '900',
+        fill: labelColor,
+        stroke: 0x000000,
+        strokeThickness: 2
+      })
+      label.anchor.set(0.5)
+      label.y = isPerfect ? -35 * baseScale : -28 * baseScale
+      markContainer.addChild(label)
+    }
+
+    if (isPerfect && scoreManager.combo > 0 && scoreManager.combo % 5 === 0) {
+      const comboLabel = new PIXI.Text(`${scoreManager.combo}x`, {
+        fontFamily: 'Arial Black',
+        fontSize: 22,
+        fontWeight: '900',
+        fill: 0xf39c12,
+        stroke: 0x000000,
+        strokeThickness: 3
+      })
+      comboLabel.anchor.set(0.5)
+      comboLabel.y = 30 * baseScale
+      comboLabel.rotation = -0.2
+      markContainer.addChild(comboLabel)
+    }
+
+    markContainer.rotation = baseRotation
+
+    const insertIndex = Math.min(1 + this.graffitiMarks.length, this.container.children.length - 1)
+    this.container.addChildAt(markContainer, insertIndex)
+    this.graffitiMarks.push(markContainer)
 
     const startTime = performance.now()
+    const totalDuration = isPerfect ? 0.4 : 0.3
     const animate = () => {
       const elapsed = (performance.now() - startTime) / 1000
-      if (elapsed < 0.3) {
-        const p = elapsed / 0.3
-        mark.alpha = p
-        mark.scale.set(0.5 + p * 0.5)
+      if (elapsed < totalDuration) {
+        const p = elapsed / totalDuration
+        const easeOut = 1 - Math.pow(1 - p, 3)
+        markContainer.alpha = easeOut
+        const scale = 0.3 + easeOut * 0.7
+        markContainer.scale.set(scale)
+        markContainer.rotation = baseRotation + Math.sin(p * Math.PI) * 0.1
         requestAnimationFrame(animate)
       }
     }
     animate()
+  }
+
+  drawBubble(g, cx, cy, size) {
+    g.drawCircle(cx, cy, size)
+    g.beginFill(0xffffff, 0.25)
+    g.drawCircle(cx - size * 0.3, cy - size * 0.3, size * 0.35)
+    g.endFill()
+  }
+
+  drawSplash(g, cx, cy, size) {
+    const drops = 8
+    for (let i = 0; i < drops; i++) {
+      const angle = (Math.PI * 2 * i) / drops + Math.random() * 0.3
+      const dist = size * (0.6 + Math.random() * 0.4)
+      const dropSize = size * (0.2 + Math.random() * 0.2)
+      const dx = cx + Math.cos(angle) * dist
+      const dy = cy + Math.sin(angle) * dist
+      g.drawCircle(dx, dy, dropSize)
+    }
+    g.drawCircle(cx, cy, size * 0.6)
   }
 
   drawStar(g, cx, cy, spikes, outerRadius, innerRadius) {
