@@ -1008,6 +1008,105 @@ class ScoreManager {
     return nextStations
   }
 
+  getStationRewards(stationId) {
+    const station = this._findStationById(stationId)
+    if (!station) return null
+
+    const rewards = []
+
+    for (const line of LINES) {
+      for (const s of line.stations) {
+        if (s.unlockCondition && s.unlockCondition.type === 'score' &&
+            s.unlockCondition.prerequisite === stationId) {
+          rewards.push({
+            stationId: s.id,
+            stationName: s.name,
+            lineName: line.name,
+            lineColor: line.color,
+            isBranch: s.isBranch || false,
+            minScore: s.unlockCondition.minScore,
+            graffiti: s.graffiti,
+            patrol: s.patrol
+          })
+        }
+      }
+    }
+
+    const difficultyTags = []
+    if (station.graffiti) {
+      if (station.graffiti.shrinkSpeed > 140) difficultyTags.push('高速缩圈')
+      if (station.graffiti.maxTargets >= 5) difficultyTags.push('多目标')
+      if (station.graffiti.perfectRadius <= 18) difficultyTags.push('精准要求')
+      if (station.graffiti.scoreMultiplier > 1) difficultyTags.push(`x${station.graffiti.scoreMultiplier}倍率`)
+      if (station.graffiti.comboBonus) difficultyTags.push('连击加成')
+      if (station.graffiti.rhythmMode) difficultyTags.push('节奏模式')
+    }
+    if (station.patrol) {
+      if (station.patrol.maxGuards >= 4) difficultyTags.push('重兵把守')
+      if (station.patrol.laserEnabled) difficultyTags.push('激光安保')
+      if (station.patrol.guardSpeed >= 180) difficultyTags.push('高速巡逻')
+    }
+
+    let difficultyLevel = '简单'
+    const score = station.unlockCondition?.minScore || 500
+    if (score >= 2000 || difficultyTags.length >= 4) difficultyLevel = '地狱'
+    else if (score >= 1200 || difficultyTags.length >= 3) difficultyLevel = '困难'
+    else if (score >= 800 || difficultyTags.length >= 2) difficultyLevel = '中等'
+    else if (score >= 500 || difficultyTags.length >= 1) difficultyLevel = '进阶'
+
+    return {
+      stationId,
+      stationName: station.name,
+      difficultyLevel,
+      difficultyTags,
+      rewards,
+      graffiti: station.graffiti,
+      patrol: station.patrol,
+      feedback: station.feedback
+    }
+  }
+
+  getRecommendedChallengeOrder() {
+    const allStations = []
+    for (const line of LINES) {
+      for (const station of line.stations) {
+        if (station.unlockCondition?.type === 'default') continue
+        if (this.unlockedStations.includes(station.id)) continue
+
+        const prereqId = station.unlockCondition?.prerequisite
+        const prereqUnlocked = prereqId ? this.unlockedStations.includes(prereqId) : false
+        const prereqScore = prereqId ? this.getStationScore(prereqId) : 0
+        const minScore = station.unlockCondition?.minScore || 0
+        const progress = minScore > 0 ? Math.min(1, prereqScore / minScore) : 0
+
+        let priority = 0
+        if (prereqUnlocked && progress >= 1) priority = 100
+        else if (prereqUnlocked && progress >= 0.7) priority = 80
+        else if (prereqUnlocked && progress > 0) priority = 60
+        else if (prereqUnlocked) priority = 40
+        else priority = 10 + progress * 20
+
+        if (station.isBranch) priority -= 5
+
+        allStations.push({
+          stationId: station.id,
+          stationName: station.name,
+          lineName: line.name,
+          lineColor: line.color,
+          isBranch: station.isBranch || false,
+          minScore,
+          currentScore: prereqScore,
+          progress,
+          prereqUnlocked,
+          priority
+        })
+      }
+    }
+
+    allStations.sort((a, b) => b.priority - a.priority)
+    return allStations.slice(0, 5)
+  }
+
   getRecentTasks() {
     const tasks = []
     const totalHits = this.perfectCount + this.goodCount + this.missCount

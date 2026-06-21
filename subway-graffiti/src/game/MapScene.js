@@ -17,6 +17,9 @@ export class MapScene {
     this.isTransitioning = false
     this.currentLine = null
     this.animationId = null
+    this.stationDetailContainer = null
+    this.stationDetailData = null
+    this.stationDetailCloseTarget = null
     this.setup()
   }
 
@@ -98,7 +101,7 @@ export class MapScene {
         stationContainer.x = station.x
         stationContainer.y = station.y
         stationContainer.eventMode = 'static'
-        stationContainer.cursor = isUnlocked ? 'pointer' : 'default'
+        stationContainer.cursor = 'pointer'
 
         const outerRing = new PIXI.Graphics()
         if (station.isBranch) {
@@ -265,6 +268,12 @@ export class MapScene {
           stationContainer.on('pointertap', () => {
             if (!this.isTransitioning) {
               this.onStationTap(line, station, idx)
+            }
+          })
+        } else {
+          stationContainer.on('pointertap', () => {
+            if (!this.isTransitioning) {
+              this.showStationDetail(line, station, idx)
             }
           })
         }
@@ -770,6 +779,7 @@ export class MapScene {
         this.updateLineGlow()
         this.updateStationHighlights()
         this.updateArrivalSequence()
+        this.updateStationDetail()
       }
       this.animationId = requestAnimationFrame(animate)
     }
@@ -818,6 +828,13 @@ export class MapScene {
     })
   }
 
+  updateStationDetail() {
+    if (!this.stationDetailContainer) return
+    if (this.stationDetailContainer.alpha < 1) {
+      this.stationDetailContainer.alpha = Math.min(1, this.stationDetailContainer.alpha + 0.08)
+    }
+  }
+
   updateTrainColor(line) {
     const lineColor = parseInt(line.color.replace('#', '0x'))
     const body = this.train.children[0]
@@ -844,6 +861,7 @@ export class MapScene {
   hide() {
     this.container.visible = false
     this.stopAnimationLoop()
+    this.closeStationDetail()
     this.cleanupArrivalSequence()
     this.trainArrivalData = null
     this.trainArrivalPhase = null
@@ -868,7 +886,7 @@ export class MapScene {
         stationContainer.x = station.x
         stationContainer.y = station.y
         stationContainer.eventMode = 'static'
-        stationContainer.cursor = isUnlocked ? 'pointer' : 'default'
+        stationContainer.cursor = 'pointer'
 
         const outerRing = new PIXI.Graphics()
         if (station.isBranch) {
@@ -1037,6 +1055,12 @@ export class MapScene {
               this.onStationTap(line, station, idx)
             }
           })
+        } else {
+          stationContainer.on('pointertap', () => {
+            if (!this.isTransitioning) {
+              this.showStationDetail(line, station, idx)
+            }
+          })
         }
 
         this.stationNodes.push({
@@ -1064,6 +1088,459 @@ export class MapScene {
       other: '⚠️'
     }
     return icons[reason] || '⚠️'
+  }
+
+  showStationDetail(line, station, idx) {
+    audioManager.playSFX('click')
+    this.closeStationDetail()
+
+    const rewardsData = scoreManager.getStationRewards(station.id)
+    const unlockReq = scoreManager.getUnlockRequirement(station)
+    const recommended = scoreManager.getRecommendedChallengeOrder()
+    const stationInfo = scoreManager.getStationInfo(station.id)
+    const lineColor = parseInt(line.color.replace('#', '0x'))
+
+    this.stationDetailData = { line, station, idx }
+    this.stationDetailContainer = new PIXI.Container()
+    this.stationDetailContainer.alpha = 0
+
+    const overlay = new PIXI.Graphics()
+    overlay.beginFill(0x000000, 0.6)
+    overlay.drawRect(0, 0, GAME_CONFIG.width, GAME_CONFIG.height)
+    overlay.endFill()
+    overlay.eventMode = 'static'
+    overlay.on('pointertap', () => this.closeStationDetail())
+    this.stationDetailContainer.addChild(overlay)
+
+    const panelW = 680
+    const panelH = 780
+    const panelX = (GAME_CONFIG.width - panelW) / 2
+    const panelY = (GAME_CONFIG.height - panelH) / 2
+
+    const panelBg = new PIXI.Graphics()
+    panelBg.beginFill(0x0d0d1f, 0.97)
+    panelBg.drawRoundedRect(panelX, panelY, panelW, panelH, 24)
+    panelBg.endFill()
+    panelBg.lineStyle(3, lineColor, 0.8)
+    panelBg.drawRoundedRect(panelX, panelY, panelW, panelH, 24)
+    this.stationDetailContainer.addChild(panelBg)
+
+    let curY = panelY + 28
+
+    const headerIcon = new PIXI.Text('🔒', { fontSize: 36, fill: 0xffffff })
+    headerIcon.anchor.set(0.5)
+    headerIcon.x = GAME_CONFIG.width / 2
+    headerIcon.y = curY
+    this.stationDetailContainer.addChild(headerIcon)
+    curY += 40
+
+    const stationNameText = new PIXI.Text(station.name, {
+      fontFamily: 'Arial',
+      fontSize: 36,
+      fontWeight: '900',
+      fill: 0xffffff,
+      stroke: lineColor,
+      strokeThickness: 3,
+      letterSpacing: 4
+    })
+    stationNameText.anchor.set(0.5)
+    stationNameText.x = GAME_CONFIG.width / 2
+    stationNameText.y = curY
+    this.stationDetailContainer.addChild(stationNameText)
+    curY += 44
+
+    const lineNameText = new PIXI.Text(line.name + (station.isBranch ? ' · 支线' : ''), {
+      fontFamily: 'Arial',
+      fontSize: 16,
+      fill: lineColor,
+      letterSpacing: 2
+    })
+    lineNameText.anchor.set(0.5)
+    lineNameText.x = GAME_CONFIG.width / 2
+    lineNameText.y = curY
+    this.stationDetailContainer.addChild(lineNameText)
+    curY += 36
+
+    if (rewardsData) {
+      const diffColors = {
+        '简单': 0x2ecc71,
+        '进阶': 0x3498db,
+        '中等': 0xf39c12,
+        '困难': 0xe94560,
+        '地狱': 0x9b59b6
+      }
+      const diffColor = diffColors[rewardsData.difficultyLevel] || 0xffffff
+
+      const diffBg = new PIXI.Graphics()
+      diffBg.beginFill(diffColor, 0.2)
+      diffBg.drawRoundedRect(panelX + 30, curY, panelW - 60, 50, 12)
+      diffBg.endFill()
+      this.stationDetailContainer.addChild(diffBg)
+
+      const diffLabel = new PIXI.Text('难度等级', {
+        fontFamily: 'Arial',
+        fontSize: 13,
+        fill: 0xaaaaaa
+      })
+      diffLabel.x = panelX + 50
+      diffLabel.y = curY + 6
+      this.stationDetailContainer.addChild(diffLabel)
+
+      const diffValue = new PIXI.Text(rewardsData.difficultyLevel, {
+        fontFamily: 'Arial',
+        fontSize: 22,
+        fontWeight: '900',
+        fill: diffColor
+      })
+      diffValue.x = panelX + 50
+      diffValue.y = curY + 22
+      this.stationDetailContainer.addChild(diffValue)
+
+      if (rewardsData.difficultyTags.length > 0) {
+        let tagX = panelX + 160
+        rewardsData.difficultyTags.forEach(tag => {
+          const tagBg = new PIXI.Graphics()
+          tagBg.beginFill(diffColor, 0.15)
+          tagBg.drawRoundedRect(tagX, curY + 14, tag.length * 14 + 16, 24, 8)
+          tagBg.endFill()
+          this.stationDetailContainer.addChild(tagBg)
+
+          const tagText = new PIXI.Text(tag, {
+            fontFamily: 'Arial',
+            fontSize: 12,
+            fill: diffColor
+          })
+          tagText.x = tagX + 8
+          tagText.y = curY + 18
+          this.stationDetailContainer.addChild(tagText)
+
+          tagX += tag.length * 14 + 24
+        })
+      }
+      curY += 62
+    }
+
+    const sectionDivider1 = new PIXI.Graphics()
+    sectionDivider1.lineStyle(1, 0xffffff, 0.1)
+    sectionDivider1.moveTo(panelX + 40, curY)
+    sectionDivider1.lineTo(panelX + panelW - 40, curY)
+    this.stationDetailContainer.addChild(sectionDivider1)
+    curY += 16
+
+    const condTitle = new PIXI.Text('📋 解锁条件', {
+      fontFamily: 'Arial',
+      fontSize: 18,
+      fontWeight: 'bold',
+      fill: 0xf39c12
+    })
+    condTitle.x = panelX + 40
+    condTitle.y = curY
+    this.stationDetailContainer.addChild(condTitle)
+    curY += 32
+
+    if (unlockReq && unlockReq.type === 'score') {
+      const condDesc = new PIXI.Text(
+        `在「${unlockReq.prerequisiteName}」获得 ${unlockReq.minScore} 分`,
+        {
+          fontFamily: 'Arial',
+          fontSize: 15,
+          fill: 0xffffff
+        }
+      )
+      condDesc.x = panelX + 50
+      condDesc.y = curY
+      this.stationDetailContainer.addChild(condDesc)
+      curY += 28
+
+      const currentLabel = new PIXI.Text(
+        `当前: ${unlockReq.currentScore} / ${unlockReq.minScore}`,
+        {
+          fontFamily: 'Arial',
+          fontSize: 13,
+          fill: 0xaaaaaa
+        }
+      )
+      currentLabel.x = panelX + 50
+      currentLabel.y = curY
+      this.stationDetailContainer.addChild(currentLabel)
+      curY += 24
+
+      const barW = panelW - 120
+      const barBg = new PIXI.Graphics()
+      barBg.beginFill(0x222233)
+      barBg.drawRoundedRect(panelX + 50, curY, barW, 10, 5)
+      barBg.endFill()
+      this.stationDetailContainer.addChild(barBg)
+
+      const barFill = new PIXI.Graphics()
+      const fillW = Math.max(0, barW * unlockReq.progress)
+      if (fillW > 0) {
+        barFill.beginFill(0xf39c12)
+        barFill.drawRoundedRect(panelX + 50, curY, fillW, 10, 5)
+        barFill.endFill()
+      }
+      this.stationDetailContainer.addChild(barFill)
+
+      const pctText = new PIXI.Text(`${Math.round(unlockReq.progress * 100)}%`, {
+        fontFamily: 'Arial',
+        fontSize: 13,
+        fontWeight: 'bold',
+        fill: unlockReq.progress >= 1 ? 0x2ecc71 : 0xf39c12
+      })
+      pctText.anchor.set(1, 0)
+      pctText.x = panelX + panelW - 50
+      pctText.y = curY - 2
+      this.stationDetailContainer.addChild(pctText)
+      curY += 26
+    } else {
+      const noCond = new PIXI.Text('无需特殊条件', {
+        fontFamily: 'Arial',
+        fontSize: 14,
+        fill: 0x888899
+      })
+      noCond.x = panelX + 50
+      noCond.y = curY
+      this.stationDetailContainer.addChild(noCond)
+      curY += 26
+    }
+
+    if (stationInfo && stationInfo.playCount > 0) {
+      const attemptText = new PIXI.Text(`已尝试 ${stationInfo.playCount} 次`, {
+        fontFamily: 'Arial',
+        fontSize: 12,
+        fill: 0x888899
+      })
+      attemptText.x = panelX + 50
+      attemptText.y = curY
+      this.stationDetailContainer.addChild(attemptText)
+      curY += 20
+    }
+
+    curY += 8
+    const sectionDivider2 = new PIXI.Graphics()
+    sectionDivider2.lineStyle(1, 0xffffff, 0.1)
+    sectionDivider2.moveTo(panelX + 40, curY)
+    sectionDivider2.lineTo(panelX + panelW - 40, curY)
+    this.stationDetailContainer.addChild(sectionDivider2)
+    curY += 16
+
+    if (rewardsData && rewardsData.rewards.length > 0) {
+      const rewardTitle = new PIXI.Text('🎁 通关奖励预告', {
+        fontFamily: 'Arial',
+        fontSize: 18,
+        fontWeight: 'bold',
+        fill: 0x2ecc71
+      })
+      rewardTitle.x = panelX + 40
+      rewardTitle.y = curY
+      this.stationDetailContainer.addChild(rewardTitle)
+      curY += 30
+
+      rewardsData.rewards.forEach(r => {
+        const rLineColor = parseInt(r.lineColor.replace('#', '0x'))
+
+        const rBg = new PIXI.Graphics()
+        rBg.beginFill(0xffffff, 0.04)
+        rBg.drawRoundedRect(panelX + 45, curY, panelW - 90, 52, 10)
+        rBg.endFill()
+        rBg.lineStyle(1, rLineColor, 0.3)
+        rBg.drawRoundedRect(panelX + 45, curY, panelW - 90, 52, 10)
+        this.stationDetailContainer.addChild(rBg)
+
+        const rDot = new PIXI.Graphics()
+        rDot.beginFill(rLineColor)
+        rDot.drawCircle(panelX + 68, curY + 26, 10)
+        rDot.endFill()
+        this.stationDetailContainer.addChild(rDot)
+
+        const rName = new PIXI.Text(r.stationName, {
+          fontFamily: 'Arial',
+          fontSize: 15,
+          fontWeight: 'bold',
+          fill: 0xffffff
+        })
+        rName.x = panelX + 88
+        rName.y = curY + 8
+        this.stationDetailContainer.addChild(rName)
+
+        const rDesc = new PIXI.Text(
+          `${r.lineName}${r.isBranch ? ' · 支线' : ''} · 需要 ${r.minScore} 分`,
+          {
+            fontFamily: 'Arial',
+            fontSize: 11,
+            fill: 0xaaaaaa
+          }
+        )
+        rDesc.x = panelX + 88
+        rDesc.y = curY + 30
+        this.stationDetailContainer.addChild(rDesc)
+
+        curY += 60
+      })
+    } else {
+      const noReward = new PIXI.Text('🎁 暂无后续站点', {
+        fontFamily: 'Arial',
+        fontSize: 14,
+        fill: 0x888899
+      })
+      noReward.x = panelX + 40
+      noReward.y = curY
+      this.stationDetailContainer.addChild(noReward)
+      curY += 26
+    }
+
+    curY += 8
+    const sectionDivider3 = new PIXI.Graphics()
+    sectionDivider3.lineStyle(1, 0xffffff, 0.1)
+    sectionDivider3.moveTo(panelX + 40, curY)
+    sectionDivider3.lineTo(panelX + panelW - 40, curY)
+    this.stationDetailContainer.addChild(sectionDivider3)
+    curY += 16
+
+    const recTitle = new PIXI.Text('🚀 推荐挑战顺序', {
+      fontFamily: 'Arial',
+      fontSize: 18,
+      fontWeight: 'bold',
+      fill: 0x3498db
+    })
+    recTitle.x = panelX + 40
+    recTitle.y = curY
+    this.stationDetailContainer.addChild(recTitle)
+    curY += 32
+
+    const stationInRec = recommended.find(r => r.stationId === station.id)
+    const recRank = stationInRec ? recommended.indexOf(stationInRec) + 1 : null
+
+    if (recRank !== null) {
+      const recRankBg = new PIXI.Graphics()
+      const rankColor = recRank <= 1 ? 0x2ecc71 : recRank <= 2 ? 0xf39c12 : 0x3498db
+      recRankBg.beginFill(rankColor, 0.2)
+      recRankBg.drawRoundedRect(panelX + 45, curY, 60, 30, 8)
+      recRankBg.endFill()
+      this.stationDetailContainer.addChild(recRankBg)
+
+      const recRankText = new PIXI.Text(`#${recRank}`, {
+        fontFamily: 'Arial',
+        fontSize: 16,
+        fontWeight: '900',
+        fill: rankColor
+      })
+      recRankText.anchor.set(0.5)
+      recRankText.x = panelX + 75
+      recRankText.y = curY + 7
+      this.stationDetailContainer.addChild(recRankText)
+
+      const recLabel = new PIXI.Text(
+        recRank <= 1 ? '最优先挑战！' : recRank <= 2 ? '推荐优先挑战' : '可后续挑战',
+        {
+          fontFamily: 'Arial',
+          fontSize: 14,
+          fill: 0xffffff
+        }
+      )
+      recLabel.x = panelX + 120
+      recLabel.y = curY + 6
+      this.stationDetailContainer.addChild(recLabel)
+      curY += 40
+    }
+
+    recommended.slice(0, 4).forEach((rec, i) => {
+      const rLineColor = parseInt(rec.lineColor.replace('#', '0x'))
+
+      const rowBg = new PIXI.Graphics()
+      rowBg.beginFill(0xffffff, i === (recRank ? recRank - 1 : -1) ? 0.08 : 0.03)
+      rowBg.drawRoundedRect(panelX + 45, curY, panelW - 90, 34, 8)
+      rowBg.endFill()
+      this.stationDetailContainer.addChild(rowBg)
+
+      const rankDot = new PIXI.Graphics()
+      rankDot.beginFill(rLineColor)
+      rankDot.drawCircle(panelX + 68, curY + 17, 8)
+      rankDot.endFill()
+      this.stationDetailContainer.addChild(rankDot)
+
+      const rankNum = new PIXI.Text(`${i + 1}`, {
+        fontFamily: 'Arial',
+        fontSize: 10,
+        fontWeight: 'bold',
+        fill: 0xffffff
+      })
+      rankNum.anchor.set(0.5)
+      rankNum.x = panelX + 68
+      rankNum.y = curY + 11
+      this.stationDetailContainer.addChild(rankNum)
+
+      const recName = new PIXI.Text(rec.stationName, {
+        fontFamily: 'Arial',
+        fontSize: 13,
+        fontWeight: 'bold',
+        fill: rec.stationId === station.id ? 0xf39c12 : 0xffffff
+      })
+      recName.x = panelX + 88
+      recName.y = curY + 8
+      this.stationDetailContainer.addChild(recName)
+
+      const recInfo = new PIXI.Text(
+        `${rec.lineName}${rec.isBranch ? ' · 支线' : ''}`,
+        {
+          fontFamily: 'Arial',
+          fontSize: 10,
+          fill: 0x888899
+        }
+      )
+      recInfo.x = panelX + 88
+      recInfo.y = curY + 22
+      this.stationDetailContainer.addChild(recInfo)
+
+      const progText = new PIXI.Text(`${Math.round(rec.progress * 100)}%`, {
+        fontFamily: 'Arial',
+        fontSize: 12,
+        fontWeight: 'bold',
+        fill: rec.progress >= 1 ? 0x2ecc71 : 0xaaaaaa
+      })
+      progText.anchor.set(1, 0)
+      progText.x = panelX + panelW - 60
+      progText.y = curY + 10
+      this.stationDetailContainer.addChild(progText)
+
+      curY += 40
+    })
+
+    curY += 16
+    const closeBtnBg = new PIXI.Graphics()
+    closeBtnBg.beginFill(lineColor, 0.3)
+    closeBtnBg.drawRoundedRect(GAME_CONFIG.width / 2 - 80, curY, 160, 44, 12)
+    closeBtnBg.endFill()
+    closeBtnBg.lineStyle(2, lineColor, 0.6)
+    closeBtnBg.drawRoundedRect(GAME_CONFIG.width / 2 - 80, curY, 160, 44, 12)
+    closeBtnBg.eventMode = 'static'
+    closeBtnBg.cursor = 'pointer'
+    closeBtnBg.on('pointertap', () => this.closeStationDetail())
+    this.stationDetailContainer.addChild(closeBtnBg)
+    this.stationDetailCloseTarget = closeBtnBg
+
+    const closeBtnText = new PIXI.Text('关闭', {
+      fontFamily: 'Arial',
+      fontSize: 16,
+      fontWeight: 'bold',
+      fill: 0xffffff
+    })
+    closeBtnText.anchor.set(0.5)
+    closeBtnText.x = GAME_CONFIG.width / 2
+    closeBtnText.y = curY + 12
+    this.stationDetailContainer.addChild(closeBtnText)
+
+    this.container.addChild(this.stationDetailContainer)
+  }
+
+  closeStationDetail() {
+    if (this.stationDetailContainer) {
+      this.container.removeChild(this.stationDetailContainer)
+      this.stationDetailContainer.destroy({ children: true })
+      this.stationDetailContainer = null
+      this.stationDetailData = null
+      this.stationDetailCloseTarget = null
+    }
   }
 
   updateNextGoalPreview() {
