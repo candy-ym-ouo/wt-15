@@ -15,6 +15,10 @@ const promptText = ref('');
 const promptColor = ref('#fff');
 const showPrompt = ref(false);
 const audioEnabled = ref(true);
+const showVolumePanel = ref(false);
+const musicVolume = ref(GAME_CONFIG.audio.musicVolume);
+const sfxVolume = ref(GAME_CONFIG.audio.sfxVolume);
+const voiceVolume = ref(GAME_CONFIG.audio.voiceVolume);
 const gameResult = ref(null);
 const stationResult = ref(null);
 const selectedDifficulty = ref('normal');
@@ -276,8 +280,40 @@ function backToMenu() {
  refreshStats();
 }
 function toggleAudio() {
- audioEnabled.value = !audioEnabled.value;
- engine.setAudioEnabled(audioEnabled.value);
+  showVolumePanel.value = !showVolumePanel.value;
+  if (showVolumePanel.value) {
+    musicVolume.value = audioManager.getVolume('music');
+    sfxVolume.value = audioManager.getVolume('sfx');
+    voiceVolume.value = audioManager.getVolume('voice');
+  }
+}
+
+function toggleAudioEnabled() {
+  audioEnabled.value = !audioEnabled.value;
+  engine.setAudioEnabled(audioEnabled.value);
+}
+
+function setVolume(type, value) {
+  const numValue = parseFloat(value);
+  switch (type) {
+    case 'music':
+      musicVolume.value = numValue;
+      break;
+    case 'sfx':
+      sfxVolume.value = numValue;
+      break;
+    case 'voice':
+      voiceVolume.value = numValue;
+      break;
+  }
+  engine.setVolume(type, numValue);
+  if (type === 'sfx') {
+    audioManager.playSFX('click');
+  }
+}
+
+function closeVolumePanel() {
+  showVolumePanel.value = false;
 }
 function showSkinsScreen() {
  audioManager.playSFX('click');
@@ -406,13 +442,82 @@ onUnmounted(() => {
         </div>
       </transition>
 
-      <button
-        v-if="currentState !== GameState.MENU"
-        @click="toggleAudio"
-        style="position: absolute; bottom: 20px; right: 20px; width: 50px; height: 50px; border-radius: 50%; border: none; background: rgba(0,0,0,0.6); color: #fff; font-size: 22px; cursor: pointer; backdrop-filter: blur(10px);"
-      >
-        {{ audioEnabled ? '🔊' : '🔇' }}
-      </button>
+      <div style="position: absolute; bottom: 20px; right: 20px; z-index: 30;">
+        <button
+          @click="toggleAudio"
+          style="width: 50px; height: 50px; border-radius: 50%; border: none; background: rgba(0,0,0,0.6); color: #fff; font-size: 22px; cursor: pointer; backdrop-filter: blur(10px);"
+        >
+          {{ audioEnabled ? '🔊' : '🔇' }}
+        </button>
+
+        <transition name="volume-panel">
+          <div v-if="showVolumePanel" class="volume-panel" @click.stop>
+            <div class="volume-panel-header">
+              <span>音量设置</span>
+              <button @click="closeVolumePanel" class="volume-close-btn">✕</button>
+            </div>
+
+            <div class="volume-item">
+              <div class="volume-item-header">
+                <span>🎵 音乐</span>
+                <span class="volume-value">{{ Math.round(musicVolume * 100) }}%</span>
+              </div>
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.01"
+                :value="musicVolume"
+                @input="setVolume('music', $event.target.value)"
+                class="volume-slider"
+              />
+            </div>
+
+            <div class="volume-item">
+              <div class="volume-item-header">
+                <span>🔊 音效</span>
+                <span class="volume-value">{{ Math.round(sfxVolume * 100) }}%</span>
+              </div>
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.01"
+                :value="sfxVolume"
+                @input="setVolume('sfx', $event.target.value)"
+                class="volume-slider"
+              />
+            </div>
+
+            <div class="volume-item">
+              <div class="volume-item-header">
+                <span>💬 提示语</span>
+                <span class="volume-value">{{ Math.round(voiceVolume * 100) }}%</span>
+              </div>
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.01"
+                :value="voiceVolume"
+                @input="setVolume('voice', $event.target.value)"
+                class="volume-slider"
+              />
+            </div>
+
+            <div class="volume-divider"></div>
+
+            <div class="volume-item" @click="toggleAudioEnabled">
+              <div class="volume-item-header">
+                <span>{{ audioEnabled ? '🔊 总开关' : '🔇 总开关' }}</span>
+                <span class="volume-toggle" :class="{ active: audioEnabled }">
+                  <span class="toggle-dot"></span>
+                </span>
+              </div>
+            </div>
+          </div>
+        </transition>
+      </div>
 
       <div v-if="currentState === GameState.MENU" class="screen">
         <div class="screen-title">地铁涂鸦</div>
@@ -1136,5 +1241,147 @@ onUnmounted(() => {
 
 .text-red {
   color: #ff4444;
+}
+
+.volume-panel {
+  position: absolute;
+  bottom: 60px;
+  right: 0;
+  width: 240px;
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(20px);
+  border-radius: 16px;
+  padding: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+.volume-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  font-weight: bold;
+  font-size: 14px;
+  color: #fff;
+}
+
+.volume-close-btn {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 14px;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.volume-close-btn:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.volume-item {
+  margin-bottom: 12px;
+}
+
+.volume-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+  font-size: 13px;
+  color: #fff;
+}
+
+.volume-value {
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+.volume-slider {
+  width: 100%;
+  height: 6px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+  outline: none;
+  cursor: pointer;
+}
+
+.volume-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #e94560;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(233, 69, 96, 0.5);
+  transition: transform 0.15s;
+}
+
+.volume-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+}
+
+.volume-slider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #e94560;
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 2px 6px rgba(233, 69, 96, 0.5);
+}
+
+.volume-divider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.15);
+  margin: 12px 0;
+}
+
+.volume-toggle {
+  position: relative;
+  width: 40px;
+  height: 22px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 11px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.volume-toggle.active {
+  background: #e94560;
+}
+
+.toggle-dot {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  background: #fff;
+  border-radius: 50%;
+  transition: transform 0.2s;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.volume-toggle.active .toggle-dot {
+  transform: translateX(18px);
+}
+
+.volume-panel-enter-active,
+.volume-panel-leave-active {
+  transition: all 0.25s ease;
+}
+
+.volume-panel-enter-from,
+.volume-panel-leave-to {
+  opacity: 0;
+  transform: translateY(10px) scale(0.95);
+  transform-origin: bottom right;
 }
 </style>

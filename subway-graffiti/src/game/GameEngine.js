@@ -357,6 +357,14 @@ export class GameEngine {
     }
   }
 
+  setVolume(type, value) {
+    audioManager.setVolume(type, value)
+  }
+
+  getVolume(type) {
+    return audioManager.getVolume(type)
+  }
+
   destroy() {
     window.removeEventListener('resize', this._onResize)
     if (this.mapScene) this.mapScene.destroy()

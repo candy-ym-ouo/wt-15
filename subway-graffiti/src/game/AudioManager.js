@@ -7,9 +7,11 @@ class AudioManager {
     this.masterVolume = GAME_CONFIG.audio.masterVolume
     this.sfxVolume = GAME_CONFIG.audio.sfxVolume
     this.musicVolume = GAME_CONFIG.audio.musicVolume
+    this.voiceVolume = GAME_CONFIG.audio.voiceVolume
     this.enabled = true
     this.musicNodes = []
     this.currentMusic = null
+    this._voiceTypes = ['click', 'unlock', 'station', 'milestone']
   }
 
   init() {
@@ -35,16 +37,61 @@ class AudioManager {
     }
   }
 
-  playTone(frequency, duration, type = 'sine', volume = 0.3) {
+  setVolume(type, value) {
+    const clampedValue = Math.max(0, Math.min(1, value))
+    switch (type) {
+      case 'master':
+        this.masterVolume = clampedValue
+        break
+      case 'sfx':
+        this.sfxVolume = clampedValue
+        break
+      case 'music':
+        this.musicVolume = clampedValue
+        break
+      case 'voice':
+        this.voiceVolume = clampedValue
+        break
+    }
+  }
+
+  getVolume(type) {
+    switch (type) {
+      case 'master': return this.masterVolume
+      case 'sfx': return this.sfxVolume
+      case 'music': return this.musicVolume
+      case 'voice': return this.voiceVolume
+      default: return 1
+    }
+  }
+
+  _getCategoryVolume(category) {
+    switch (category) {
+      case 'sfx': return this.sfxVolume
+      case 'music': return this.musicVolume
+      case 'voice': return this.voiceVolume
+      default: return 1
+    }
+  }
+
+  _getSFXCategory(type) {
+    if (this._voiceTypes.includes(type)) {
+      return 'voice'
+    }
+    return 'sfx'
+  }
+
+  playTone(frequency, duration, type = 'sine', volume = 0.3, category = 'sfx') {
     if (!this.enabled || !this.ctx) return
 
     const osc = this.ctx.createOscillator()
     const gain = this.ctx.createGain()
+    const categoryVolume = this._getCategoryVolume(category)
 
     osc.type = type
     osc.frequency.setValueAtTime(frequency, this.ctx.currentTime)
 
-    gain.gain.setValueAtTime(volume * this.sfxVolume * this.masterVolume, this.ctx.currentTime)
+    gain.gain.setValueAtTime(volume * categoryVolume * this.masterVolume, this.ctx.currentTime)
     gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + duration)
 
     osc.connect(gain)
@@ -58,45 +105,46 @@ class AudioManager {
     if (!this.enabled || !this.ctx) return
 
     const audioConfig = scoreManager.getSkinAudio()
+    const category = this._getSFXCategory(type)
 
     switch (type) {
       case 'perfect': {
         const config = audioConfig.perfect
-        this.playTone(config.baseFreq, config.duration, config.type, 0.4)
+        this.playTone(config.baseFreq, config.duration, config.type, 0.4, category)
         if (config.harmonic) {
-          setTimeout(() => this.playTone(config.harmonic, config.duration * 1.5, config.type, 0.3), 80)
+          setTimeout(() => this.playTone(config.harmonic, config.duration * 1.5, config.type, 0.3, category), 80)
         }
         break
       }
       case 'good': {
         const config = audioConfig.good
-        this.playTone(config.baseFreq, config.duration, config.type, 0.3)
+        this.playTone(config.baseFreq, config.duration, config.type, 0.3, category)
         break
       }
       case 'miss': {
         const config = audioConfig.miss
-        this.playTone(config.baseFreq, config.duration, config.type, 0.2)
+        this.playTone(config.baseFreq, config.duration, config.type, 0.2, category)
         break
       }
       case 'caught':
-        this.playTone(150, 0.3, 'sawtooth', 0.4)
-        setTimeout(() => this.playTone(100, 0.4, 'sawtooth', 0.3), 150)
+        this.playTone(150, 0.3, 'sawtooth', 0.4, category)
+        setTimeout(() => this.playTone(100, 0.4, 'sawtooth', 0.3, category), 150)
         break
       case 'click':
-        this.playTone(440, 0.05, 'square', 0.15)
+        this.playTone(440, 0.05, 'square', 0.15, category)
         break
       case 'unlock':
-        this.playTone(523, 0.1, 'sine', 0.3)
-        setTimeout(() => this.playTone(659, 0.1, 'sine', 0.3), 100)
-        setTimeout(() => this.playTone(784, 0.2, 'sine', 0.3), 200)
+        this.playTone(523, 0.1, 'sine', 0.3, category)
+        setTimeout(() => this.playTone(659, 0.1, 'sine', 0.3, category), 100)
+        setTimeout(() => this.playTone(784, 0.2, 'sine', 0.3, category), 200)
         break
       case 'station':
-        this.playTone(392, 0.1, 'sine', 0.3)
-        setTimeout(() => this.playTone(523, 0.15, 'sine', 0.25), 80)
+        this.playTone(392, 0.1, 'sine', 0.3, category)
+        setTimeout(() => this.playTone(523, 0.15, 'sine', 0.25, category), 80)
         break
       case 'combo': {
         const config = audioConfig.combo
-        this.playTone(config.baseFreq, config.duration, config.type, 0.25)
+        this.playTone(config.baseFreq, config.duration, config.type, 0.25, category)
         break
       }
       case 'milestone': {
@@ -106,12 +154,12 @@ class AudioManager {
         const notes = [0, 4, 7, 12]
         notes.forEach((interval, i) => {
           const freq = baseFreq * Math.pow(2, interval / 12)
-          setTimeout(() => this.playTone(freq, config.duration * (1 + tier * 0.1), config.type, 0.35 + tier * 0.05), i * 80)
+          setTimeout(() => this.playTone(freq, config.duration * (1 + tier * 0.1), config.type, 0.35 + tier * 0.05, category), i * 80)
         })
         if (tier >= 3) {
           setTimeout(() => {
             const highFreq = baseFreq * Math.pow(2, 19 / 12)
-            this.playTone(highFreq, config.duration * 1.5, config.type, 0.4)
+            this.playTone(highFreq, config.duration * 1.5, config.type, 0.4, category)
           }, 400)
         }
         break

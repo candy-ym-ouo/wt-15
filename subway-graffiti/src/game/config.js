@@ -318,7 +318,8 @@ export const GAME_CONFIG = {
   audio: {
     masterVolume: 0.7,
     sfxVolume: 0.8,
-    musicVolume: 0.4
+    musicVolume: 0.4,
+    voiceVolume: 0.7
   },
 
   difficulty: {
