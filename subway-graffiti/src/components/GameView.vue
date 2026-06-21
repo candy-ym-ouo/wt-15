@@ -61,12 +61,29 @@ function showProfilesScreen() {
   currentState.value = GameState.PROFILES;
 }
 
+function resetGameUIState() {
+  score.value = 0;
+  combo.value = 0;
+  Object.assign(comboState, scoreManager.getComboState());
+  gameResult.value = null;
+  stationResult.value = null;
+  showMilestone.value = false;
+  currentMilestone.value = null;
+  milestoneBonus.value = 0;
+  phaseInfo.value = null;
+  showArrival.value = false;
+  arrivalData.value = null;
+  showReplay.value = false;
+  currentReplayData.value = null;
+}
+
 function handleSelectProfile(profileId) {
   if (profileId === currentProfile.value?.id) return;
   audioManager.playSFX('click');
   if (engine.switchProfile(profileId)) {
     refreshProfiles();
     refreshStats();
+    resetGameUIState();
     showGamePrompt('档案切换成功', '#2ecc71');
   }
 }
@@ -114,10 +131,14 @@ function closeDeleteConfirmDialog() {
 function confirmDeleteProfile() {
   if (!profileToDelete.value) return;
   audioManager.playSFX('click');
+  const deletingCurrent = profileToDelete.value.id === currentProfile.value?.id;
   const result = engine.deleteProfile(profileToDelete.value.id);
   if (result) {
     refreshProfiles();
     refreshStats();
+    if (deletingCurrent) {
+      resetGameUIState();
+    }
     closeDeleteConfirmDialog();
     showGamePrompt('档案删除成功', '#2ecc71');
   } else {

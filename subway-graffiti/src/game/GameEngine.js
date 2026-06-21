@@ -205,6 +205,7 @@ export class GameEngine {
   switchProfile(profileId) {
     if (profileManager.switchProfile(profileId)) {
       scoreManager.loadProfile(profileId)
+      this._resetGameEngineState()
       this.showMenu()
       if (this.callbacks.onProfileSwitched) {
         this.callbacks.onProfileSwitched(profileManager.getCurrentProfile())
@@ -212,6 +213,18 @@ export class GameEngine {
       return true
     }
     return false
+  }
+
+  _resetGameEngineState() {
+    this.currentStation = null
+    this.currentLine = null
+    this.stationsCompleted = 0
+    this.currentPhase = 0
+    this.difficulty = 'normal'
+    this.currentDifficultyParams = null
+    this._pendingPhaseResult = null
+    this._waitingForReplay = false
+    this._preStationStatsSnapshot = null
   }
 
   createProfile(name, color) {
@@ -229,6 +242,7 @@ export class GameEngine {
       const newCurrent = profileManager.getCurrentProfile()
       if (newCurrent) {
         scoreManager.loadProfile(newCurrent.id)
+        this._resetGameEngineState()
       }
     }
     if (this.callbacks.onProfileDeleted) {

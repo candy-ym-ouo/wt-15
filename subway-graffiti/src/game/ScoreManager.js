@@ -186,6 +186,7 @@ class ScoreManager {
       } else {
         this._resetProfileData()
       }
+      this._resetAllTemporaryState()
     } catch (e) {
       console.warn('读取档案失败:', e)
       this._resetProfileData()
@@ -213,6 +214,44 @@ class ScoreManager {
     this.totalRescueSuccess = 0
     this.totalRescueFail = 0
     this.totalPreserveTriggered = 0
+    this._resetAllTemporaryState()
+  }
+
+  _resetAllTemporaryState() {
+    this.currentScore = 0
+    this.combo = 0
+    this.difficulty = 'normal'
+    this.scoreMultiplier = 1
+    this.currentStationId = null
+    this.stationMaxCombo = 0
+    this.stationPerfectCount = 0
+    this.stationGoodCount = 0
+    this.stationMissCount = 0
+    this.stationCaughtCount = 0
+    this.stationStartScore = 0
+    this.stationMilestoneBonus = 0
+    this.stationMissSources = { timeout: 0, early: 0, late: 0 }
+    this.stationCaughtLocations = []
+    this.stationMilestones = []
+    this.currentGameStations = []
+    this.currentGamePhaseBreakdown = {
+      graffiti: { score: 0, perfect: 0, good: 0, miss: 0, milestoneBonus: 0 },
+      patrol: { score: 0, caught: 0 }
+    }
+    this.maxPerfectStreak = 0
+    this.currentPerfectStreak = 0
+    this.currentPhaseType = null
+    this.lastComboBeforeBreak = 0
+    this.rescueWindowActive = false
+    this.rescueWindowStartTime = 0
+    this.rescuePerfectStreak = 0
+    this.stationRescueCount = 0
+    this.gameRescueCount = 0
+    this.rescueWindowRemaining = 0
+    this.preservedCombo = 0
+    this.justRescued = false
+    this.rescueResult = null
+    this.stationPreserveCount = 0
   }
 
   save() {
