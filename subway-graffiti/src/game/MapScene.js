@@ -15,6 +15,8 @@ export class MapScene {
     this.train = null
     this.trainTargetStation = null
     this.isTransitioning = false
+    this.currentLine = null
+    this.animationId = null
     this.setup()
   }
 
@@ -340,9 +342,12 @@ export class MapScene {
   }
 
   onTrainArrived(line, station, idx) {
-    this.isTransitioning = false
+    this.isTransitioning = true
     this.currentLineIndex = LINES.indexOf(line)
     this.currentStationIndex = idx
+
+    this.updateTrainColor(line)
+    this.updateTheme(line)
 
     if (!scoreManager.unlockedStations.includes(station.id)) {
       scoreManager.unlockedStations.push(station.id)
@@ -350,17 +355,426 @@ export class MapScene {
       audioManager.playSFX('unlock')
     }
 
-    audioManager.playSFX('station')
+    this.playArrivalSequence(line, station, idx)
+  }
 
-    setTimeout(() => {
-      this.callbacks.onStationSelected(station, line)
-    }, 300)
+  playArrivalSequence(line, station, idx) {
+    this.trainArrivalPhase = 'braking'
+    this.trainArrivalTimer = 0
+    this.trainArrivalData = { line, station, idx }
+
+    audioManager.playSFX('trainArrival')
+
+    this.createArrivalBroadcast(line, station)
+    this.createArrivalParticles(line, station)
+  }
+
+  createArrivalBroadcast(line, station) {
+    if (this.arrivalBroadcastContainer) {
+      this.container.removeChild(this.arrivalBroadcastContainer)
+      this.arrivalBroadcastContainer.destroy({ children: true })
+    }
+
+    this.arrivalBroadcastContainer = new PIXI.Container()
+    this.arrivalBroadcastContainer.alpha = 0
+
+    const lineColor = parseInt(line.color.replace('#', '0x'))
+    const bg = new PIXI.Graphics()
+    bg.beginFill(0x000000, 0.85)
+    bg.drawRoundedRect(GAME_CONFIG.width / 2 - 260, 200, 520, 160, 20)
+    bg.endFill()
+    bg.lineStyle(3, lineColor, 0.8)
+    bg.drawRoundedRect(GAME_CONFIG.width / 2 - 260, 200, 520, 160, 20)
+    this.arrivalBroadcastContainer.addChild(bg)
+
+    const icon = new PIXI.Text('🚇', { fontSize: 32 })
+    icon.anchor.set(0.5)
+    icon.x = GAME_CONFIG.width / 2
+    icon.y = 235
+    this.arrivalBroadcastContainer.addChild(icon)
+
+    const stationName = new PIXI.Text(station.name, {
+      fontFamily: 'Arial',
+      fontSize: 36,
+      fontWeight: '900',
+      fill: 0xffffff,
+      stroke: lineColor,
+      strokeThickness: 3,
+      letterSpacing: 4
+    })
+    stationName.anchor.set(0.5)
+    stationName.x = GAME_CONFIG.width / 2
+    stationName.y = 280
+    this.arrivalBroadcastContainer.addChild(stationName)
+
+    const lineName = new PIXI.Text(line.name, {
+      fontFamily: 'Arial',
+      fontSize: 16,
+      fill: lineColor,
+      letterSpacing: 2
+    })
+    lineName.anchor.set(0.5)
+    lineName.x = GAME_CONFIG.width / 2
+    lineName.y = 320
+    this.arrivalBroadcastContainer.addChild(lineName)
+
+    const hint = new PIXI.Text('列车进站', {
+      fontFamily: 'Arial',
+      fontSize: 14,
+      fill: 0xffffff,
+      alpha: 0.6
+    })
+    hint.anchor.set(0.5)
+    hint.x = GAME_CONFIG.width / 2
+    hint.y = 345
+    this.arrivalBroadcastContainer.addChild(hint)
+
+    this.container.addChild(this.arrivalBroadcastContainer)
+  }
+
+  createArrivalParticles(line, station) {
+    if (this.arrivalParticleContainer) {
+      this.container.removeChild(this.arrivalParticleContainer)
+      this.arrivalParticleContainer.destroy({ children: true })
+    }
+
+    this.arrivalParticleContainer = new PIXI.Container()
+    this.arrivalParticles = []
+
+    const lineColor = parseInt(line.color.replace('#', '0x'))
+
+    for (let i = 0; i < 30; i++) {
+      const p = new PIXI.Graphics()
+      p.beginFill(lineColor, 0.8)
+      p.drawCircle(0, 0, 3 + Math.random() * 4)
+      p.endFill()
+      p.x = station.x
+      p.y = station.y - 40
+      p.vx = (Math.random() - 0.5) * 8
+      p.vy = (Math.random() - 0.5) * 8
+      p.life = 1
+      p.decay = 0.01 + Math.random() * 0.02
+      this.arrivalParticles.push(p)
+      this.arrivalParticleContainer.addChild(p)
+    }
+
+    this.container.addChild(this.arrivalParticleContainer)
+  }
+
+  createRewardNotification(station, line) {
+    if (this.rewardContainer) {
+      this.container.removeChild(this.rewardContainer)
+      this.rewardContainer.destroy({ children: true })
+    }
+
+    this.rewardContainer = new PIXI.Container()
+    this.rewardContainer.alpha = 0
+
+    const lineColor = parseInt(line.color.replace('#', '0x'), 16)
+    const stationScore = scoreManager.getStationScore(station.id)
+
+    const bg = new PIXI.Graphics()
+    bg.beginFill(0x000000, 0.9)
+    bg.drawRoundedRect(GAME_CONFIG.width / 2 - 200, 420, 400, 160, 20)
+    bg.endFill()
+    bg.lineStyle(2, 0xf1c40f, 0.6)
+    bg.drawRoundedRect(GAME_CONFIG.width / 2 - 200, 420, 400, 160, 20)
+    this.rewardContainer.addChild(bg)
+
+    const rewardIcon = new PIXI.Text('🎯', { fontSize: 28 })
+    rewardIcon.anchor.set(0.5)
+    rewardIcon.x = GAME_CONFIG.width / 2
+    rewardIcon.y = 455
+    this.rewardContainer.addChild(rewardIcon)
+
+    const title = new PIXI.Text('准备挑战', {
+      fontFamily: 'Arial',
+      fontSize: 22,
+      fontWeight: '900',
+      fill: 0xf1c40f,
+      letterSpacing: 2
+    })
+    title.anchor.set(0.5)
+    title.x = GAME_CONFIG.width / 2
+    title.y = 490
+    this.rewardContainer.addChild(title)
+
+    if (stationScore > 0) {
+      const prevScore = new PIXI.Text(`历史最高: ${stationScore}`, {
+        fontFamily: 'Arial',
+        fontSize: 14,
+        fill: 0xf39c12
+      })
+      prevScore.anchor.set(0.5)
+      prevScore.x = GAME_CONFIG.width / 2
+      prevScore.y = 520
+      this.rewardContainer.addChild(prevScore)
+    }
+
+    if (station.feedback && station.feedback.start) {
+      const feedbackText = new PIXI.Text(station.feedback.start, {
+        fontFamily: 'Arial',
+        fontSize: 13,
+        fill: 0xffffff,
+        alpha: 0.8,
+        wordWrap: true,
+        wordWrapWidth: 360
+      })
+      feedbackText.anchor.set(0.5)
+      feedbackText.x = GAME_CONFIG.width / 2
+      feedbackText.y = 560
+      this.rewardContainer.addChild(feedbackText)
+    }
+
+    this.container.addChild(this.rewardContainer)
+  }
+
+  updateArrivalSequence() {
+    if (!this.trainArrivalData) return
+
+    this.trainArrivalTimer += 1 / 60
+
+    if (this.trainArrivalPhase === 'braking') {
+      const wobble = Math.sin(this.trainArrivalTimer * 30) * 0.08 * Math.max(0, 1 - this.trainArrivalTimer * 2)
+      this.train.rotation = wobble
+      const scaleX = 1.2 + Math.sin(this.trainArrivalTimer * 20) * 0.03 * Math.max(0, 1 - this.trainArrivalTimer * 2)
+      this.train.scale.set(scaleX)
+
+      if (this.arrivalBroadcastContainer) {
+        const t = Math.min(this.trainArrivalTimer / 0.4, 1)
+        this.arrivalBroadcastContainer.alpha = t
+        this.arrivalBroadcastContainer.y = (1 - t) * -30
+      }
+
+      if (this.arrivalBroadcastContainer) {
+        this.arrivalBroadcastContainer.scale.set(1 + (1 - t) * 0.3)
+      }
+
+      if (this.trainArrivalTimer >= 0.5) {
+        this.trainArrivalPhase = 'stopped'
+        this.trainArrivalTimer = 0
+        this.train.rotation = 0
+        this.train.scale.set(1.2)
+        audioManager.playSFX('station')
+      }
+    } else if (this.trainArrivalPhase === 'stopped') {
+      this.train.rotation = 0
+
+      if (this.arrivalBroadcastContainer) {
+        this.arrivalBroadcastContainer.alpha = 1
+        this.arrivalBroadcastContainer.scale.set(1)
+      }
+
+      if (this.trainArrivalTimer >= 1.0) {
+        this.trainArrivalPhase = 'reward'
+        this.trainArrivalTimer = 0
+        const { station, line } = this.trainArrivalData
+        this.createRewardNotification(station, line)
+
+        if (this.callbacks.onTrainArrival) {
+          this.callbacks.onTrainArrival(station, line)
+        }
+      }
+    } else if (this.trainArrivalPhase === 'reward') {
+      if (this.rewardContainer) {
+        const t = Math.min(this.trainArrivalTimer / 0.3, 1)
+        this.rewardContainer.alpha = t
+        this.rewardContainer.y = (1 - t) * 20
+      }
+
+      if (this.trainArrivalTimer >= 1.5) {
+        this.trainArrivalPhase = 'depart'
+        this.trainArrivalTimer = 0
+      }
+    } else if (this.trainArrivalPhase === 'depart') {
+      const t = Math.min(this.trainArrivalTimer / 0.5, 1)
+      if (this.arrivalBroadcastContainer) {
+        this.arrivalBroadcastContainer.alpha = 1 - t
+        this.arrivalBroadcastContainer.y = -t * 30
+      }
+      if (this.rewardContainer) {
+        this.rewardContainer.alpha = 1 - t
+        this.rewardContainer.y = t * 30
+      }
+
+      if (t >= 1) {
+        this.cleanupArrivalSequence()
+        this.isTransitioning = false
+        this.callbacks.onStationSelected(
+          this.trainArrivalData.station,
+          this.trainArrivalData.line
+        )
+        this.trainArrivalData = null
+        this.trainArrivalPhase = null
+      }
+    }
+
+    this.updateArrivalParticles()
+  }
+
+  updateArrivalParticles() {
+    if (!this.arrivalParticles) return
+    this.arrivalParticles.forEach(p => {
+      p.x += p.vx
+      p.y += p.vy
+      p.vx *= 0.96
+      p.vy *= 0.96
+      p.life -= p.decay
+      p.alpha = Math.max(0, p.life)
+      p.scale.set(Math.max(0.01, p.life))
+    })
+  }
+
+  cleanupArrivalSequence() {
+    if (this.arrivalBroadcastContainer) {
+      this.container.removeChild(this.arrivalBroadcastContainer)
+      this.arrivalBroadcastContainer.destroy({ children: true })
+      this.arrivalBroadcastContainer = null
+    }
+    if (this.rewardContainer) {
+      this.container.removeChild(this.rewardContainer)
+      this.rewardContainer.destroy({ children: true })
+      this.rewardContainer = null
+    }
+    if (this.arrivalParticleContainer) {
+      this.container.removeChild(this.arrivalParticleContainer)
+      this.arrivalParticleContainer.destroy({ children: true })
+      this.arrivalParticleContainer = null
+    }
+    this.arrivalParticles = []
+  }
+
+  drawBackground(line) {
+    if (this.bgContainer) {
+      this.container.removeChild(this.bgContainer)
+      this.bgContainer.destroy({ children: true })
+    }
+
+    this.bgContainer = new PIXI.Container()
+    this.container.addChildAt(this.bgContainer, 1)
+
+    const lineColor = parseInt(line.color.replace('#', '0x'), 16)
+
+    const glow = new PIXI.Graphics()
+    glow.beginFill(lineColor, 0.06)
+    glow.drawCircle(GAME_CONFIG.width / 2, GAME_CONFIG.height / 2, 500, 400)
+    glow.endFill()
+    this.bgContainer.addChild(glow)
+
+    this.bgParticles = []
+    for (let i = 0; i < 40; i++) {
+      const dot = new PIXI.Graphics()
+      dot.beginFill(lineColor, 0.4)
+      dot.drawCircle(0, 0, 1.5 + Math.random() * 2.5)
+      dot.endFill()
+      dot.x = Math.random() * GAME_CONFIG.width
+      dot.y = Math.random() * GAME_CONFIG.height
+      dot.vx = (Math.random() - 0.5) * 0.4
+      dot.vy = (Math.random() - 0.5) * 0.4
+      this.bgParticles.push(dot)
+      this.bgContainer.addChild(dot)
+    }
+
+    this.lineGlowGraphics = []
+    LINES.forEach(l => {
+      const g = new PIXI.Graphics()
+      const lc = parseInt(l.color.replace('#', '0x'))
+      g.lineStyle(10, lc, 0.15)
+      l.stations.forEach(station => {
+        if (station.unlockCondition && station.unlockCondition.prerequisite) {
+          const prereq = l.stations.find(s => s.id === station.unlockCondition.prerequisite)
+          if (prereq) {
+            g.moveTo(prereq.x, prereq.y)
+            g.lineTo(station.x, station.y)
+          }
+        }
+      })
+      this.lineGlowGraphics.push(g)
+      this.bgContainer.addChild(g)
+    })
+
+    this.stationHighlightGraphics = new PIXI.Graphics()
+    this.bgContainer.addChild(this.stationHighlightGraphics)
+  }
+
+  startAnimationLoop() {
+    if (this.animationId) return
+
+    const animate = () => {
+      if (this.container.visible) {
+        this.updateBgParticles()
+        this.updateLineGlow()
+        this.updateStationHighlights()
+        this.updateArrivalSequence()
+      }
+      this.animationId = requestAnimationFrame(animate)
+    }
+    animate()
+  }
+
+  stopAnimationLoop() {
+    if (this.animationId) {
+      cancelAnimationFrame(this.animationId)
+      this.animationId = null
+    }
+  }
+
+  updateBgParticles() {
+    if (!this.bgParticles) return
+    this.bgParticles.forEach(p => {
+      p.x += p.vx
+      p.y += p.vy
+      if (p.x < 0) p.x = GAME_CONFIG.width
+      if (p.x > GAME_CONFIG.width) p.x = 0
+      if (p.y < 0) p.y = GAME_CONFIG.height
+      if (p.y > GAME_CONFIG.height) p.y = 0
+    })
+  }
+
+  updateLineGlow() {
+    if (!this.lineGlowGraphics) return
+    const t = performance.now() / 1000
+    this.lineGlowGraphics.forEach((g, i) => {
+      g.alpha = 0.1 + Math.sin(t * 2 + i) * 0.08
+    })
+  }
+
+  updateStationHighlights() {
+    if (!this.stationHighlightGraphics) return
+    const t = performance.now() / 500
+
+    this.stationHighlightGraphics.clear()
+
+    this.stationNodes.forEach(node => {
+      if (!node.isUnlocked) return
+      const s = node.station
+      const pulse = 0.3 + Math.sin(t + node.index) * 0.2
+      this.stationHighlightGraphics.lineStyle(2, parseInt(node.line.color.replace('#', '0x'), 16), pulse)
+      this.stationHighlightGraphics.drawCircle(s.x, s.y, 38 + Math.sin(t * 2 + node.index) * 4)
+    })
+  }
+
+  updateTrainColor(line) {
+    const lineColor = parseInt(line.color.replace('#', '0x'))
+    const body = this.train.children[0]
+    if (body) body.clear().beginFill(lineColor).drawRoundedRect(-30, -18, 60, 36, 8).endFill()
+  }
+
+  updateTheme(line) {
+    this.currentLine = line
+    this.drawBackground(line)
   }
 
   show() {
     this.container.visible = true
     this.refreshStationStatus()
     this.updateNextGoalPreview()
+    this.startAnimationLoop()
+
+    if (!this.currentLine) {
+      this.currentLine = LINES[0]
+      this.drawBackground(this.currentLine)
+    }
   }
 
   hide() {

@@ -90,7 +90,8 @@ export class GameEngine {
 
   _setupScenes() {
     this.mapScene = new MapScene(this.app, {
-      onStationSelected: (station, line) => this._onStationSelected(station, line)
+      onStationSelected: (station, line) => this._onStationSelected(station, line),
+      onTrainArrival: (station, line) => this._onTrainArrival(station, line)
     })
 
     this.graffitiGame = new GraffitiGame(this.app, {
@@ -196,7 +197,14 @@ export class GameEngine {
     this.currentDifficultyParams = this.computeDifficultyParams()
     const stationScoreMultiplier = (station.graffiti && station.graffiti.scoreMultiplier) || 1
     scoreManager.setScoreMultiplier(this.currentDifficultyParams.scoreMultiplier * stationScoreMultiplier)
+    scoreManager.startStation(station)
     this._startNextPhase()
+  }
+
+  _onTrainArrival(station, line) {
+    if (this.callbacks.onTrainArrival) {
+      this.callbacks.onTrainArrival(station, line)
+    }
   }
 
   _startNextPhase() {
