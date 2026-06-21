@@ -3,6 +3,7 @@ import { GAME_CONFIG, LINES } from './config.js'
 import { scoreManager } from './ScoreManager.js'
 import { audioManager } from './AudioManager.js'
 import { replayManager, RiskLevel } from './ReplayManager.js'
+import { heatSystem } from './HeatSystem.js'
 
 export class PatrolAvoid {
   constructor(app, callbacks) {
@@ -490,8 +491,9 @@ export class PatrolAvoid {
 
     guard.addChild(body, hat, badge)
 
+    const heatEffects = heatSystem.getCurrentEffects()
     const baseGuardSpeed = this.getStationConfig(this.station, 'guardSpeed', GAME_CONFIG.patrol.guardSpeed)
-    let guardSpeed = (baseGuardSpeed + this.extraGuardSpeed) * (0.8 + Math.random() * 0.4)
+    let guardSpeed = (baseGuardSpeed + this.extraGuardSpeed) * (0.8 + Math.random() * 0.4) * heatEffects.guardSpeedMultiplier
     if (this.cityEventEffects?.patrol?.chaseSpeedMultiplier) {
       guard.chaseSpeedMultiplier = this.cityEventEffects.patrol.chaseSpeedMultiplier
     }
@@ -500,7 +502,7 @@ export class PatrolAvoid {
     guard.angle = Math.random() * Math.PI * 2
     guard.visionAngle = Math.random() * Math.PI * 2
     const baseFlashRadius = this.getStationConfig(this.station, 'flashRadius', GAME_CONFIG.patrol.flashRadius)
-    guard.visionRange = baseFlashRadius * this.patrolRangeMultiplier
+    guard.visionRange = baseFlashRadius * this.patrolRangeMultiplier * heatEffects.flashRadiusMultiplier
     guard.visionSpread = Math.PI / 3
     guard.changeTimer = 1 + Math.random() * 2
 
@@ -537,7 +539,9 @@ export class PatrolAvoid {
   }
 
   spawnGuard() {
-    const maxGuards = this.getStationConfig(this.station, 'maxGuards', GAME_CONFIG.patrol.maxGuards)
+    const heatEffects = heatSystem.getCurrentEffects()
+    const baseMaxGuards = this.getStationConfig(this.station, 'maxGuards', GAME_CONFIG.patrol.maxGuards)
+    const maxGuards = baseMaxGuards + heatEffects.guardCountAdd
     if (this.guards.length >= maxGuards) return
 
     const edges = [
@@ -553,8 +557,18 @@ export class PatrolAvoid {
 
   createLaserBeam() {
     const laserEnabled = this.getStationConfig(this.station, 'laserEnabled', false)
-    if (!laserEnabled) return
-    if (Math.random() > 0.5) return
+    const heatEffects = heatSystem.getCurrentEffects()
+    
+    if (!laserEnabled && heatEffects.laserChanceMultiplier <= 0) return
+    
+    let chance = 0.5
+    if (laserEnabled) {
+      chance = 0.5 * heatEffects.laserChanceMultiplier
+    } else if (heatEffects.laserChanceMultiplier > 0) {
+      chance = 0.3 * heatEffects.laserChanceMultiplier
+    }
+    
+    if (Math.random() > Math.min(0.9, chance)) return
 
     const horizontal = Math.random() > 0.5
     const beam = new PIXI.Graphics()
@@ -1552,6 +1566,8 @@ export class PatrolAvoid {
       location: location ? { ...location, stationId } : null,
       source
     })
+    
+    heatSystem.addHeatFromResult('caught')
 
     const rescueResult = scoreManager.rescueResult
     if (rescueResult && rescueResult.type === 'combo_break_no_rescue' && rescueResult.preservedCombo > 0) {
@@ -1611,6 +1627,8 @@ export class PatrolAvoid {
     this.gameTime += delta
     this.spawnTimer += delta * 1000
     this.laserTimer += delta * 1000
+    
+    heatSystem.update(delta, Date.now())
 
     const remaining = Math.max(0, this.duration - this.gameTime)
     this.updateTimerBar(remaining / this.duration)
@@ -1621,13 +1639,17 @@ export class PatrolAvoid {
       audioManager.playSFX('miss')
     }
 
-    const spawnInterval = this.getStationConfig(this.station, 'spawnInterval', GAME_CONFIG.patrol.spawnInterval)
+    const heatEffects = heatSystem.getCurrentEffects()
+    const baseSpawnInterval = this.getStationConfig(this.station, 'spawnInterval', GAME_CONFIG.patrol.spawnInterval)
+    const spawnInterval = baseSpawnInterval * heatEffects.spawnIntervalMultiplier
     if (this.spawnTimer >= spawnInterval) {
       this.spawnTimer = 0
       this.spawnGuard()
     }
 
-    if (this.laserTimer >= 5000) {
+    const baseLaserInterval = 5000
+    const laserInterval = baseLaserInterval * heatEffects.laserIntervalMultiplier
+    if (this.laserTimer >= laserInterval) {
       this.laserTimer = 0
       this.createLaserBeam()
     }

@@ -2,6 +2,7 @@ import { GAME_CONFIG, LINES, BATTLE_PASS_CONFIG } from './config.js'
 import { profileManager } from './ProfileManager.js'
 import { battlePassManager } from './BattlePassManager.js'
 import { graffitiWorkshop } from './GraffitiWorkshop.js'
+import { heatSystem } from './HeatSystem.js'
 
 const SAVE_VERSION = 3
 
@@ -1530,20 +1531,25 @@ class ScoreManager {
       ? Math.round((this.stationPerfectCount + this.stationGoodCount) / totalHits * 100)
       : 0
 
+    const heatEvaluation = heatSystem.getEvaluationEffects()
+    const bonusScore = Math.floor(stationScore * (heatEvaluation.bonusScoreMultiplier - 1))
+    const adjustedScore = stationScore + bonusScore
+
     let stars = 0
-    let scoreRatio = stationScore / minScore
+    let scoreRatio = adjustedScore / minScore
     if (scoreRatio >= 3) stars = 5
     else if (scoreRatio >= 2) stars = 4
     else if (scoreRatio >= 1.5) stars = 3
     else if (scoreRatio >= 1) stars = 2
     else if (scoreRatio >= 0.5) stars = 1
 
-    let rank = '新手'
-    if (stars === 5) rank = '传说'
-    else if (stars === 4) rank = '大师'
-    else if (stars === 3) rank = '精英'
-    else if (stars === 2) rank = '熟练'
-    else if (stars === 1) rank = '入门'
+    stars = Math.max(1, stars - heatEvaluation.starPenalty)
+
+    const rankLevels = ['新手', '入门', '熟练', '精英', '大师', '传说']
+    const starsToRankIndex = [0, 1, 2, 3, 4, 5]
+    let rankIndex = Math.min(5, starsToRankIndex[stars] - heatEvaluation.rankPenalty)
+    rankIndex = Math.max(0, rankIndex)
+    const rank = rankLevels[rankIndex]
 
     const hasNoMisses = this.stationMissCount === 0
     const hasNoCatches = this.stationCaughtCount === 0
@@ -1551,10 +1557,15 @@ class ScoreManager {
     if (hasNoMisses) perfectBonus += 10
     if (hasNoCatches) perfectBonus += 5
 
+    const heatLevelInfo = heatSystem.getLevelInfo()
+    const peakLevelInfo = heatSystem.getLevelInfo(heatEvaluation.peakLevel)
+
     return {
       stars,
       rank,
       score: stationScore,
+      adjustedScore,
+      bonusScore,
       details: {
         hitRate,
         combo: this.stationMaxCombo,
@@ -1562,7 +1573,19 @@ class ScoreManager {
         caught: this.stationCaughtCount,
         hasNoMisses,
         hasNoCatches,
-        perfectBonus
+        perfectBonus,
+        heat: {
+          currentHeat: Math.round(heatSystem.currentHeat),
+          peakHeat: Math.round(heatEvaluation.peakHeat),
+          averageHeat: Math.round(heatEvaluation.averageHeat),
+          currentLevel: heatEvaluation.level,
+          peakLevel: heatEvaluation.peakLevel,
+          currentLevelName: heatLevelInfo.name,
+          peakLevelName: peakLevelInfo.name,
+          starPenalty: heatEvaluation.starPenalty,
+          rankPenalty: heatEvaluation.rankPenalty,
+          bonusScoreMultiplier: heatEvaluation.bonusScoreMultiplier
+        }
       }
     }
   }

@@ -671,6 +671,47 @@ export const GAME_CONFIG = {
     disengageColor: 0x888888
   },
 
+  heatSystem: {
+    enabled: true,
+    maxHeat: 100,
+    decayPerSecond: 2,
+    decayDelay: 3,
+    
+    heatGain: {
+      miss: 15,
+      caught: 25,
+      perfect: 3,
+      good: 1,
+      combo10: 5,
+      combo25: 10,
+      combo50: 15,
+      highScorePer1000: 2
+    },
+    
+    levels: [
+      { threshold: 0, name: '平静', color: '#2ecc71', description: '风平浪静' },
+      { threshold: 20, name: '警惕', color: '#f1c40f', description: '保安开始注意' },
+      { threshold: 40, name: '警戒', color: '#e67e22', description: '巡逻加强' },
+      { threshold: 60, name: '搜捕', color: '#e74c3c', description: '全面搜捕' },
+      { threshold: 80, name: '封锁', color: '#c0392b', description: '全城封锁' }
+    ],
+    
+    effects: {
+      guardCountAdd: [0, 0, 1, 2, 3],
+      guardSpeedMultiplier: [1, 1.1, 1.25, 1.4, 1.6],
+      flashRadiusMultiplier: [1, 1.1, 1.2, 1.35, 1.5],
+      spawnIntervalMultiplier: [1, 0.95, 0.85, 0.75, 0.65],
+      laserChanceMultiplier: [0, 1, 1.5, 2, 3],
+      laserIntervalMultiplier: [1, 0.9, 0.75, 0.6, 0.45]
+    },
+    
+    evaluation: {
+      rankPenalty: [0, 0, 1, 2, 3],
+      starPenalty: [0, 0, 0, 1, 2],
+      bonusScoreMultiplier: [1, 1.1, 1.25, 1.5, 2]
+    }
+  },
+
   map: {
     stationCount: 8,
     unlockScorePerStation: 1000,

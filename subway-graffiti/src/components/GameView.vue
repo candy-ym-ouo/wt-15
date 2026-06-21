@@ -8,6 +8,7 @@ import { audioManager } from '@/game/AudioManager.js';
 import { battlePassManager } from '@/game/BattlePassManager.js';
 import { graffitiWorkshop } from '@/game/GraffitiWorkshop.js';
 import { questManager } from '@/game/QuestManager.js';
+import { heatSystem } from '@/game/HeatSystem.js';
 import ReplayView from './ReplayView.vue';
 import GraffitiWorkshopView from './GraffitiWorkshop.vue';
 const canvasRef = ref(null);
@@ -46,6 +47,13 @@ const arrivalData = ref(null);
 const showReplay = ref(false);
 const currentReplayData = ref(null);
 const comboState = reactive(scoreManager.getComboState());
+
+const heatState = reactive({
+  currentHeat: 0,
+  currentLevel: 0,
+  levelInfo: { name: '平静', color: '#2ecc71', description: '' },
+  effects: null
+});
 
 const currentCutscene = ref(null);
 const cutsceneData = ref(null);
@@ -750,6 +758,12 @@ function onTick() {
  score.value = scoreManager.currentScore;
  combo.value = scoreManager.combo;
  Object.assign(comboState, scoreManager.getComboState());
+ 
+ const summary = heatSystem.getSummary();
+ heatState.currentHeat = summary.currentHeat;
+ heatState.currentLevel = summary.currentLevel;
+ heatState.levelInfo = summary.levelInfo;
+ heatState.effects = summary.effects;
 }
 function onMilestone(milestone, bonusPoints) {
   currentMilestone.value = milestone;
@@ -782,6 +796,7 @@ function startGame(difficulty = 'normal') {
   const diffConfig = GAME_CONFIG.difficulty[difficulty];
   const initialMultiplier = difficulty === 'hard' ? diffConfig.baseScoreMultiplier : diffConfig.scoreMultiplier;
   scoreManager.resetGame(difficulty, initialMultiplier);
+  heatSystem.reset();
   audioManager.playSFX('click');
   engine.startNewGame(difficulty);
 }
@@ -1066,6 +1081,25 @@ onUnmounted(() => {
         <div class="hud-item" style="text-align: right;">
           <div class="hud-label">最高</div>
           <div class="hud-value" :style="{ color: currentTheme.ui.primary }">{{ stats.highScore }}</div>
+        </div>
+      </div>
+
+      <div v-if="currentState === GameState.GRAFFITI || currentState === GameState.PATROL" class="heat-bar-container">
+        <div class="heat-bar-label">
+          <span class="heat-level-name" :style="{ color: heatState.levelInfo.color }">{{ heatState.levelInfo.name }}</span>
+          <span class="heat-value">{{ Math.round(heatState.currentHeat) }}/{{ heatSystem.maxHeat }}</span>
+        </div>
+        <div class="heat-bar-background">
+          <div 
+            class="heat-bar-fill" 
+            :style="{ 
+              width: (heatState.currentHeat / heatSystem.maxHeat * 100) + '%',
+              background: `linear-gradient(90deg, #2ecc71, #f1c40f 20%, #e67e22 40%, #e74c3c 60%, #c0392b 80%)`
+            }"
+          ></div>
+        </div>
+        <div v-if="heatState.levelInfo.description" class="heat-description">
+          {{ heatState.levelInfo.description }}
         </div>
       </div>
 
@@ -6398,5 +6432,59 @@ onUnmounted(() => {
     height: 60px;
     font-size: 28px;
   }
+}
+
+.heat-bar-container {
+  position: absolute;
+  top: 130px;
+  left: 20px;
+  right: 20px;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(10px);
+  border-radius: 12px;
+  padding: 12px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  z-index: 20;
+}
+
+.heat-bar-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.heat-level-name {
+  font-size: 14px;
+  font-weight: bold;
+  text-shadow: 0 0 10px currentColor;
+}
+
+.heat-value {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.7);
+  font-family: 'Courier New', monospace;
+}
+
+.heat-bar-background {
+  height: 10px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 5px;
+  overflow: hidden;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.heat-bar-fill {
+  height: 100%;
+  border-radius: 5px;
+  transition: width 0.3s ease;
+  box-shadow: 0 0 15px currentColor;
+}
+
+.heat-description {
+  margin-top: 6px;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.6);
+  text-align: center;
 }
 </style>

@@ -6,6 +6,7 @@ import { profileManager } from './ProfileManager.js'
 import { battlePassManager } from './BattlePassManager.js'
 import { cityEventManager } from './CityEventManager.js'
 import { questManager } from './QuestManager.js'
+import { heatSystem } from './HeatSystem.js'
 import { MapScene } from './MapScene.js'
 import { GraffitiGame } from './GraffitiGame.js'
 import { PatrolAvoid } from './PatrolAvoid.js'
@@ -420,6 +421,7 @@ export class GameEngine {
     scoreManager.setCityEventEffects(stationEffects)
     scoreManager.startStation(station)
     questManager.onStationStart(station.id)
+    heatSystem.reset()
 
     if (this.callbacks.onStationEffectsApplied) {
       this.callbacks.onStationEffectsApplied(stationEffects, station.id)

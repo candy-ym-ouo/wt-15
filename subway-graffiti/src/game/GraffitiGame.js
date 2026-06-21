@@ -3,6 +3,7 @@ import { GAME_CONFIG, LINES } from './config.js'
 import { scoreManager } from './ScoreManager.js'
 import { audioManager } from './AudioManager.js'
 import { replayManager } from './ReplayManager.js'
+import { heatSystem } from './HeatSystem.js'
 
 export class GraffitiGame {
   constructor(app, callbacks) {
@@ -411,6 +412,11 @@ export class GraffitiGame {
     const particleConfig = scoreManager.getSkinParticles()
     const count = result === 'perfect' ? particleConfig.count.perfect : particleConfig.count.good
     this.createParticles(target.x, target.y, result === 'miss' ? color : null, count)
+
+    heatSystem.addHeatFromResult(result)
+    if (result !== 'miss' && scoreManager.combo > 0 && scoreManager.combo % 10 === 0) {
+      heatSystem.addHeatFromResult('combo', { combo: scoreManager.combo })
+    }
 
     const rescueResult = scoreManager.rescueResult
     if (rescueResult) {
@@ -1048,6 +1054,7 @@ export class GraffitiGame {
 
     this.gameTime += delta
     this.spawnTimer += delta * 1000
+    heatSystem.update(delta, Date.now())
 
     const remaining = Math.max(0, this.duration - this.gameTime)
     this.updateTimerBar(remaining / this.duration)
@@ -1070,6 +1077,7 @@ export class GraffitiGame {
         scoreManager.addScore('miss', { source: 'timeout' })
         audioManager.playSFX('miss')
         this.showPrompt(this.getFeedbackText('miss'), 0xff4444)
+        heatSystem.addHeatFromResult('miss')
         
         replayManager.recordGraffitiTarget({
           ...target,
