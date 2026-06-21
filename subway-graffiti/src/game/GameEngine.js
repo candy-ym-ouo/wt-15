@@ -14,7 +14,8 @@ export const GameState = {
   STATION_COMPLETE: 'station_complete',
   GAME_OVER: 'game_over',
   SKINS: 'skins',
-  STATS: 'stats'
+  STATS: 'stats',
+  REPLAY: 'replay'
 }
 
 export class GameEngine {
@@ -30,6 +31,9 @@ export class GameEngine {
     this.currentPhase = 0
     this.difficulty = 'normal'
     this.currentDifficultyParams = null
+
+    this._pendingPhaseResult = null
+    this._waitingForReplay = false
 
     this._onResize = this._onResize.bind(this)
   }
@@ -250,17 +254,61 @@ export class GameEngine {
   }
 
   _onPhaseComplete(result = {}) {
-    this.currentPhase++
+    const needsReplay = result.caught || (result.replayData && result.replayData?.problems?.length > 0)
     
-    if (result.replayData && (result.caught || result.replayData?.problems?.length > 0)) {
-      if (this.callbacks.onReplayAvailable) {
+    if (needsReplay) {
+      this._pendingPhaseResult = result
+      this._waitingForReplay = true
+      this.currentPhase++
+      
+      if (result.replayData && this.callbacks.onReplayAvailable) {
         this.callbacks.onReplayAvailable(result.replayData)
       }
+      
+      this.state = GameState.REPLAY
+      if (this.callbacks.onStateChange) {
+        this.callbacks.onStateChange(this.state, {
+          caught: result.caught,
+          replayData: result.replayData,
+          station: this.currentStation,
+          phase: this.currentPhase
+        })
+      }
+    } else {
+      this.currentPhase++
+      
+      setTimeout(() => {
+        this._startNextPhase()
+      }, 800)
     }
-    
+  }
+
+  continueAfterReplay() {
+    if (!this._waitingForReplay) return
+
+    this._waitingForReplay = false
+    const wasCaught = this._pendingPhaseResult?.caught
+    this._pendingPhaseResult = null
+
+    if (wasCaught) {
+      this._onStationComplete()
+    } else {
+      setTimeout(() => {
+        this._startNextPhase()
+      }, 300)
+    }
+  }
+
+  retryPhase() {
+    if (!this._waitingForReplay) return
+
+    this._waitingForReplay = false
+    this._pendingPhaseResult = null
+    this.currentPhase = 0
+
     setTimeout(() => {
       this._startNextPhase()
-    }, result.caught ? 1500 : 800)
+    }, 300)
   }
 
   _onStationComplete() {

@@ -368,13 +368,15 @@ function onReplayAvailable(replayData) {
 
 function closeReplay() {
   showReplay.value = false;
+  if (engine) {
+    engine.continueAfterReplay();
+  }
 }
 
 function retryFromReplay() {
   showReplay.value = false;
-  if (engine && engine.currentStation) {
-    engine.currentPhase = 0;
-    engine._startNextPhase();
+  if (engine) {
+    engine.retryPhase();
   }
 }
 

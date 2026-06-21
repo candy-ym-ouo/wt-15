@@ -807,10 +807,10 @@ onMounted(() => {
 
         <div class="replay-footer">
           <button class="btn btn-outline" @click="closeReplay">
-            返回
+            继续
           </button>
           <button class="btn btn-primary" @click="retryGame">
-            🔄 重试
+            🔄 重试本站
           </button>
         </div>
       </div>
