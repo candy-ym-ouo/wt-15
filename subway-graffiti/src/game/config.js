@@ -24,7 +24,19 @@ export const GAME_CONFIG = {
     spawnInterval: 4000,
     maxGuards: 3,
     caughtPenalty: 500,
-    safeZoneRadius: 80
+    safeZoneRadius: 80,
+    visionAlertRatio: 0.7,
+    alertDuration: 0.8,
+    chaseSpeedMultiplier: 1.6,
+    searchDuration: 3,
+    searchLookSpeed: 2.5,
+    flankSpeedMultiplier: 1.3,
+    flankAngle: Math.PI / 3,
+    flankTriggerRange: 300,
+    disengageIndicatorDuration: 1.5,
+    visionAlertColor: 0xffaa00,
+    searchColor: 0xff6600,
+    disengageColor: 0x888888
   },
 
   map: {

@@ -27,6 +27,7 @@ export class PatrolAvoid {
     this.lastSafeZone = null
     this.bgDecorations = null
     this.currentLine = null
+    this.disengageEffects = []
     this.setup()
   }
 
@@ -52,7 +53,9 @@ export class PatrolAvoid {
     }
     const defaults = {
       caught: '被发现了!',
-      start: '躲避巡逻!'
+      start: '躲避巡逻!',
+      alert: '注意!',
+      escape: '甩掉了!'
     }
     return defaults[type] || ''
   }
@@ -62,10 +65,10 @@ export class PatrolAvoid {
 
     this.bg = new PIXI.Graphics()
     this.container.addChild(this.bg)
-    
+
     this.bgGrid = new PIXI.Container()
     this.container.addChild(this.bgGrid)
-    
+
     this.bgDecorations = new PIXI.Container()
     this.container.addChild(this.bgDecorations)
 
@@ -121,8 +124,11 @@ export class PatrolAvoid {
     this.riskWarningContainer = new PIXI.Container()
     this.container.addChild(this.riskWarningContainer)
 
+    this.disengageContainer = new PIXI.Container()
+    this.container.addChild(this.disengageContainer)
+
     this.dangerFlash = new PIXI.Graphics()
-    this.dangerFlash.beginFill(GAME_CONFIG.patrol.dangerColor, 0)
+    this.dangerFlash.beginFill(GAME_CONFIG.patrol.dangerColor || 0xff4444, 0)
     this.dangerFlash.drawRect(0, 0, GAME_CONFIG.width, GAME_CONFIG.height)
     this.dangerFlash.endFill()
     this.container.addChild(this.dangerFlash)
@@ -131,20 +137,20 @@ export class PatrolAvoid {
   drawBackground(line = null) {
     const theme = line?.theme
     const patrolConfig = theme?.patrol
-    
+
     this.bg.clear()
     this.bgGrid.removeChildren()
     this.bgDecorations.removeChildren()
-    
+
     const bgColor = patrolConfig ? parseInt(patrolConfig.bgColor.replace('#', '0x')) : 0x1a1a2e
     const gridColor = patrolConfig ? parseInt(patrolConfig.gridColor.replace('#', '0x')) : 0x2a2a4e
     const groundColor = patrolConfig ? parseInt(patrolConfig.groundColor.replace('#', '0x')) : 0x2c2c3e
     const accentColor = patrolConfig ? parseInt(patrolConfig.accentColor.replace('#', '0x')) : 0xe94560
-    
+
     this.bg.beginFill(bgColor)
     this.bg.drawRect(0, 0, GAME_CONFIG.width, GAME_CONFIG.height)
     this.bg.endFill()
-    
+
     const gridSize = 100
     for (let x = 0; x < GAME_CONFIG.width; x += gridSize) {
       for (let y = 0; y < GAME_CONFIG.height; y += gridSize) {
@@ -155,7 +161,7 @@ export class PatrolAvoid {
         this.bgGrid.addChild(tile)
       }
     }
-    
+
     if (patrolConfig && patrolConfig.type === 'metro') {
       for (let i = 0; i < 6; i++) {
         const panel = new PIXI.Graphics()
@@ -163,12 +169,12 @@ export class PatrolAvoid {
         const py = 180 + Math.floor(i / 3) * 400 + Math.random() * 100
         const pw = 80 + Math.random() * 60
         const ph = 120 + Math.random() * 80
-        
+
         panel.beginFill(accentColor, 0.08)
         panel.lineStyle(2, accentColor, 0.2)
         panel.drawRoundedRect(px, py, pw, ph, 6)
         panel.endFill()
-        
+
         for (let j = 0; j < 4; j++) {
           const bar = new PIXI.Graphics()
           bar.beginFill(accentColor, 0.15 + Math.random() * 0.15)
@@ -176,29 +182,29 @@ export class PatrolAvoid {
           bar.endFill()
           this.bgDecorations.addChild(bar)
         }
-        
+
         this.bgDecorations.addChild(panel)
       }
-      
+
       for (let i = 0; i < 4; i++) {
         const energyBar = new PIXI.Graphics()
         const ex = 100 + i * 180
         const ey = 250 + Math.random() * 600
         const ew = 8
         const eh = 60 + Math.random() * 80
-        
+
         energyBar.beginFill(groundColor)
         energyBar.drawRoundedRect(ex, ey, ew, eh, 4)
         energyBar.endFill()
-        
+
         const fillHeight = eh * (0.3 + Math.random() * 0.7)
         energyBar.beginFill(accentColor, 0.6)
         energyBar.drawRoundedRect(ex, ey + eh - fillHeight, ew, fillHeight, 4)
         energyBar.endFill()
-        
+
         this.bgDecorations.addChild(energyBar)
       }
-      
+
       for (let i = 0; i < 3; i++) {
         const hologram = new PIXI.Text('◈', {
           fontFamily: 'Arial',
@@ -210,58 +216,58 @@ export class PatrolAvoid {
         hologram.y = 200 + Math.random() * (GAME_CONFIG.height - 400)
         this.bgDecorations.addChild(hologram)
       }
-      
+
     } else {
       for (let i = 0; i < 4; i++) {
         const streetLight = new PIXI.Graphics()
         const sx = 100 + i * 200
         const sy = 150 + Math.random() * 200
-        
+
         streetLight.lineStyle(4, 0x444455)
         streetLight.moveTo(sx, sy)
         streetLight.lineTo(sx, sy + 100)
         streetLight.endFill()
-        
+
         streetLight.beginFill(accentColor, 0.3)
         streetLight.drawCircle(sx, sy, 25)
         streetLight.endFill()
-        
+
         streetLight.beginFill(0xffffaa, 0.6)
         streetLight.drawCircle(sx, sy, 12)
         streetLight.endFill()
-        
+
         this.bgDecorations.addChild(streetLight)
       }
-      
+
       for (let i = 0; i < 3; i++) {
         const manhole = new PIXI.Graphics()
         const mx = 150 + i * 250 + Math.random() * 50
         const my = 400 + Math.random() * 500
-        
+
         manhole.lineStyle(3, 0x333344, 0.6)
         manhole.drawCircle(mx, my, 30)
         manhole.endFill()
-        
+
         manhole.lineStyle(2, 0x444455, 0.4)
         manhole.drawCircle(mx, my, 22)
         manhole.endFill()
-        
+
         this.bgDecorations.addChild(manhole)
       }
-      
+
       for (let i = 0; i < 2; i++) {
         const hydrant = new PIXI.Graphics()
         const hx = 200 + i * 400
         const hy = 500 + Math.random() * 300
-        
+
         hydrant.beginFill(0xcc3333, 0.7)
         hydrant.drawRoundedRect(hx - 10, hy - 20, 20, 35, 4)
         hydrant.endFill()
-        
+
         hydrant.beginFill(0xaa2222, 0.7)
         hydrant.drawRoundedRect(hx - 15, hy - 25, 30, 10, 3)
         hydrant.endFill()
-        
+
         this.bgDecorations.addChild(hydrant)
       }
     }
@@ -463,11 +469,33 @@ export class PatrolAvoid {
     guard.visionSpread = Math.PI / 3
     guard.changeTimer = 1 + Math.random() * 2
 
+    guard.aiState = 'patrol'
+    guard.alertTimer = 0
+    guard.searchTimer = 0
+    guard.lastKnownPlayerX = 0
+    guard.lastKnownPlayerY = 0
+    guard.searchLookAngle = 0
+    guard.searchPhaseReached = false
+    guard.disengageTimer = 0
+    guard.flankTargetX = 0
+    guard.flankTargetY = 0
+    guard.isFlanking = false
+    guard.wasTracking = false
+
     const flash = new PIXI.Graphics()
     guard.flashIndicator = flash
     guard.isFlashing = false
     guard.flashTimer = 0
     guard.addChild(flash)
+
+    const stateIndicator = new PIXI.Container()
+    guard.stateIndicator = stateIndicator
+    guard.stateIcon = null
+    guard.addChild(stateIndicator)
+
+    const chaseRing = new PIXI.Graphics()
+    guard.chaseRing = chaseRing
+    guard.addChild(chaseRing)
 
     this.guards.push(guard)
     this.container.addChild(guard)
@@ -525,7 +553,8 @@ export class PatrolAvoid {
     this.startTime = Date.now()
     this.riskIndicators = []
     this.lastSafeZone = null
-    
+    this.disengageEffects = []
+
     this.drawBackground(this.currentLine)
 
     this.safeZones.forEach(zone => {
@@ -549,6 +578,8 @@ export class PatrolAvoid {
       l.destroy()
     })
     this.laserBeams = []
+
+    this.disengageContainer.removeChildren()
 
     if (station) {
       this.duration = this.getStationConfig(station, 'duration', 20)
@@ -692,87 +723,426 @@ export class PatrolAvoid {
     audioManager.playTone(659, 0.15, 'sine', 0.3)
   }
 
-  update(delta) {
-    if (!this.isRunning) return
+  isPlayerInVision(guard) {
+    if (!this.player || this.player.isSafe) return { detected: false, depth: 0 }
 
-    this.gameTime += delta
-    this.spawnTimer += delta * 1000
-    this.laserTimer += delta * 1000
+    const dx = this.player.x - guard.x
+    const dy = this.player.y - guard.y
+    const dist = Math.sqrt(dx * dx + dy * dy)
 
-    const remaining = Math.max(0, this.duration - this.gameTime)
-    this.updateTimerBar(remaining / this.duration)
+    if (dist > guard.visionRange) return { detected: false, depth: 0 }
 
-    const spawnInterval = this.getStationConfig(this.station, 'spawnInterval', GAME_CONFIG.patrol.spawnInterval)
-    if (this.spawnTimer >= spawnInterval) {
-      this.spawnTimer = 0
-      this.spawnGuard()
-    }
+    const angleToPlayer = Math.atan2(dy, dx)
+    let angleDiff = angleToPlayer - guard.visionAngle
+    while (angleDiff > Math.PI) angleDiff -= Math.PI * 2
+    while (angleDiff < -Math.PI) angleDiff += Math.PI * 2
 
-    if (this.laserTimer >= 5000) {
-      this.laserTimer = 0
-      this.createLaserBeam()
-    }
+    const effectiveSpread = guard.isFlashing ? guard.visionSpread * 2 : guard.visionSpread / 2
+    if (Math.abs(angleDiff) >= effectiveSpread) return { detected: false, depth: 0 }
 
-    this.updatePlayer(delta)
-    this.updateGuards(delta)
-    this.updateLasers(delta)
-    this.updateSafeZones(delta)
-    this.updateShield(delta)
-    this.updateRiskWarnings(delta)
-    this.checkCollisions()
+    const depth = 1 - (dist / guard.visionRange)
+    return { detected: true, depth }
+  }
 
-    if (this.gameTime >= this.duration && !this.isCaught) {
-      this.isRunning = false
-      const duration = Date.now() - this.startTime
-      this.callbacks.onComplete({ duration })
+  triggerFlanking(sourceGuard) {
+    const flankRange = GAME_CONFIG.patrol.flankTriggerRange || 300
+    const flankAngle = GAME_CONFIG.patrol.flankAngle || Math.PI / 3
+    const flankSpeedMult = GAME_CONFIG.patrol.flankSpeedMultiplier || 1.3
+
+    const angleToPlayer = Math.atan2(
+      this.player.y - sourceGuard.y,
+      this.player.x - sourceGuard.x
+    )
+
+    this.guards.forEach(guard => {
+      if (guard === sourceGuard) return
+      if (guard.aiState === 'chase' || guard.aiState === 'alert') return
+
+      const dx = guard.x - sourceGuard.x
+      const dy = guard.y - sourceGuard.y
+      const dist = Math.sqrt(dx * dx + dy * dy)
+
+      if (dist < flankRange && guard.aiState === 'patrol') {
+        const side = (Math.random() > 0.5) ? 1 : -1
+        const flankingAngle = angleToPlayer + side * flankAngle
+
+        const targetDist = Math.sqrt(
+          (this.player.x - sourceGuard.x) ** 2 +
+          (this.player.y - sourceGuard.y) ** 2
+        ) * 0.8
+
+        guard.flankTargetX = this.player.x + Math.cos(flankingAngle) * targetDist * 0.3
+        guard.flankTargetY = this.player.y + Math.sin(flankingAngle) * targetDist * 0.3
+
+        guard.flankTargetX = Math.max(50, Math.min(GAME_CONFIG.width - 50, guard.flankTargetX))
+        guard.flankTargetY = Math.max(150, Math.min(GAME_CONFIG.height - 50, guard.flankTargetY))
+
+        guard.isFlanking = true
+        guard.wasTracking = true
+        guard.lastKnownPlayerX = this.player.x
+        guard.lastKnownPlayerY = this.player.y
+        guard.speed = guard.speed * flankSpeedMult
+        guard.aiState = 'chase'
+      }
+    })
+  }
+
+  spawnDisengageEffect(guard) {
+    const effect = new PIXI.Container()
+    effect.x = guard.x
+    effect.y = guard.y - 40
+    effect.life = GAME_CONFIG.patrol.disengageIndicatorDuration || 1.5
+    effect.maxLife = effect.life
+
+    const bg = new PIXI.Graphics()
+    bg.beginFill(0x000000, 0.6)
+    bg.drawRoundedRect(-14, -14, 28, 28, 6)
+    bg.endFill()
+    effect.addChild(bg)
+
+    const icon = new PIXI.Text('?', {
+      fontFamily: 'Arial',
+      fontSize: 20,
+      fontWeight: 'bold',
+      fill: GAME_CONFIG.patrol.disengageColor || 0x888888
+    })
+    icon.anchor.set(0.5)
+    effect.addChild(icon)
+
+    const ring = new PIXI.Graphics()
+    ring.lineStyle(2, GAME_CONFIG.patrol.disengageColor || 0x888888, 0.6)
+    ring.drawCircle(0, 0, 18)
+    ring.endFill()
+    effect.addChild(ring)
+
+    this.disengageEffects.push(effect)
+    this.disengageContainer.addChild(effect)
+  }
+
+  updateGuardState(guard, delta) {
+    const vision = this.isPlayerInVision(guard)
+    const prevState = guard.aiState
+
+    switch (guard.aiState) {
+      case 'patrol': {
+        if (vision.detected) {
+          const alertRatio = GAME_CONFIG.patrol.visionAlertRatio || 0.7
+          if (vision.depth > alertRatio) {
+            guard.aiState = 'chase'
+            guard.lastKnownPlayerX = this.player.x
+            guard.lastKnownPlayerY = this.player.y
+            guard.wasTracking = true
+            this.triggerFlanking(guard)
+            audioManager.playTone(600, 0.1, 'sawtooth', 0.15)
+          } else {
+            guard.aiState = 'alert'
+            guard.alertTimer = GAME_CONFIG.patrol.alertDuration || 0.8
+            guard.lastKnownPlayerX = this.player.x
+            guard.lastKnownPlayerY = this.player.y
+            audioManager.playTone(400, 0.08, 'sine', 0.1)
+          }
+        }
+        break
+      }
+
+      case 'alert': {
+        guard.alertTimer -= delta
+
+        const angleToPlayer = Math.atan2(
+          this.player.y - guard.y,
+          this.player.x - guard.x
+        )
+        let diff = angleToPlayer - guard.visionAngle
+        while (diff > Math.PI) diff -= Math.PI * 2
+        while (diff < -Math.PI) diff += Math.PI * 2
+        guard.visionAngle += diff * delta * 5
+
+        if (vision.detected) {
+          guard.lastKnownPlayerX = this.player.x
+          guard.lastKnownPlayerY = this.player.y
+
+          if (guard.alertTimer <= 0) {
+            guard.aiState = 'chase'
+            guard.wasTracking = true
+            this.triggerFlanking(guard)
+            audioManager.playTone(700, 0.12, 'sawtooth', 0.15)
+          }
+        } else {
+          if (guard.alertTimer <= 0) {
+            guard.aiState = 'search'
+            guard.searchTimer = GAME_CONFIG.patrol.searchDuration || 3
+            guard.searchPhaseReached = false
+            guard.searchLookAngle = guard.visionAngle
+          }
+        }
+        break
+      }
+
+      case 'chase': {
+        if (vision.detected) {
+          guard.lastKnownPlayerX = this.player.x
+          guard.lastKnownPlayerY = this.player.y
+          guard.isFlanking = false
+        } else {
+          guard.aiState = 'search'
+          guard.searchTimer = GAME_CONFIG.patrol.searchDuration || 3
+          guard.searchPhaseReached = false
+          guard.searchLookAngle = guard.visionAngle
+        }
+        break
+      }
+
+      case 'search': {
+        if (vision.detected) {
+          guard.aiState = 'chase'
+          guard.lastKnownPlayerX = this.player.x
+          guard.lastKnownPlayerY = this.player.y
+          guard.isFlanking = false
+          audioManager.playTone(600, 0.1, 'sawtooth', 0.12)
+          break
+        }
+
+        guard.searchTimer -= delta
+
+        const dx = guard.lastKnownPlayerX - guard.x
+        const dy = guard.lastKnownPlayerY - guard.y
+        const distToTarget = Math.sqrt(dx * dx + dy * dy)
+
+        if (!guard.searchPhaseReached && distToTarget < 30) {
+          guard.searchPhaseReached = true
+        }
+
+        if (guard.searchPhaseReached) {
+          guard.searchLookAngle += (GAME_CONFIG.patrol.searchLookSpeed || 2.5) * delta
+          guard.visionAngle = guard.searchLookAngle
+        }
+
+        if (guard.searchTimer <= 0) {
+          guard.aiState = 'patrol'
+          guard.changeTimer = 0.5 + Math.random()
+          guard.angle = Math.random() * Math.PI * 2
+          if (guard.wasTracking) {
+            this.spawnDisengageEffect(guard)
+            audioManager.playTone(300, 0.08, 'triangle', 0.15)
+            guard.wasTracking = false
+          }
+          guard.isFlanking = false
+        }
+        break
+      }
     }
   }
 
-  updatePlayer(delta) {
-    const dx = this.player.targetX - this.player.x
-    const dy = this.player.targetY - this.player.y
-    const dist = Math.sqrt(dx * dx + dy * dy)
+  updateGuardMovement(guard, delta) {
+    switch (guard.aiState) {
+      case 'patrol': {
+        guard.changeTimer -= delta
+        if (guard.changeTimer <= 0) {
+          guard.changeTimer = 1 + Math.random() * 2
+          guard.angle = Math.random() * Math.PI * 2
+        }
 
-    if (dist > 2) {
-      const speed = 350 * delta
-      const move = Math.min(speed, dist)
-      this.player.x += (dx / dist) * move
-      this.player.y += (dy / dist) * move
+        guard.x += Math.cos(guard.angle) * guard.speed * delta
+        guard.y += Math.sin(guard.angle) * guard.speed * delta
+        guard.visionAngle += delta * 0.5
+        break
+      }
+
+      case 'alert': {
+        break
+      }
+
+      case 'chase': {
+        let targetX, targetY
+
+        if (guard.isFlanking) {
+          targetX = guard.flankTargetX
+          targetY = guard.flankTargetY
+        } else {
+          targetX = this.player.x
+          targetY = this.player.y
+        }
+
+        const dx = targetX - guard.x
+        const dy = targetY - guard.y
+        const dist = Math.sqrt(dx * dx + dy * dy)
+
+        if (dist > 5) {
+          const chaseSpeed = guard.speed * (GAME_CONFIG.patrol.chaseSpeedMultiplier || 1.6)
+          const move = Math.min(chaseSpeed * delta, dist)
+          guard.x += (dx / dist) * move
+          guard.y += (dy / dist) * move
+        }
+
+        if (!guard.isFlanking) {
+          const angleToPlayer = Math.atan2(dy, dx)
+          guard.visionAngle = angleToPlayer
+        } else {
+          const angleToFlank = Math.atan2(
+            guard.flankTargetY - guard.y,
+            guard.flankTargetX - guard.x
+          )
+          guard.visionAngle = angleToFlank
+        }
+
+        if (guard.isFlanking) {
+          const fDx = guard.flankTargetX - guard.x
+          const fDy = guard.flankTargetY - guard.y
+          if (Math.sqrt(fDx * fDx + fDy * fDy) < 40) {
+            guard.isFlanking = false
+          }
+        }
+        break
+      }
+
+      case 'search': {
+        if (!guard.searchPhaseReached) {
+          const dx = guard.lastKnownPlayerX - guard.x
+          const dy = guard.lastKnownPlayerY - guard.y
+          const dist = Math.sqrt(dx * dx + dy * dy)
+
+          if (dist > 10) {
+            const searchSpeed = guard.speed * 0.8
+            const move = Math.min(searchSpeed * delta, dist)
+            guard.x += (dx / dist) * move
+            guard.y += (dy / dist) * move
+            guard.visionAngle = Math.atan2(dy, dx)
+          }
+        }
+        break
+      }
     }
 
-    this.player.x = Math.max(30, Math.min(GAME_CONFIG.width - 30, this.player.x))
-    this.player.y = Math.max(130, Math.min(GAME_CONFIG.height - 30, this.player.y))
+    guard.x = Math.max(50, Math.min(GAME_CONFIG.width - 50, guard.x))
+    guard.y = Math.max(150, Math.min(GAME_CONFIG.height - 50, guard.y))
+  }
+
+  updateGuardVisionCone(guard) {
+    guard.visionCone.clear()
+
+    let coneColor, coneAlpha, spread
+
+    switch (guard.aiState) {
+      case 'alert':
+        coneColor = GAME_CONFIG.patrol.visionAlertColor || 0xffaa00
+        coneAlpha = 0.25 + Math.sin(this.gameTime * 12) * 0.1
+        spread = guard.visionSpread * 0.8
+        break
+      case 'chase':
+        coneColor = 0xff2222
+        coneAlpha = 0.2
+        spread = guard.visionSpread * 0.7
+        break
+      case 'search':
+        coneColor = GAME_CONFIG.patrol.searchColor || 0xff6600
+        coneAlpha = 0.15
+        spread = guard.visionSpread * 1.2
+        break
+      default:
+        coneColor = 0xff4444
+        coneAlpha = 0.12
+        spread = guard.visionSpread / 2
+    }
+
+    if (guard.isFlashing) {
+      coneColor = 0xffff00
+      coneAlpha = 0.3
+      spread = guard.visionSpread * 2
+    }
+
+    guard.visionCone.beginFill(coneColor, coneAlpha)
+    guard.visionCone.moveTo(0, 0)
+    guard.visionCone.arc(0, 0, guard.visionRange,
+      guard.visionAngle - spread / 2,
+      guard.visionAngle + spread / 2)
+    guard.visionCone.closePath()
+    guard.visionCone.endFill()
+  }
+
+  updateGuardIndicators(guard) {
+    guard.stateIndicator.removeChildren()
+    guard.chaseRing.clear()
+
+    switch (guard.aiState) {
+      case 'alert': {
+        const bg = new PIXI.Graphics()
+        bg.beginFill(0x000000, 0.7)
+        bg.drawRoundedRect(-10, -48, 20, 22, 4)
+        bg.endFill()
+        guard.stateIndicator.addChild(bg)
+
+        const icon = new PIXI.Text('!', {
+          fontFamily: 'Arial',
+          fontSize: 18,
+          fontWeight: '900',
+          fill: GAME_CONFIG.patrol.visionAlertColor || 0xffaa00
+        })
+        icon.anchor.set(0.5)
+        icon.y = -37
+        guard.stateIndicator.addChild(icon)
+        break
+      }
+
+      case 'chase': {
+        const bg = new PIXI.Graphics()
+        bg.beginFill(0x000000, 0.7)
+        bg.drawRoundedRect(-14, -52, 28, 22, 4)
+        bg.endFill()
+        guard.stateIndicator.addChild(bg)
+
+        const icon = new PIXI.Text('!!', {
+          fontFamily: 'Arial',
+          fontSize: 16,
+          fontWeight: '900',
+          fill: 0xff2222
+        })
+        icon.anchor.set(0.5)
+        icon.y = -41
+        guard.stateIndicator.addChild(icon)
+
+        guard.chaseRing.lineStyle(2, 0xff2222, 0.4 + Math.sin(this.gameTime * 8) * 0.3)
+        guard.chaseRing.drawCircle(0, 0, 30)
+        guard.chaseRing.endFill()
+
+        guard.chaseRing.lineStyle(1, 0xff2222, 0.2 + Math.sin(this.gameTime * 6) * 0.15)
+        guard.chaseRing.drawCircle(0, 0, 38 + Math.sin(this.gameTime * 4) * 3)
+        guard.chaseRing.endFill()
+        break
+      }
+
+      case 'search': {
+        const bg = new PIXI.Graphics()
+        bg.beginFill(0x000000, 0.7)
+        bg.drawRoundedRect(-10, -48, 20, 22, 4)
+        bg.endFill()
+        guard.stateIndicator.addChild(bg)
+
+        const icon = new PIXI.Text('?', {
+          fontFamily: 'Arial',
+          fontSize: 18,
+          fontWeight: '900',
+          fill: GAME_CONFIG.patrol.searchColor || 0xff6600
+        })
+        icon.anchor.set(0.5)
+        icon.y = -37
+        guard.stateIndicator.addChild(icon)
+
+        const searchProgress = guard.searchTimer / (GAME_CONFIG.patrol.searchDuration || 3)
+        guard.chaseRing.lineStyle(2, GAME_CONFIG.patrol.searchColor || 0xff6600, 0.5)
+        guard.chaseRing.arc(0, 0, 28, -Math.PI / 2, -Math.PI / 2 + searchProgress * Math.PI * 2)
+        guard.chaseRing.endFill()
+        break
+      }
+    }
   }
 
   updateGuards(delta) {
     this.guards.forEach(guard => {
-      guard.changeTimer -= delta
-      if (guard.changeTimer <= 0) {
-        guard.changeTimer = 1 + Math.random() * 2
-        guard.angle = Math.random() * Math.PI * 2
-      }
-
-      guard.x += Math.cos(guard.angle) * guard.speed * delta
-      guard.y += Math.sin(guard.angle) * guard.speed * delta
-
-      if (guard.x < 50) { guard.x = 50; guard.angle = Math.PI - guard.angle }
-      if (guard.x > GAME_CONFIG.width - 50) { guard.x = GAME_CONFIG.width - 50; guard.angle = Math.PI - guard.angle }
-      if (guard.y < 150) { guard.y = 150; guard.angle = -guard.angle }
-      if (guard.y > GAME_CONFIG.height - 50) { guard.y = GAME_CONFIG.height - 50; guard.angle = -guard.angle }
-
-      guard.visionAngle += delta * 0.5
-
-      guard.visionCone.clear()
-      guard.visionCone.beginFill(0xff4444, 0.12)
-      guard.visionCone.moveTo(0, 0)
-      guard.visionCone.arc(0, 0, guard.visionRange,
-        guard.visionAngle - guard.visionSpread / 2,
-        guard.visionAngle + guard.visionSpread / 2)
-      guard.visionCone.closePath()
-      guard.visionCone.endFill()
+      this.updateGuardState(guard, delta)
+      this.updateGuardMovement(guard, delta)
 
       guard.flashTimer -= delta
-      if (guard.flashTimer <= 0 && !guard.isFlashing && Math.random() < 0.005) {
+      if (guard.flashTimer <= 0 && !guard.isFlashing && Math.random() < 0.005 && guard.aiState === 'patrol') {
         guard.isFlashing = true
         guard.flashTimer = 0.8
       }
@@ -780,21 +1150,40 @@ export class PatrolAvoid {
       if (guard.isFlashing) {
         guard.flashIndicator.clear()
         const progress = 1 - (guard.flashTimer / 0.8)
-        const flashRadius = guard.visionRange * (1.5 - progress * 0.5)
 
-        if (progress < 0.3) {
-          guard.visionCone.clear()
-          guard.visionCone.beginFill(0xffff00, 0.3)
-          guard.visionCone.moveTo(0, 0)
-          guard.visionCone.arc(0, 0, flashRadius,
-            guard.visionAngle - guard.visionSpread,
-            guard.visionAngle + guard.visionSpread)
-          guard.visionCone.closePath()
-          guard.visionCone.endFill()
-        } else {
+        if (progress >= 0.3) {
           guard.isFlashing = false
+          guard.flashIndicator.clear()
         }
+      } else {
+        guard.flashIndicator.clear()
       }
+
+      this.updateGuardVisionCone(guard)
+      this.updateGuardIndicators(guard)
+    })
+
+    this.disengageEffects = this.disengageEffects.filter(effect => {
+      effect.life -= delta
+      if (effect.life <= 0) {
+        this.disengageContainer.removeChild(effect)
+        effect.destroy({ children: true })
+        return false
+      }
+
+      const progress = effect.life / effect.maxLife
+      effect.alpha = progress
+      effect.y -= delta * 15
+
+      const ring = effect.getChildAt(2)
+      if (ring) {
+        ring.clear()
+        ring.lineStyle(2, GAME_CONFIG.patrol.disengageColor || 0x888888, progress * 0.6)
+        ring.drawCircle(0, 0, 18 + (1 - progress) * 12)
+        ring.endFill()
+      }
+
+      return true
     })
   }
 
@@ -921,7 +1310,7 @@ export class PatrolAvoid {
   }
 
   updateRiskWarnings(delta) {
-    const warningDistance = GAME_CONFIG.patrol.riskWarningDistance
+    const warningDistance = GAME_CONFIG.patrol.riskWarningDistance || 200
     let minDistance = Infinity
     let nearestGuard = null
 
@@ -941,15 +1330,18 @@ export class PatrolAvoid {
     if (minDistance < warningDistance && !this.player.isSafe && !this.player.hasShield) {
       const dangerLevel = 1 - (minDistance / warningDistance)
 
+      const isChased = this.guards.some(g => g.aiState === 'chase')
+      const effectiveDanger = isChased ? Math.min(dangerLevel * 1.5, 1) : dangerLevel
+
       this.dangerFlash.clear()
-      this.dangerFlash.beginFill(GAME_CONFIG.patrol.dangerColor, dangerLevel * 0.15)
+      this.dangerFlash.beginFill(GAME_CONFIG.patrol.dangerColor || 0xff4444, effectiveDanger * 0.15)
       this.dangerFlash.drawRect(0, 0, GAME_CONFIG.width, GAME_CONFIG.height)
       this.dangerFlash.endFill()
 
       if (nearestGuard) {
         const angleToGuard = Math.atan2(nearestGuard.y - this.player.y, nearestGuard.x - this.player.x)
         const indicatorRadius = 60
-        const indicatorCount = 3 + Math.floor(dangerLevel * 3)
+        const indicatorCount = 3 + Math.floor(effectiveDanger * 3)
 
         for (let i = 0; i < indicatorCount; i++) {
           const indicator = new PIXI.Graphics()
@@ -959,8 +1351,9 @@ export class PatrolAvoid {
           indicator.x = this.player.x + Math.cos(angleToGuard + offsetAngle) * dist
           indicator.y = this.player.y + Math.sin(angleToGuard + offsetAngle) * dist
 
-          indicator.beginFill(GAME_CONFIG.patrol.dangerColor, (1 - i * 0.15) * dangerLevel)
-          indicator.drawCircle(0, 0, 4 + (1 - dangerLevel) * 2)
+          const dotColor = isChased ? 0xff2222 : (GAME_CONFIG.patrol.dangerColor || 0xff4444)
+          indicator.beginFill(dotColor, (1 - i * 0.15) * effectiveDanger)
+          indicator.drawCircle(0, 0, 4 + (1 - effectiveDanger) * 2)
           indicator.endFill()
 
           this.riskWarningContainer.addChild(indicator)
@@ -975,11 +1368,12 @@ export class PatrolAvoid {
         edgeIndicator.y = edgeY
 
         const pulseSize = 20 + Math.sin(this.gameTime * 10) * 5
-        edgeIndicator.lineStyle(3, GAME_CONFIG.patrol.dangerColor, 0.5 + dangerLevel * 0.5)
+        const edgeColor = isChased ? 0xff2222 : (GAME_CONFIG.patrol.dangerColor || 0xff4444)
+        edgeIndicator.lineStyle(3, edgeColor, 0.5 + effectiveDanger * 0.5)
         edgeIndicator.drawCircle(0, 0, pulseSize)
         edgeIndicator.endFill()
 
-        edgeIndicator.lineStyle(2, GAME_CONFIG.patrol.dangerColor, 0.8)
+        edgeIndicator.lineStyle(2, edgeColor, 0.8)
         edgeIndicator.moveTo(0, -pulseSize - 10)
         edgeIndicator.lineTo(0, -pulseSize - 20)
         edgeIndicator.moveTo(-8, -pulseSize - 15)
@@ -987,11 +1381,11 @@ export class PatrolAvoid {
         edgeIndicator.lineTo(8, -pulseSize - 15)
         edgeIndicator.endFill()
 
-        const exclamation = new PIXI.Text('!', {
+        const exclamation = new PIXI.Text(isChased ? '!!' : '!', {
           fontFamily: 'Arial',
-          fontSize: 24,
+          fontSize: isChased ? 28 : 24,
           fontWeight: 'bold',
-          fill: GAME_CONFIG.patrol.dangerColor
+          fill: edgeColor
         })
         exclamation.anchor.set(0.5)
         exclamation.y = -pulseSize - 35
@@ -1000,12 +1394,12 @@ export class PatrolAvoid {
         this.riskWarningContainer.addChild(edgeIndicator)
       }
 
-      if (dangerLevel > 0.7 && Math.random() < 0.1) {
+      if (effectiveDanger > 0.7 && Math.random() < 0.1) {
         audioManager.playTone(200 + Math.random() * 100, 0.05, 'square', 0.1)
       }
     } else {
       this.dangerFlash.clear()
-      this.dangerFlash.beginFill(GAME_CONFIG.patrol.dangerColor, 0)
+      this.dangerFlash.beginFill(GAME_CONFIG.patrol.dangerColor || 0xff4444, 0)
       this.dangerFlash.drawRect(0, 0, GAME_CONFIG.width, GAME_CONFIG.height)
       this.dangerFlash.endFill()
     }
@@ -1032,16 +1426,14 @@ export class PatrolAvoid {
         return
       }
 
-      if (dist < guard.visionRange) {
-        const angleToPlayer = Math.atan2(dy, dx)
-        let angleDiff = angleToPlayer - guard.visionAngle
-        while (angleDiff > Math.PI) angleDiff -= Math.PI * 2
-        while (angleDiff < -Math.PI) angleDiff += Math.PI * 2
-
-        const effectiveSpread = guard.isFlashing ? guard.visionSpread * 2 : guard.visionSpread / 2
-        if (Math.abs(angleDiff) < effectiveSpread) {
-          this.onCaught('vision', { x: this.player.x, y: this.player.y })
-          return
+      if (guard.aiState === 'chase' || guard.aiState === 'alert') {
+        const vision = this.isPlayerInVision(guard)
+        if (vision.detected && vision.depth > 0.85) {
+          const catchRadius = 40 + (1 - vision.depth) * guard.visionRange * 0.3
+          if (dist < catchRadius) {
+            this.onCaught('vision', { x: this.player.x, y: this.player.y })
+            return
+          }
         }
       }
     }
@@ -1098,6 +1490,58 @@ export class PatrolAvoid {
       }
     }
     flash()
+  }
+
+  update(delta) {
+    if (!this.isRunning) return
+
+    this.gameTime += delta
+    this.spawnTimer += delta * 1000
+    this.laserTimer += delta * 1000
+
+    const remaining = Math.max(0, this.duration - this.gameTime)
+    this.updateTimerBar(remaining / this.duration)
+
+    const spawnInterval = this.getStationConfig(this.station, 'spawnInterval', GAME_CONFIG.patrol.spawnInterval)
+    if (this.spawnTimer >= spawnInterval) {
+      this.spawnTimer = 0
+      this.spawnGuard()
+    }
+
+    if (this.laserTimer >= 5000) {
+      this.laserTimer = 0
+      this.createLaserBeam()
+    }
+
+    this.updatePlayer(delta)
+    this.updateGuards(delta)
+    this.updateLasers(delta)
+    this.updateSafeZones(delta)
+    this.updateShield(delta)
+    this.updateRiskWarnings(delta)
+    this.checkCollisions()
+
+    if (this.gameTime >= this.duration && !this.isCaught) {
+      this.isRunning = false
+      const duration = Date.now() - this.startTime
+      this.callbacks.onComplete({ duration })
+    }
+  }
+
+  updatePlayer(delta) {
+    const dx = this.player.targetX - this.player.x
+    const dy = this.player.targetY - this.player.y
+    const dist = Math.sqrt(dx * dx + dy * dy)
+
+    if (dist > 2) {
+      const speed = 350 * delta
+      const move = Math.min(speed, dist)
+      this.player.x += (dx / dist) * move
+      this.player.y += (dy / dist) * move
+    }
+
+    this.player.x = Math.max(30, Math.min(GAME_CONFIG.width - 30, this.player.x))
+    this.player.y = Math.max(130, Math.min(GAME_CONFIG.height - 30, this.player.y))
   }
 
   updateTimerBar(progress) {
