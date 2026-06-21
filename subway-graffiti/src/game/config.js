@@ -1,3 +1,621 @@
+export const BATTLE_PASS_CONFIG = {
+  currentSeason: {
+    id: 's1',
+    name: '开服赛季 · 涂鸦纪元',
+    description: '地铁涂鸦首发赛季，解锁限定皮肤与专属奖励！',
+    startTime: Date.now(),
+    endTime: Date.now() + 90 * 24 * 60 * 60 * 1000,
+    maxLevel: 50,
+    premiumUnlocked: false
+  },
+
+  expPerLevel: 100,
+  expPerLevelGrowth: 20,
+  maxExpPerLevel: 800,
+
+  expSources: {
+    stationClear: 30,
+    stationFirstClear: 80,
+    stationNewRecord: 50,
+    stationStarsBonus: { 1: 5, 2: 10, 3: 20, 4: 35, 5: 50 },
+    taskComplete: 40,
+    milestoneReach: 25,
+    perfectCountBonus: 0.5,
+    comboBonus: 0.2
+  },
+
+  freeTrack: [
+    { level: 1, type: 'skin', id: 'bp_starter', name: '启程涂鸦', rarity: 'common' },
+    { level: 3, type: 'title', id: 'bp_newbie', name: '涂鸦新手', rarity: 'common' },
+    { level: 5, type: 'skin', id: 'bp_urban', name: '都市迷彩', rarity: 'common' },
+    { level: 8, type: 'emote', id: 'bp_cheer', name: '欢呼动作', rarity: 'common' },
+    { level: 10, type: 'skin', id: 'bp_street', name: '街头潮流', rarity: 'rare' },
+    { level: 15, type: 'title', id: 'bp_street_artist', name: '街头艺人', rarity: 'rare' },
+    { level: 20, type: 'skin', id: 'bp_graffiti_king', name: '涂鸦王者', rarity: 'rare' },
+    { level: 25, type: 'emote', id: 'bp_flex', name: '炫技动作', rarity: 'rare' },
+    { level: 30, type: 'skin', id: 'bp_city_hero', name: '城市英雄', rarity: 'epic' },
+    { level: 35, type: 'title', id: 'bp_legend', name: '涂鸦传说', rarity: 'epic' },
+    { level: 40, type: 'skin', id: 'bp_metro_master', name: '地铁大师', rarity: 'epic' },
+    { level: 45, type: 'emote', id: 'bp_legendary', name: '传奇动作', rarity: 'epic' },
+    { level: 50, type: 'skin', id: 'bp_ultimate', name: '终极涂鸦', rarity: 'legendary' }
+  ],
+
+  premiumTrack: [
+    { level: 1, type: 'skin', id: 'bp_premium_starter', name: '黄金启程', rarity: 'rare' },
+    { level: 3, type: 'title', id: 'bp_vip', name: 'VIP涂鸦人', rarity: 'rare' },
+    { level: 5, type: 'skin', id: 'bp_premium_urban', name: '鎏金都市', rarity: 'rare' },
+    { level: 8, type: 'emote', id: 'bp_premium_cheer', name: '奢华欢呼', rarity: 'rare' },
+    { level: 10, type: 'skin', id: 'bp_premium_street', name: '潮流先锋', rarity: 'epic' },
+    { level: 15, type: 'title', id: 'bp_master', name: '涂鸦大师', rarity: 'epic' },
+    { level: 20, type: 'skin', id: 'bp_premium_king', name: '黄金王者', rarity: 'epic' },
+    { level: 25, type: 'emote', id: 'bp_premium_flex', name: '王者炫技', rarity: 'epic' },
+    { level: 30, type: 'skin', id: 'bp_cyber_hero', name: '赛博英雄', rarity: 'legendary' },
+    { level: 35, type: 'title', id: 'bp_myth', name: '神话涂鸦人', rarity: 'legendary' },
+    { level: 40, type: 'skin', id: 'bp_premium_metro', name: '至尊大师', rarity: 'legendary' },
+    { level: 45, type: 'emote', id: 'bp_mythic', name: '神话动作', rarity: 'legendary' },
+    { level: 50, type: 'skin', id: 'bp_eternal', name: '永恒传说', rarity: 'legendary' }
+  ],
+
+  rarityConfig: {
+    common: { color: '#95a5a6', glow: 'rgba(149, 165, 166, 0.4)', name: '普通' },
+    rare: { color: '#3498db', glow: 'rgba(52, 152, 219, 0.4)', name: '稀有' },
+    epic: { color: '#9b59b6', glow: 'rgba(155, 89, 182, 0.4)', name: '史诗' },
+    legendary: { color: '#f1c40f', glow: 'rgba(241, 196, 15, 0.5)', name: '传说' }
+  },
+
+  battlePassSkins: [
+    {
+      id: 'bp_starter',
+      name: '启程涂鸦',
+      color: '#1abc9c',
+      setName: '赛季套装',
+      description: '赛季初始奖励，清新翠绿',
+      unlockScore: 0,
+      battlePass: true,
+      effects: {
+        particles: {
+          shapes: ['circle', 'star'],
+          colors: ['#1abc9c', '#16a085', '#2ecc71'],
+          gravity: 500,
+          spread: 400,
+          count: { perfect: 22, good: 11 },
+          trail: false
+        },
+        prompt: {
+          fontFamily: 'Arial',
+          fontWeight: '900',
+          fontSize: 64,
+          animation: 'bounce',
+          glowColor: 'rgba(26, 188, 156, 0.6)',
+          textShake: false
+        },
+        audio: {
+          perfect: { type: 'sine', baseFreq: 900, harmonic: 1350, duration: 0.1 },
+          good: { type: 'sine', baseFreq: 680, duration: 0.12 },
+          miss: { type: 'sawtooth', baseFreq: 210, duration: 0.2 },
+          combo: { type: 'triangle', baseFreq: 460, duration: 0.08 }
+        }
+      }
+    },
+    {
+      id: 'bp_urban',
+      name: '都市迷彩',
+      color: '#7f8c8d',
+      setName: '赛季套装',
+      description: '都市风格迷彩配色',
+      unlockScore: 0,
+      battlePass: true,
+      effects: {
+        particles: {
+          shapes: ['square', 'circle'],
+          colors: ['#7f8c8d', '#95a5a6', '#bdc3c7', '#2c3e50'],
+          gravity: 450,
+          spread: 420,
+          count: { perfect: 24, good: 12 },
+          trail: true
+        },
+        prompt: {
+          fontFamily: 'Arial',
+          fontWeight: '900',
+          fontSize: 64,
+          animation: 'bounce',
+          glowColor: 'rgba(127, 140, 141, 0.6)',
+          textShake: false
+        },
+        audio: {
+          perfect: { type: 'square', baseFreq: 880, harmonic: 1320, duration: 0.09 },
+          good: { type: 'square', baseFreq: 660, duration: 0.11 },
+          miss: { type: 'sawtooth', baseFreq: 200, duration: 0.21 },
+          combo: { type: 'square', baseFreq: 440, duration: 0.07 }
+        }
+      }
+    },
+    {
+      id: 'bp_street',
+      name: '街头潮流',
+      color: '#e67e22',
+      setName: '赛季套装',
+      description: '橙色街头潮流风',
+      unlockScore: 0,
+      battlePass: true,
+      effects: {
+        particles: {
+          shapes: ['star', 'circle', 'diamond'],
+          colors: ['#e67e22', '#d35400', '#f39c12', '#e74c3c'],
+          gravity: 380,
+          spread: 480,
+          count: { perfect: 28, good: 14 },
+          trail: true
+        },
+        prompt: {
+          fontFamily: 'Arial Black',
+          fontWeight: '900',
+          fontSize: 70,
+          animation: 'shake',
+          glowColor: 'rgba(230, 126, 34, 0.7)',
+          textShake: true
+        },
+        audio: {
+          perfect: { type: 'sawtooth', baseFreq: 940, harmonic: 1410, duration: 0.11 },
+          good: { type: 'sawtooth', baseFreq: 700, duration: 0.13 },
+          miss: { type: 'sawtooth', baseFreq: 190, duration: 0.24 },
+          combo: { type: 'sawtooth', baseFreq: 490, duration: 0.09 }
+        }
+      }
+    },
+    {
+      id: 'bp_graffiti_king',
+      name: '涂鸦王者',
+      color: '#8e44ad',
+      setName: '赛季套装',
+      description: '紫色王者风范',
+      unlockScore: 0,
+      battlePass: true,
+      effects: {
+        particles: {
+          shapes: ['star', 'heart', 'diamond'],
+          colors: ['#8e44ad', '#9b59b6', '#e84393', '#fd79a8'],
+          gravity: 350,
+          spread: 500,
+          count: { perfect: 30, good: 15 },
+          trail: true
+        },
+        prompt: {
+          fontFamily: 'Georgia',
+          fontWeight: '900',
+          fontSize: 68,
+          animation: 'float',
+          glowColor: 'rgba(142, 68, 173, 0.7)',
+          textShake: false
+        },
+        audio: {
+          perfect: { type: 'triangle', baseFreq: 980, harmonic: 1470, duration: 0.13 },
+          good: { type: 'triangle', baseFreq: 735, duration: 0.15 },
+          miss: { type: 'triangle', baseFreq: 185, duration: 0.23 },
+          combo: { type: 'triangle', baseFreq: 510, duration: 0.1 }
+        }
+      }
+    },
+    {
+      id: 'bp_city_hero',
+      name: '城市英雄',
+      color: '#2980b9',
+      setName: '赛季套装',
+      description: '深蓝英雄主题',
+      unlockScore: 0,
+      battlePass: true,
+      effects: {
+        particles: {
+          shapes: ['star', 'circle', 'hexagon'],
+          colors: ['#2980b9', '#3498db', '#1abc9c', '#ffffff'],
+          gravity: 300,
+          spread: 520,
+          count: { perfect: 32, good: 16 },
+          trail: true
+        },
+        prompt: {
+          fontFamily: 'Arial',
+          fontWeight: '900',
+          fontSize: 72,
+          animation: 'sparkle',
+          glowColor: 'rgba(41, 128, 185, 0.8)',
+          textShake: false
+        },
+        audio: {
+          perfect: { type: 'sine', baseFreq: 1020, harmonic: 1530, duration: 0.12 },
+          good: { type: 'sine', baseFreq: 765, duration: 0.14 },
+          miss: { type: 'sine', baseFreq: 215, duration: 0.21 },
+          combo: { type: 'sine', baseFreq: 530, duration: 0.1 }
+        }
+      }
+    },
+    {
+      id: 'bp_metro_master',
+      name: '地铁大师',
+      color: '#c0392b',
+      setName: '赛季套装',
+      description: '深红大师级别',
+      unlockScore: 0,
+      battlePass: true,
+      effects: {
+        particles: {
+          shapes: ['diamond', 'star', 'circle'],
+          colors: ['#c0392b', '#e74c3c', '#f39c12', '#ffffff'],
+          gravity: 280,
+          spread: 550,
+          count: { perfect: 35, good: 17 },
+          trail: true
+        },
+        prompt: {
+          fontFamily: 'Arial Black',
+          fontWeight: '900',
+          fontSize: 74,
+          animation: 'rainbow',
+          glowColor: 'rgba(192, 57, 43, 0.8)',
+          textShake: true
+        },
+        audio: {
+          perfect: { type: 'square', baseFreq: 1060, harmonic: 1590, duration: 0.1 },
+          good: { type: 'square', baseFreq: 795, duration: 0.12 },
+          miss: { type: 'square', baseFreq: 225, duration: 0.19 },
+          combo: { type: 'square', baseFreq: 550, duration: 0.08 }
+        }
+      }
+    },
+    {
+      id: 'bp_ultimate',
+      name: '终极涂鸦',
+      color: '#f39c12',
+      setName: '赛季套装',
+      description: '赛季终极奖励 · 黄金闪耀',
+      unlockScore: 0,
+      battlePass: true,
+      effects: {
+        particles: {
+          shapes: ['star', 'diamond', 'heart', 'circle'],
+          colors: ['#f39c12', '#f1c40f', '#e67e22', '#ffffff', '#d35400'],
+          gravity: 200,
+          spread: 600,
+          count: { perfect: 45, good: 22 },
+          trail: true
+        },
+        prompt: {
+          fontFamily: 'Arial Black',
+          fontWeight: '900',
+          fontSize: 80,
+          animation: 'rainbow',
+          glowColor: 'rgba(243, 156, 18, 0.9)',
+          textShake: true
+        },
+        audio: {
+          perfect: { type: 'sine', baseFreq: 1120, harmonic: 1680, duration: 0.14 },
+          good: { type: 'sine', baseFreq: 840, duration: 0.16 },
+          miss: { type: 'sine', baseFreq: 235, duration: 0.22 },
+          combo: { type: 'sine', baseFreq: 580, duration: 0.11 }
+        }
+      }
+    },
+    {
+      id: 'bp_premium_starter',
+      name: '黄金启程',
+      color: '#f39c12',
+      setName: '高级赛季套装',
+      description: '高级赛季初始奖励',
+      unlockScore: 0,
+      battlePass: true,
+      premium: true,
+      effects: {
+        particles: {
+          shapes: ['star', 'diamond'],
+          colors: ['#f39c12', '#f1c40f', '#e67e22'],
+          gravity: 450,
+          spread: 450,
+          count: { perfect: 26, good: 13 },
+          trail: true
+        },
+        prompt: {
+          fontFamily: 'Arial Black',
+          fontWeight: '900',
+          fontSize: 66,
+          animation: 'sparkle',
+          glowColor: 'rgba(243, 156, 18, 0.7)',
+          textShake: false
+        },
+        audio: {
+          perfect: { type: 'sine', baseFreq: 920, harmonic: 1380, duration: 0.11 },
+          good: { type: 'sine', baseFreq: 690, duration: 0.13 },
+          miss: { type: 'sawtooth', baseFreq: 205, duration: 0.2 },
+          combo: { type: 'triangle', baseFreq: 470, duration: 0.08 }
+        }
+      }
+    },
+    {
+      id: 'bp_premium_urban',
+      name: '鎏金都市',
+      color: '#d4af37',
+      setName: '高级赛季套装',
+      description: '鎏金都市奢华风格',
+      unlockScore: 0,
+      battlePass: true,
+      premium: true,
+      effects: {
+        particles: {
+          shapes: ['diamond', 'circle', 'hexagon'],
+          colors: ['#d4af37', '#f1c40f', '#fff8dc', '#ffd700'],
+          gravity: 400,
+          spread: 480,
+          count: { perfect: 28, good: 14 },
+          trail: true
+        },
+        prompt: {
+          fontFamily: 'Georgia',
+          fontWeight: '900',
+          fontSize: 68,
+          animation: 'float',
+          glowColor: 'rgba(212, 175, 55, 0.7)',
+          textShake: false
+        },
+        audio: {
+          perfect: { type: 'triangle', baseFreq: 960, harmonic: 1440, duration: 0.12 },
+          good: { type: 'triangle', baseFreq: 720, duration: 0.14 },
+          miss: { type: 'triangle', baseFreq: 200, duration: 0.22 },
+          combo: { type: 'triangle', baseFreq: 500, duration: 0.09 }
+        }
+      }
+    },
+    {
+      id: 'bp_premium_street',
+      name: '潮流先锋',
+      color: '#ff6b6b',
+      setName: '高级赛季套装',
+      description: '珊瑚红潮流先锋',
+      unlockScore: 0,
+      battlePass: true,
+      premium: true,
+      effects: {
+        particles: {
+          shapes: ['star', 'heart', 'circle'],
+          colors: ['#ff6b6b', '#ee5a6f', '#feca57', '#ff9ff3'],
+          gravity: 350,
+          spread: 520,
+          count: { perfect: 32, good: 16 },
+          trail: true
+        },
+        prompt: {
+          fontFamily: 'Arial Black',
+          fontWeight: '900',
+          fontSize: 72,
+          animation: 'shake',
+          glowColor: 'rgba(255, 107, 107, 0.75)',
+          textShake: true
+        },
+        audio: {
+          perfect: { type: 'sawtooth', baseFreq: 1000, harmonic: 1500, duration: 0.12 },
+          good: { type: 'sawtooth', baseFreq: 750, duration: 0.14 },
+          miss: { type: 'sawtooth', baseFreq: 195, duration: 0.23 },
+          combo: { type: 'sawtooth', baseFreq: 520, duration: 0.09 }
+        }
+      }
+    },
+    {
+      id: 'bp_premium_king',
+      name: '黄金王者',
+      color: '#ffd700',
+      setName: '高级赛季套装',
+      description: '纯金王者 · 至尊荣耀',
+      unlockScore: 0,
+      battlePass: true,
+      premium: true,
+      effects: {
+        particles: {
+          shapes: ['diamond', 'star', 'crown'],
+          colors: ['#ffd700', '#ffed4e', '#fff8dc', '#ffa500', '#ffffff'],
+          gravity: 250,
+          spread: 580,
+          count: { perfect: 38, good: 19 },
+          trail: true
+        },
+        prompt: {
+          fontFamily: 'Georgia',
+          fontWeight: '900',
+          fontSize: 76,
+          animation: 'sparkle',
+          glowColor: 'rgba(255, 215, 0, 0.85)',
+          textShake: false
+        },
+        audio: {
+          perfect: { type: 'sine', baseFreq: 1080, harmonic: 1620, duration: 0.14 },
+          good: { type: 'sine', baseFreq: 810, duration: 0.16 },
+          miss: { type: 'sine', baseFreq: 225, duration: 0.22 },
+          combo: { type: 'sine', baseFreq: 560, duration: 0.1 }
+        }
+      }
+    },
+    {
+      id: 'bp_cyber_hero',
+      name: '赛博英雄',
+      color: '#00ffcc',
+      setName: '高级赛季套装',
+      description: '赛博朋克 · 霓虹未来',
+      unlockScore: 0,
+      battlePass: true,
+      premium: true,
+      effects: {
+        particles: {
+          shapes: ['circle', 'hexagon', 'diamond'],
+          colors: ['#00ffcc', '#00ffff', '#ff00ff', '#00ff88', '#ffff00'],
+          gravity: 150,
+          spread: 620,
+          count: { perfect: 40, good: 20 },
+          trail: true
+        },
+        prompt: {
+          fontFamily: 'Courier New',
+          fontWeight: '900',
+          fontSize: 74,
+          animation: 'pulse',
+          glowColor: 'rgba(0, 255, 204, 0.85)',
+          textShake: false
+        },
+        audio: {
+          perfect: { type: 'square', baseFreq: 1100, harmonic: 1650, duration: 0.11 },
+          good: { type: 'square', baseFreq: 825, duration: 0.13 },
+          miss: { type: 'square', baseFreq: 230, duration: 0.2 },
+          combo: { type: 'square', baseFreq: 570, duration: 0.08 }
+        }
+      }
+    },
+    {
+      id: 'bp_premium_metro',
+      name: '至尊大师',
+      color: '#e84393',
+      setName: '高级赛季套装',
+      description: '至尊级 · 粉色传奇',
+      unlockScore: 0,
+      battlePass: true,
+      premium: true,
+      effects: {
+        particles: {
+          shapes: ['heart', 'star', 'diamond', 'circle'],
+          colors: ['#e84393', '#fd79a8', '#fab1a0', '#ffeaa7', '#ffffff'],
+          gravity: 220,
+          spread: 600,
+          count: { perfect: 42, good: 21 },
+          trail: true
+        },
+        prompt: {
+          fontFamily: 'Arial Black',
+          fontWeight: '900',
+          fontSize: 78,
+          animation: 'rainbow',
+          glowColor: 'rgba(232, 67, 147, 0.85)',
+          textShake: true
+        },
+        audio: {
+          perfect: { type: 'triangle', baseFreq: 1100, harmonic: 1650, duration: 0.15 },
+          good: { type: 'triangle', baseFreq: 825, duration: 0.17 },
+          miss: { type: 'triangle', baseFreq: 240, duration: 0.24 },
+          combo: { type: 'triangle', baseFreq: 570, duration: 0.11 }
+        }
+      }
+    },
+    {
+      id: 'bp_eternal',
+      name: '永恒传说',
+      color: '#ffffff',
+      setName: '高级赛季套装',
+      description: '赛季终极 · 永恒纯白传说',
+      unlockScore: 0,
+      battlePass: true,
+      premium: true,
+      effects: {
+        particles: {
+          shapes: ['star', 'diamond', 'heart', 'hexagon', 'circle'],
+          colors: ['#ffffff', '#ffd700', '#e84393', '#00ffff', '#9b59b6', '#f39c12'],
+          gravity: 100,
+          spread: 650,
+          count: { perfect: 50, good: 25 },
+          trail: true
+        },
+        prompt: {
+          fontFamily: 'Arial Black',
+          fontWeight: '900',
+          fontSize: 84,
+          animation: 'rainbow',
+          glowColor: 'rgba(255, 255, 255, 0.9)',
+          textShake: true
+        },
+        audio: {
+          perfect: { type: 'sine', baseFreq: 1200, harmonic: 1800, duration: 0.16 },
+          good: { type: 'sine', baseFreq: 900, duration: 0.18 },
+          miss: { type: 'sine', baseFreq: 250, duration: 0.25 },
+          combo: { type: 'sine', baseFreq: 600, duration: 0.12 }
+        }
+      }
+    }
+  ],
+
+  seasonTasks: [
+    {
+      id: 'bp_daily_1',
+      name: '每日涂鸦',
+      description: '完成任意 3 个站点',
+      icon: '🎨',
+      type: 'daily',
+      target: 3,
+      rewardExp: 50,
+      resetPeriod: 'daily',
+      progressKey: 'stationsCompleted'
+    },
+    {
+      id: 'bp_daily_2',
+      name: '完美主义',
+      description: '累计达成 20 次 Perfect',
+      icon: '✨',
+      type: 'daily',
+      target: 20,
+      rewardExp: 40,
+      resetPeriod: 'daily',
+      progressKey: 'perfectCount'
+    },
+    {
+      id: 'bp_daily_3',
+      name: '零失误挑战',
+      description: '在 1 个站点中实现零失误',
+      icon: '🎯',
+      type: 'daily',
+      target: 1,
+      rewardExp: 60,
+      resetPeriod: 'daily',
+      progressKey: 'zeroMissStations'
+    },
+    {
+      id: 'bp_weekly_1',
+      name: '线路征服者',
+      description: '本周完成 10 个不同站点',
+      icon: '🚇',
+      type: 'weekly',
+      target: 10,
+      rewardExp: 150,
+      resetPeriod: 'weekly',
+      progressKey: 'uniqueStations'
+    },
+    {
+      id: 'bp_weekly_2',
+      name: '连击专家',
+      description: '本周累计达成 50 连击 3 次',
+      icon: '🔥',
+      type: 'weekly',
+      target: 3,
+      rewardExp: 120,
+      resetPeriod: 'weekly',
+      progressKey: 'combo50Count'
+    },
+    {
+      id: 'bp_weekly_3',
+      name: '星星收藏家',
+      description: '本周累计收集 20 颗星星',
+      icon: '⭐',
+      type: 'weekly',
+      target: 20,
+      rewardExp: 180,
+      resetPeriod: 'weekly',
+      progressKey: 'starsEarned'
+    },
+    {
+      id: 'bp_weekly_4',
+      name: '高分冲刺',
+      description: '单局总分达到 5000 以上',
+      icon: '🏆',
+      type: 'weekly',
+      target: 1,
+      rewardExp: 200,
+      resetPeriod: 'weekly',
+      progressKey: 'highScore5000'
+    }
+  ]
+}
+
 export const GAME_CONFIG = {
   width: 750,
   height: 1334,

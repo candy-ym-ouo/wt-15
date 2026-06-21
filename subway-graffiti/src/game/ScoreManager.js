@@ -1,7 +1,8 @@
-import { GAME_CONFIG, LINES } from './config.js'
+import { GAME_CONFIG, LINES, BATTLE_PASS_CONFIG } from './config.js'
 import { profileManager } from './ProfileManager.js'
+import { battlePassManager } from './BattlePassManager.js'
 
-const SAVE_VERSION = 2
+const SAVE_VERSION = 3
 
 const FAIL_REASONS = {
   CAUGHT_TOO_MANY: 'caught_too_many',
@@ -154,8 +155,19 @@ class ScoreManager {
         this.totalRescueFail = saved.totalRescueFail || 0
         this.totalPreserveTriggered = saved.totalPreserveTriggered || 0
       }
+      battlePassManager.load()
+      this._syncBattlePassSkins()
     } catch (e) {
       console.warn('读取存档失败:', e)
+    }
+  }
+
+  _syncBattlePassSkins() {
+    const bpSkins = battlePassManager.getUnlockedSkins()
+    for (const skinId of bpSkins) {
+      if (!this.unlockedSkins.includes(skinId)) {
+        this.unlockedSkins.push(skinId)
+      }
     }
   }
 
@@ -186,6 +198,8 @@ class ScoreManager {
       } else {
         this._resetProfileData()
       }
+      battlePassManager.loadProfile(profileId)
+      this._syncBattlePassSkins()
       this._resetAllTemporaryState()
     } catch (e) {
       console.warn('读取档案失败:', e)
@@ -282,6 +296,7 @@ class ScoreManager {
         totalRescueFail: this.totalRescueFail,
         totalPreserveTriggered: this.totalPreserveTriggered
       }
+      data.battlePass = battlePassManager.exportForSaveData()
       profileManager.saveProfileData(currentProfile.id, data)
     } catch (e) {
       console.warn('保存存档失败:', e)
@@ -1008,7 +1023,31 @@ class ScoreManager {
       }
     })
 
+    this._syncBattlePassSkins()
     this.checkStationUnlocks()
+  }
+
+  _findSkinById(skinId) {
+    let skin = GAME_CONFIG.skins.find(s => s.id === skinId)
+    if (!skin) {
+      skin = BATTLE_PASS_CONFIG.battlePassSkins.find(s => s.id === skinId)
+    }
+    return skin
+  }
+
+  getAllSkins() {
+    const regular = GAME_CONFIG.skins.map(s => ({
+      ...s,
+      unlocked: this.unlockedSkins.includes(s.id),
+      type: 'regular'
+    }))
+    const bp = BATTLE_PASS_CONFIG.battlePassSkins.map(s => ({
+      ...s,
+      unlocked: this.unlockedSkins.includes(s.id),
+      type: 'battlePass',
+      premium: s.premium || false
+    }))
+    return [...regular, ...bp]
   }
 
   selectSkin(id) {
@@ -1021,27 +1060,27 @@ class ScoreManager {
   }
 
   getSkinColor() {
-    const skin = GAME_CONFIG.skins.find(s => s.id === this.selectedSkin)
+    const skin = this._findSkinById(this.selectedSkin)
     return skin ? skin.color : '#3498db'
   }
 
   getSkinName() {
-    const skin = GAME_CONFIG.skins.find(s => s.id === this.selectedSkin)
+    const skin = this._findSkinById(this.selectedSkin)
     return skin ? skin.name : '街头蓝'
   }
 
   getSkinSetName() {
-    const skin = GAME_CONFIG.skins.find(s => s.id === this.selectedSkin)
+    const skin = this._findSkinById(this.selectedSkin)
     return skin ? skin.setName : '街头套装'
   }
 
   getSkinDescription() {
-    const skin = GAME_CONFIG.skins.find(s => s.id === this.selectedSkin)
+    const skin = this._findSkinById(this.selectedSkin)
     return skin ? skin.description : '经典蓝色系，清新自然'
   }
 
   getSkinEffects() {
-    const skin = GAME_CONFIG.skins.find(s => s.id === this.selectedSkin)
+    const skin = this._findSkinById(this.selectedSkin)
     return skin ? skin.effects : GAME_CONFIG.skins[0].effects
   }
 
@@ -1069,6 +1108,22 @@ class ScoreManager {
           requiredScore: skin.unlockScore,
           remaining: Math.max(0, skin.unlockScore - this.totalScore),
           progress: Math.min(1, this.totalScore / skin.unlockScore)
+        }
+      }
+    }
+    for (const skin of BATTLE_PASS_CONFIG.battlePassSkins) {
+      if (!this.unlockedSkins.includes(skin.id)) {
+        const reward = skin.premium
+          ? BATTLE_PASS_CONFIG.premiumTrack.find(r => r.id === skin.id)
+          : BATTLE_PASS_CONFIG.freeTrack.find(r => r.id === skin.id)
+        const level = reward?.level || 0
+        return {
+          ...skin,
+          type: 'battlePass',
+          currentLevel: battlePassManager.level,
+          requiredLevel: level,
+          remaining: Math.max(0, level - battlePassManager.level),
+          progress: Math.min(1, battlePassManager.level / Math.max(1, level))
         }
       }
     }

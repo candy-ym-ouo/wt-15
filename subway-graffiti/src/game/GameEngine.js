@@ -3,6 +3,7 @@ import { GAME_CONFIG } from './config.js'
 import { audioManager } from './AudioManager.js'
 import { scoreManager } from './ScoreManager.js'
 import { profileManager } from './ProfileManager.js'
+import { battlePassManager } from './BattlePassManager.js'
 import { MapScene } from './MapScene.js'
 import { GraffitiGame } from './GraffitiGame.js'
 import { PatrolAvoid } from './PatrolAvoid.js'
@@ -17,7 +18,8 @@ export const GameState = {
   SKINS: 'skins',
   STATS: 'stats',
   REPLAY: 'replay',
-  PROFILES: 'profiles'
+  PROFILES: 'profiles',
+  SEASON_PASS: 'season_pass'
 }
 
 export class GameEngine {
@@ -202,6 +204,11 @@ export class GameEngine {
     this.callbacks.onStateChange(this.state)
   }
 
+  showSeasonPass() {
+    this.state = GameState.SEASON_PASS
+    this.callbacks.onStateChange(this.state)
+  }
+
   switchProfile(profileId) {
     if (profileManager.switchProfile(profileId)) {
       scoreManager.loadProfile(profileId)
@@ -269,7 +276,8 @@ export class GameEngine {
       caughtCount: scoreManager.caughtCount,
       highScore: scoreManager.highScore,
       stationScores: JSON.parse(JSON.stringify(scoreManager.stationScores)),
-      recentTasks: JSON.parse(JSON.stringify(scoreManager.getRecentTasks()))
+      recentTasks: JSON.parse(JSON.stringify(scoreManager.getRecentTasks())),
+      battlePass: battlePassManager.getSummary()
     }
 
     this.currentStation = station
@@ -400,6 +408,22 @@ export class GameEngine {
     )
     const evaluation = scoreManager.evaluateStation(this.currentStation.id, stationScore)
     const newUnlocks = scoreManager.checkStationUnlocks()
+    scoreManager.checkUnlocks()
+
+    const isFirstClear = stationRecord?.isFirstClear || false
+    const battlePassResult = battlePassManager.processStationCompletion({
+      stationId: this.currentStation.id,
+      stationScore,
+      isFirstClear,
+      isNewRecord: isNewStationHigh,
+      stars: evaluation.stars || 0,
+      perfectCount: scoreManager.stationPerfectCount,
+      maxCombo: scoreManager.stationMaxCombo,
+      missCount: scoreManager.stationMissCount,
+      caughtCount: scoreManager.stationCaughtCount
+    })
+
+    scoreManager._syncBattlePassSkins()
     scoreManager.save()
 
     this.state = GameState.STATION_COMPLETE
@@ -413,7 +437,12 @@ export class GameEngine {
       evaluation,
       stationRecord,
       newUnlocks,
-      preStationStats
+      preStationStats,
+      battlePass: {
+        ...battlePassResult,
+        before: preStationStats?.battlePass,
+        after: battlePassManager.getSummary()
+      }
     })
   }
 

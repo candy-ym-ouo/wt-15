@@ -2,8 +2,9 @@
 import { GameEngine, GameState } from '@/game/GameEngine.js';
 import { scoreManager } from '@/game/ScoreManager.js';
 import { profileManager } from '@/game/ProfileManager.js';
-import { GAME_CONFIG, LINES } from '@/game/config.js';
+import { GAME_CONFIG, LINES, BATTLE_PASS_CONFIG } from '@/game/config.js';
 import { audioManager } from '@/game/AudioManager.js';
+import { battlePassManager } from '@/game/BattlePassManager.js';
 import ReplayView from './ReplayView.vue';
 const canvasRef = ref(null);
 const containerRef = ref(null);
@@ -83,6 +84,7 @@ function handleSelectProfile(profileId) {
   if (engine.switchProfile(profileId)) {
     refreshProfiles();
     refreshStats();
+    refreshBattlePassSummary();
     resetGameUIState();
     showGamePrompt('档案切换成功', '#2ecc71');
   }
@@ -172,22 +174,130 @@ const currentTheme = computed(() => {
 
 const currentPromptConfig = computed(() => scoreManager.getSkinPrompt());
 const skins = computed(() => {
- return GAME_CONFIG.skins.map(skin => ({
- ...skin,
- unlocked: scoreManager.unlockedSkins.includes(skin.id),
- selected: scoreManager.selectedSkin === skin.id
- }));
+  const allSkins = scoreManager.getAllSkins();
+  return allSkins.map(skin => ({
+    ...skin,
+    unlocked: skin.unlocked || scoreManager.unlockedSkins.includes(skin.id),
+    selected: scoreManager.selectedSkin === skin.id
+  }));
 });
 const unlockedSkinsCount = computed(() => scoreManager.unlockedSkins.length);
-const totalSkinsCount = computed(() => GAME_CONFIG.skins.length);
+const totalSkinsCount = computed(() => GAME_CONFIG.skins.length + BATTLE_PASS_CONFIG.battlePassSkins.length);
 const nextUnlockScore = computed(() => {
- for (const skin of GAME_CONFIG.skins) {
- if (!scoreManager.unlockedSkins.includes(skin.id)) {
- return skin.unlockScore;
- }
- }
- return null;
+  for (const skin of GAME_CONFIG.skins) {
+    if (!scoreManager.unlockedSkins.includes(skin.id)) {
+      return skin.unlockScore;
+    }
+  }
+  return null;
 });
+
+const battlePassSummary = reactive(battlePassManager.getSummary());
+const battlePassTab = ref('rewards');
+const battlePassTasks = computed(() => battlePassManager.getSeasonTasks());
+const battlePassDailyTasks = computed(() => battlePassManager.getDailyTasks());
+const battlePassWeeklyTasks = computed(() => battlePassManager.getWeeklyTasks());
+const battlePassRewardTrack = computed(() => {
+  const startLv = Math.max(1, battlePassSummary.level - 3);
+  const endLv = Math.min(battlePassSummary.maxLevel, battlePassSummary.level + 7);
+  return battlePassManager.getRewardTrack(startLv, endLv);
+});
+const battlePassHasUnclaimedRewards = computed(() => {
+  const track = battlePassManager.getRewardTrack(1, battlePassSummary.level);
+  for (const item of track) {
+    if (item.free?.canClaim) return true;
+    if (item.premium?.canClaim) return true;
+  }
+  for (const task of battlePassTasks.value) {
+    if (task.completed && !task.claimed) return true;
+  }
+  return false;
+});
+
+function refreshBattlePassSummary() {
+  Object.assign(battlePassSummary, battlePassManager.getSummary());
+}
+
+function selectBattlePassTab(tab) {
+  battlePassTab.value = tab;
+  audioManager.playSFX('click');
+}
+
+function claimBattlePassReward(rewardId, track) {
+  audioManager.playSFX('click');
+  const result = battlePassManager.claimReward(rewardId, track);
+  if (result.success) {
+    scoreManager._syncBattlePassSkins();
+    scoreManager.save();
+    refreshBattlePassSummary();
+    showGamePrompt('奖励领取成功!', '#2ecc71');
+  } else {
+    showGamePrompt('领取失败', '#e74c3c');
+  }
+}
+
+function claimAllBattlePassRewards() {
+  audioManager.playSFX('click');
+  const result = battlePassManager.claimAllAvailableRewards();
+  if (result.claimed.length > 0) {
+    scoreManager._syncBattlePassSkins();
+    scoreManager.save();
+    refreshBattlePassSummary();
+    showGamePrompt(`已领取 ${result.claimed.length} 个奖励!`, '#2ecc71');
+  } else {
+    showGamePrompt('暂无可领取奖励', '#f39c12');
+  }
+}
+
+function claimBattlePassTask(taskId) {
+  audioManager.playSFX('click');
+  const result = battlePassManager.claimTaskReward(taskId);
+  if (result.success) {
+    scoreManager._syncBattlePassSkins();
+    scoreManager.save();
+    refreshBattlePassSummary();
+    showGamePrompt(`任务完成! +${result.expGained} 经验`, '#2ecc71');
+  } else {
+    showGamePrompt('领取失败', '#e74c3c');
+  }
+}
+
+function claimAllBattlePassTasks() {
+  audioManager.playSFX('click');
+  let totalExp = 0;
+  let claimedCount = 0;
+  for (const task of battlePassTasks.value) {
+    if (task.completed && !task.claimed) {
+      const result = battlePassManager.claimTaskReward(task.id);
+      if (result.success) {
+        totalExp += result.expGained;
+        claimedCount++;
+      }
+    }
+  }
+  if (claimedCount > 0) {
+    scoreManager._syncBattlePassSkins();
+    scoreManager.save();
+    refreshBattlePassSummary();
+    showGamePrompt(`已完成 ${claimedCount} 个任务! +${totalExp} 经验`, '#2ecc71');
+  } else {
+    showGamePrompt('暂无可领取任务奖励', '#f39c12');
+  }
+}
+
+function getRarityStyle(rarity) {
+  return BATTLE_PASS_CONFIG.rarityConfig[rarity] || BATTLE_PASS_CONFIG.rarityConfig.common;
+}
+
+function getRewardTypeIcon(type) {
+  const icons = { skin: '👕', title: '🎖️', emote: '💃' };
+  return icons[type] || '🎁';
+}
+
+function getRewardTypeName(type) {
+  const names = { skin: '皮肤', title: '称号', emote: '动作' };
+  return names[type] || type;
+}
 
 const goalTrackingTab = ref('skin');
 
@@ -266,7 +376,8 @@ const routeEarnings = computed(() => {
     newlyCompletedTasks,
     isFirstClear: stationResult.value.stationRecord?.isFirstClear,
     isNewHigh: stationResult.value.isNewStationHigh,
-    preStats
+    preStats,
+    battlePass: stationResult.value?.battlePass
   };
 });
 
@@ -279,7 +390,10 @@ function getUnlockedStationName(stationId) {
 }
 
 function getSkinName(skinId) {
-  const skin = GAME_CONFIG.skins.find(s => s.id === skinId);
+  let skin = GAME_CONFIG.skins.find(s => s.id === skinId);
+  if (!skin) {
+    skin = BATTLE_PASS_CONFIG.battlePassSkins.find(s => s.id === skinId);
+  }
   return skin ? skin.name : skinId;
 }
 
@@ -421,6 +535,7 @@ function onStateChange(state, data) {
  else if (state === GameState.GAME_OVER) {
    gameResult.value = data;
    refreshStats();
+   refreshBattlePassSummary();
  }
  else if (state === GameState.STATION_COMPLETE) {
    stationResult.value = data;
@@ -428,12 +543,16 @@ function onStateChange(state, data) {
      currentLine.value = data.line;
    }
    refreshStats();
+   refreshBattlePassSummary();
  }
  else if (state === GameState.MAP) {
    currentLine.value = null;
  }
  else if (state === GameState.PROFILES) {
    refreshProfiles();
+ }
+ else if (state === GameState.SEASON_PASS) {
+   refreshBattlePassSummary();
  }
 }
 function onTick() {
@@ -551,6 +670,11 @@ function showStatsScreen() {
  audioManager.playSFX('click');
  refreshStats();
  currentState.value = GameState.STATS;
+}
+function showSeasonPassScreen() {
+  audioManager.playSFX('click');
+  refreshBattlePassSummary();
+  currentState.value = GameState.SEASON_PASS;
 }
 function backFromSubscreen() {
  audioManager.playSFX('click');
@@ -1012,12 +1136,49 @@ onUnmounted(() => {
             🚇 开始巡游
           </button>
 
+          <div
+            v-if="battlePassSummary"
+            class="battle-pass-mini-card"
+            @click="showSeasonPassScreen"
+          >
+            <div class="battle-pass-mini-header">
+              <div class="battle-pass-mini-icon">🎖️</div>
+              <div class="battle-pass-mini-info">
+                <div class="battle-pass-mini-title">
+                  {{ battlePassSummary.seasonName }}
+                  <span v-if="battlePassHasUnclaimedRewards" class="bp-dot-notification"></span>
+                </div>
+                <div class="battle-pass-mini-subtitle">
+                  Lv.{{ battlePassSummary.level }}/{{ battlePassSummary.maxLevel }} · 皮肤 {{ battlePassSummary.unlockedSkinsCount }}
+                </div>
+              </div>
+              <div class="battle-pass-mini-level-exp">
+                <span>+{{ battlePassSummary.remainingExpToNext }} EXP</span>
+              </div>
+            </div>
+            <div class="bp-progress-bar">
+              <div
+                class="bp-progress-fill"
+                :style="{ width: (battlePassSummary.expProgress * 100) + '%' }"
+              ></div>
+              <div
+                v-if="battlePassSummary.premiumUnlocked"
+                class="bp-progress-fill-premium"
+                :style="{ width: (battlePassSummary.expProgress * 100) + '%' }"
+              ></div>
+            </div>
+          </div>
+
           <div class="buttons-row">
             <button class="btn btn-secondary" @click="showSkinsScreen">
               👕 皮肤
             </button>
             <button class="btn btn-secondary" @click="showStatsScreen">
               📊 统计
+            </button>
+            <button class="btn btn-secondary battle-pass-btn" @click="showSeasonPassScreen">
+              🎖️ 通行证
+              <span v-if="battlePassHasUnclaimedRewards" class="btn-notification-dot"></span>
             </button>
             <button class="btn btn-secondary" @click="showProfilesScreen">
               👤 档案
@@ -1740,6 +1901,103 @@ onUnmounted(() => {
                 </div>
               </div>
             </div>
+
+            <div v-if="routeEarnings.battlePass" class="earnings-section" style="background: linear-gradient(135deg, rgba(241, 196, 15, 0.08), rgba(155, 89, 182, 0.08));">
+              <div class="earnings-section-title">
+                <span class="earnings-icon">🎖️</span>
+                <span>赛季通行证</span>
+              </div>
+
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; padding: 12px 16px; background: rgba(255,255,255,0.05); border-radius: 12px;">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                  <div style="width: 52px; height: 52px; border-radius: 50%; background: linear-gradient(135deg, #f1c40f, #9b59b6); display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: 900; color: #fff; text-shadow: 0 2px 8px rgba(0,0,0,0.3);">
+                    {{ battlePassSummary.level }}
+                  </div>
+                  <div>
+                    <div style="font-size: 15px; font-weight: 600;">
+                      {{ battlePassSummary.seasonName }}
+                    </div>
+                    <div style="font-size: 12px; opacity: 0.7; margin-top: 2px;">
+                      {{ routeEarnings.battlePass.levelUp?.levelsUp > 0 ? '升级啦！' : '继续加油～' }}
+                    </div>
+                  </div>
+                </div>
+                <div style="text-align: right;">
+                  <div style="font-size: 22px; font-weight: 900; color: #f1c40f;">
+                    +{{ routeEarnings.battlePass.exp.total }}
+                  </div>
+                  <div style="font-size: 12px; opacity: 0.7;">EXP</div>
+                </div>
+              </div>
+
+              <div v-if="routeEarnings.battlePass.exp.breakdown && routeEarnings.battlePass.exp.breakdown.length > 0" style="margin-bottom: 14px;">
+                <div class="bp-exp-breakdown">
+                  <div
+                    v-for="(item, idx) in routeEarnings.battlePass.exp.breakdown"
+                    :key="idx"
+                    class="bp-exp-row"
+                  >
+                    <span class="bp-exp-label">{{ item.label }}</span>
+                    <span class="bp-exp-value">+{{ item.amount }}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div style="margin-bottom: 12px;">
+                <div style="display: flex; justify-content: space-between; font-size: 12px; opacity: 0.8; margin-bottom: 6px;">
+                  <span>Lv.{{ battlePassSummary.level }}</span>
+                  <span>{{ battlePassSummary.currentLevelExp }}/{{ battlePassSummary.expRequiredForNext }} EXP</span>
+                  <span>Lv.{{ Math.min(battlePassSummary.level + 1, battlePassSummary.maxLevel) }}</span>
+                </div>
+                <div class="bp-progress-bar">
+                  <div class="bp-progress-fill" :style="{ width: (battlePassSummary.expProgress * 100) + '%' }"></div>
+                  <div
+                    v-if="battlePassSummary.premiumUnlocked"
+                    class="bp-progress-fill-premium"
+                    :style="{ width: (battlePassSummary.expProgress * 100) + '%' }"
+                  ></div>
+                </div>
+              </div>
+
+              <div v-if="routeEarnings.battlePass.levelUp?.levelsUp > 0" style="background: linear-gradient(135deg, rgba(46, 204, 113, 0.15), rgba(241, 196, 15, 0.15)); border: 1px solid rgba(241, 196, 15, 0.3); border-radius: 12px; padding: 12px 16px; margin-bottom: 12px;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                  <span style="font-size: 28px;">🎉</span>
+                  <div style="flex: 1;">
+                    <div style="font-weight: 700; color: #f1c40f;">等级提升 +{{ routeEarnings.battlePass.levelUp.levelsUp }}</div>
+                    <div style="font-size: 12px; opacity: 0.8; margin-top: 2px;">
+                      {{ routeEarnings.battlePass.levelUp.levelsReached.length > 0 ? '解锁新奖励，请前往通行证页面领取！' : '经验累积，再接再厉！' }}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div v-if="routeEarnings.battlePass.newlyUnlocked && (routeEarnings.battlePass.newlyUnlocked.skins?.length > 0 || routeEarnings.battlePass.newlyUnlocked.titles?.length > 0 || routeEarnings.battlePass.newlyUnlocked.emotes?.length > 0)">
+                <div style="font-size: 13px; opacity: 0.8; margin-bottom: 8px;">✨ 本次解锁的通行证奖励</div>
+                <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+                  <div
+                    v-for="skinId in (routeEarnings.battlePass.newlyUnlocked.skins || [])"
+                    :key="skinId"
+                    class="bp-reward-pill skin-reward"
+                  >
+                    👕 {{ getSkinName(skinId) }}
+                  </div>
+                  <div
+                    v-for="title in (routeEarnings.battlePass.newlyUnlocked.titles || [])"
+                    :key="title"
+                    class="bp-reward-pill title-reward"
+                  >
+                    🎖️ {{ title }}
+                  </div>
+                  <div
+                    v-for="emote in (routeEarnings.battlePass.newlyUnlocked.emotes || [])"
+                    :key="emote"
+                    class="bp-reward-pill emote-reward"
+                  >
+                    💃 {{ emote }}
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
 
           <div style="text-align: center; margin: 16px 0; opacity: 0.7;">
@@ -1797,6 +2055,313 @@ onUnmounted(() => {
 
           <button class="btn btn-outline" style="width: 100%; margin-top: 12px;" @click="backToMenu">
             🏠 返回主菜单
+          </button>
+        </div>
+      </div>
+
+      <div v-if="currentState === GameState.SEASON_PASS" class="screen season-pass-screen">
+        <div class="bp-hero-banner">
+          <div class="bp-hero-bg"></div>
+          <div class="bp-hero-content">
+            <div style="font-size: 12px; opacity: 0.8; letter-spacing: 2px; margin-bottom: 4px;">SEASON PASS</div>
+            <div class="bp-hero-title">{{ battlePassSummary.seasonName }}</div>
+            <div class="bp-hero-desc">{{ battlePassSummary.seasonDescription }}</div>
+            <div class="bp-hero-level-row">
+              <div class="bp-level-circle">
+                <div class="bp-level-num">{{ battlePassSummary.level }}</div>
+                <div class="bp-level-label">等级</div>
+              </div>
+              <div class="bp-level-progress-area">
+                <div style="display: flex; justify-content: space-between; font-size: 12px; opacity: 0.8; margin-bottom: 6px;">
+                  <span>Exp. {{ battlePassSummary.currentLevelExp }}</span>
+                  <span>{{ battlePassSummary.expRequiredForNext }}</span>
+                </div>
+                <div class="bp-progress-bar large">
+                  <div class="bp-progress-fill" :style="{ width: (battlePassSummary.expProgress * 100) + '%' }"></div>
+                  <div
+                    v-if="battlePassSummary.premiumUnlocked"
+                    class="bp-progress-fill-premium"
+                    :style="{ width: (battlePassSummary.expProgress * 100) + '%' }"
+                  ></div>
+                </div>
+                <div style="display: flex; justify-content: space-between; margin-top: 10px; font-size: 12px;">
+                  <div>
+                    <span style="opacity: 0.7;">总经验:</span>
+                    <span style="font-weight: 700; color: #f1c40f;"> {{ battlePassSummary.totalExp }}</span>
+                  </div>
+                  <div v-if="!battlePassSummary.premiumUnlocked" style="opacity: 0.6;">
+                    ⭐ 高级通行证未解锁
+                  </div>
+                  <div v-else style="color: #9b59b6; font-weight: 600;">
+                    ⭐ 高级通行证已激活
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="screen-content">
+          <div class="bp-tabs">
+            <button
+              class="bp-tab"
+              :class="{ active: battlePassTab === 'rewards' }"
+              @click="selectBattlePassTab('rewards')"
+            >
+              🎁 奖励路线
+              <span v-if="battlePassHasUnclaimedRewards" class="bp-dot-notification"></span>
+            </button>
+            <button
+              class="bp-tab"
+              :class="{ active: battlePassTab === 'daily' }"
+              @click="selectBattlePassTab('daily')"
+            >
+              📅 每日任务
+            </button>
+            <button
+              class="bp-tab"
+              :class="{ active: battlePassTab === 'weekly' }"
+              @click="selectBattlePassTab('weekly')"
+            >
+              📆 每周任务
+            </button>
+            <button
+              class="bp-tab"
+              :class="{ active: battlePassTab === 'season' }"
+              @click="selectBattlePassTab('season')"
+            >
+              🎯 赛季挑战
+            </button>
+          </div>
+
+          <div v-if="battlePassTab === 'rewards'">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+              <div style="font-size: 15px; font-weight: 600;">
+                等级奖励（已解锁 {{ battlePassSummary.claimedFreeRewards + battlePassSummary.claimedPremiumRewards }}/{{ battlePassSummary.maxLevel * 2 }}）
+              </div>
+              <button class="btn btn-small btn-primary" @click="claimAllBattlePassRewards">
+                一键领取
+              </button>
+            </div>
+
+            <div class="bp-reward-track">
+              <div
+                v-for="item in battlePassRewardTrack"
+                :key="item.level"
+                class="bp-reward-row"
+                :class="{ 'is-current-level': item.level === battlePassSummary.level }"
+              >
+                <div class="bp-reward-level-marker">
+                  <div class="bp-reward-level-num">{{ item.level }}</div>
+                </div>
+
+                <div
+                  class="bp-reward-card free-track"
+                  :class="{
+                    unlocked: item.free?.unlocked,
+                    claimed: item.free?.claimed
+                  }"
+                  @click="item.free?.canClaim && claimBattlePassReward(item.free?.id, 'free')"
+                >
+                  <div class="bp-reward-card-inner">
+                    <div class="bp-reward-icon" :style="{ background: item.free ? getRarityStyle(item.free.reward?.rarity)?.color : '#444' }">
+                      {{ item.free?.reward ? getRewardTypeIcon(item.free.reward.type) : '—' }}
+                    </div>
+                    <div class="bp-reward-info">
+                      <div class="bp-reward-name">{{ item.free?.reward?.name || '免费奖励' }}</div>
+                      <div class="bp-reward-type">
+                        {{ item.free?.reward ? getRewardTypeName(item.free.reward.type) : '' }}
+                        <span v-if="item.free?.reward?.rarity" :style="{ color: getRarityStyle(item.free.reward.rarity)?.glow }">
+                          [{{ getRarityStyle(item.free.reward.rarity)?.name }}]
+                        </span>
+                      </div>
+                    </div>
+                    <div class="bp-reward-status">
+                      <span v-if="item.free?.claimed" class="status-claimed">✓ 已领</span>
+                      <span v-else-if="item.free?.canClaim" class="status-can-claim">领取</span>
+                      <span v-else class="status-locked">Lv.{{ item.level }}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div
+                  class="bp-reward-card premium-track"
+                  :class="{
+                    unlocked: item.premium?.unlocked,
+                    claimed: item.premium?.claimed,
+                    'premium-locked': !battlePassSummary.premiumUnlocked
+                  }"
+                  @click="item.premium?.canClaim && claimBattlePassReward(item.premium?.id, 'premium')"
+                >
+                  <div class="bp-reward-card-inner">
+                    <div class="bp-reward-icon premium" :style="{ background: item.premium ? getRarityStyle(item.premium.reward?.rarity)?.color : '#444' }">
+                      {{ item.premium?.reward ? getRewardTypeIcon(item.premium.reward.type) : '—' }}
+                    </div>
+                    <div class="bp-reward-info">
+                      <div class="bp-reward-name premium-name">{{ item.premium?.reward?.name || '高级奖励' }}</div>
+                      <div class="bp-reward-type">
+                        ⭐ {{ item.premium?.reward ? getRewardTypeName(item.premium.reward.type) : '' }}
+                        <span v-if="item.premium?.reward?.rarity" :style="{ color: getRarityStyle(item.premium.reward.rarity)?.glow }">
+                          [{{ getRarityStyle(item.premium.reward.rarity)?.name }}]
+                        </span>
+                      </div>
+                    </div>
+                    <div class="bp-reward-status">
+                      <span v-if="!battlePassSummary.premiumUnlocked" class="status-premium-locked">🔒</span>
+                      <span v-else-if="item.premium?.claimed" class="status-claimed">✓ 已领</span>
+                      <span v-else-if="item.premium?.canClaim" class="status-can-claim">领取</span>
+                      <span v-else class="status-locked">Lv.{{ item.level }}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div v-if="battlePassTab === 'daily' || battlePassTab === 'weekly'">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+              <div style="font-size: 15px; font-weight: 600;">
+                {{ battlePassTab === 'daily' ? '每日任务' : '每周任务' }}
+                · <span style="color: #f1c40f;">{{ (battlePassTab === 'daily' ? battlePassDailyTasks : battlePassWeeklyTasks).filter(t => t.completed && !t.claimed).length }}</span> 个待领取
+              </div>
+              <button class="btn btn-small btn-primary" @click="claimAllBattlePassTasks">
+                一键领取
+              </button>
+            </div>
+
+            <div class="bp-task-list">
+              <div
+                v-for="task in (battlePassTab === 'daily' ? battlePassDailyTasks : battlePassWeeklyTasks)"
+                :key="task.id"
+                class="bp-task-card"
+                :class="{ completed: task.completed, claimed: task.claimed }"
+              >
+                <div class="bp-task-icon" :style="{ background: task.color + '30' }">
+                  {{ task.icon }}
+                </div>
+                <div class="bp-task-content">
+                  <div class="bp-task-title">{{ task.name }}</div>
+                  <div class="bp-task-desc">{{ task.description }}</div>
+                  <div class="bp-task-progress-bar-row">
+                    <div class="bp-task-progress-bar">
+                      <div class="bp-task-progress-fill" :style="{ width: Math.min(100, (task.progress / task.target) * 100) + '%', background: task.color }"></div>
+                    </div>
+                    <span class="bp-task-progress-text">{{ task.progress }}/{{ task.target }}</span>
+                  </div>
+                </div>
+                <div class="bp-task-action">
+                  <div class="bp-task-reward">+{{ task.expReward }} EXP</div>
+                  <button
+                    v-if="task.claimed"
+                    class="btn btn-small btn-outline disabled"
+                    disabled
+                  >
+                    ✓ 已完成
+                  </button>
+                  <button
+                    v-else-if="task.completed"
+                    class="btn btn-small btn-primary"
+                    @click="claimBattlePassTask(task.id)"
+                  >
+                    领取
+                  </button>
+                  <button
+                    v-else
+                    class="btn btn-small btn-outline disabled"
+                    disabled
+                  >
+                    进行中
+                  </button>
+                </div>
+              </div>
+
+              <div v-if="(battlePassTab === 'daily' ? battlePassDailyTasks : battlePassWeeklyTasks).length === 0" class="bp-empty-state">
+                <span style="font-size: 48px; display: block; margin-bottom: 12px;">📋</span>
+                <div style="font-weight: 600; margin-bottom: 4px;">暂无任务</div>
+                <div style="font-size: 13px; opacity: 0.7;">
+                  {{ battlePassTab === 'daily' ? '今日任务已全部完成，明天再来吧！' : '本周任务已全部完成！' }}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div v-if="battlePassTab === 'season'">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+              <div style="font-size: 15px; font-weight: 600;">
+                赛季挑战
+                · 完成后奖励丰厚
+              </div>
+              <button class="btn btn-small btn-primary" @click="claimAllBattlePassTasks">
+                一键领取
+              </button>
+            </div>
+
+            <div class="bp-task-list">
+              <div
+                v-for="task in battlePassTasks"
+                :key="task.id"
+                class="bp-task-card"
+                :class="{ completed: task.completed, claimed: task.claimed, 'season-task': true }"
+              >
+                <div class="bp-task-icon season" :style="{ background: 'linear-gradient(135deg, #9b59b640, #f1c40f40)' }">
+                  {{ task.icon }}
+                </div>
+                <div class="bp-task-content">
+                  <div class="bp-task-title">
+                    {{ task.name }}
+                    <span v-if="task.difficulty" :class="`bp-difficulty-badge difficulty-${task.difficulty}`">
+                      {{ { easy: '简单', medium: '普通', hard: '困难', extreme: '极限' }[task.difficulty] }}
+                    </span>
+                  </div>
+                  <div class="bp-task-desc">{{ task.description }}</div>
+                  <div class="bp-task-progress-bar-row">
+                    <div class="bp-task-progress-bar">
+                      <div class="bp-task-progress-fill season" :style="{ width: Math.min(100, (task.progress / task.target) * 100) + '%' }"></div>
+                    </div>
+                    <span class="bp-task-progress-text">{{ task.progress }}/{{ task.target }}</span>
+                  </div>
+                </div>
+                <div class="bp-task-action">
+                  <div class="bp-task-reward big">+{{ task.expReward }} EXP</div>
+                  <div v-if="task.rewards && task.rewards.length > 0" style="margin-bottom: 8px;">
+                    <div v-for="(reward, idx) in task.rewards" :key="idx" class="bp-task-extra-reward">
+                      {{ getRewardTypeIcon(reward.type) }} {{ reward.name }}
+                    </div>
+                  </div>
+                  <button
+                    v-if="task.claimed"
+                    class="btn btn-small btn-outline disabled"
+                    disabled
+                  >
+                    ✓ 已完成
+                  </button>
+                  <button
+                    v-else-if="task.completed"
+                    class="btn btn-small btn-primary"
+                    @click="claimBattlePassTask(task.id)"
+                  >
+                    领取奖励
+                  </button>
+                  <button
+                    v-else
+                    class="btn btn-small btn-outline disabled"
+                    disabled
+                  >
+                    挑战中
+                  </button>
+                </div>
+              </div>
+
+              <div v-if="battlePassTasks.length === 0" class="bp-empty-state">
+                <span style="font-size: 48px; display: block; margin-bottom: 12px;">🏆</span>
+                <div style="font-weight: 600; margin-bottom: 4px;">暂无赛季挑战</div>
+                <div style="font-size: 13px; opacity: 0.7;">敬请期待下一赛季挑战任务！</div>
+              </div>
+            </div>
+          </div>
+
+          <button class="btn btn-outline" style="width: 100%; margin-top: 20px;" @click="backFromSubscreen">
+            ← 返回主菜单
           </button>
         </div>
       </div>
@@ -3389,5 +3954,728 @@ onUnmounted(() => {
   opacity: 0.5;
   cursor: not-allowed;
   transform: none;
+}
+
+.battle-pass-mini-card {
+  background: linear-gradient(135deg, rgba(241, 196, 15, 0.12), rgba(155, 89, 182, 0.12));
+  border: 1.5px solid rgba(241, 196, 15, 0.3);
+  border-radius: 14px;
+  padding: 14px 16px;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  margin-bottom: 16px;
+}
+
+.battle-pass-mini-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(241, 196, 15, 0.6);
+  box-shadow: 0 8px 24px rgba(241, 196, 15, 0.15);
+}
+
+.battle-pass-mini-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.battle-pass-mini-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #f1c40f, #9b59b6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  flex-shrink: 0;
+}
+
+.battle-pass-mini-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.battle-pass-mini-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #fff;
+  margin-bottom: 2px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  position: relative;
+}
+
+.battle-pass-mini-subtitle {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.battle-pass-mini-level-exp {
+  font-size: 13px;
+  font-weight: 600;
+  color: #f1c40f;
+  white-space: nowrap;
+}
+
+.battle-pass-btn {
+  position: relative;
+}
+
+.btn-notification-dot {
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #e74c3c;
+  box-shadow: 0 0 8px rgba(231, 76, 60, 0.6);
+}
+
+.bp-dot-notification {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #e74c3c;
+  box-shadow: 0 0 8px rgba(231, 76, 60, 0.6);
+  margin-left: 2px;
+}
+
+.bp-progress-bar {
+  width: 100%;
+  height: 10px;
+  background: rgba(0, 0, 0, 0.35);
+  border-radius: 5px;
+  overflow: hidden;
+  position: relative;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.bp-progress-bar.large {
+  height: 14px;
+  border-radius: 7px;
+}
+
+.bp-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #f1c40f, #e67e22);
+  border-radius: 5px;
+  transition: width 0.6s ease;
+  box-shadow: 0 0 10px rgba(241, 196, 15, 0.4);
+  position: relative;
+  z-index: 2;
+}
+
+.bp-progress-fill-premium {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  background: linear-gradient(90deg, #9b59b6, #8e44ad);
+  border-radius: 5px;
+  opacity: 0.35;
+  z-index: 1;
+}
+
+.bp-exp-breakdown {
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 10px;
+  padding: 8px 12px;
+}
+
+.bp-exp-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 0;
+  font-size: 12px;
+}
+
+.bp-exp-row + .bp-exp-row {
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.bp-exp-label {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.bp-exp-value {
+  font-weight: 600;
+  color: #f1c40f;
+}
+
+.bp-reward-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
+  border-radius: 16px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.bp-reward-pill.skin-reward {
+  background: rgba(52, 152, 219, 0.18);
+  color: #3498db;
+  border: 1px solid rgba(52, 152, 219, 0.35);
+}
+
+.bp-reward-pill.title-reward {
+  background: rgba(241, 196, 15, 0.18);
+  color: #f1c40f;
+  border: 1px solid rgba(241, 196, 15, 0.35);
+}
+
+.bp-reward-pill.emote-reward {
+  background: rgba(46, 204, 113, 0.18);
+  color: #2ecc71;
+  border: 1px solid rgba(46, 204, 113, 0.35);
+}
+
+.season-pass-screen {
+  padding-top: 0 !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+  max-width: 640px !important;
+}
+
+.season-pass-screen .screen-content {
+  padding: 0 20px 100px;
+}
+
+.bp-hero-banner {
+  position: relative;
+  padding: 28px 20px 24px;
+  overflow: hidden;
+  margin-bottom: 0;
+}
+
+.bp-hero-bg {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 20% 30%, rgba(241, 196, 15, 0.35), transparent 60%),
+    radial-gradient(circle at 80% 70%, rgba(155, 89, 182, 0.4), transparent 60%),
+    linear-gradient(135deg, #1a1a2e, #2c1654, #4a1942);
+  z-index: 0;
+}
+
+.bp-hero-bg::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.035'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+  opacity: 0.8;
+}
+
+.bp-hero-content {
+  position: relative;
+  z-index: 1;
+  color: #fff;
+}
+
+.bp-hero-title {
+  font-size: 28px;
+  font-weight: 900;
+  margin-bottom: 4px;
+  background: linear-gradient(135deg, #f1c40f, #fff, #ffd700);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  text-shadow: 0 0 40px rgba(241, 196, 15, 0.3);
+}
+
+.bp-hero-desc {
+  font-size: 13px;
+  opacity: 0.8;
+  margin-bottom: 20px;
+}
+
+.bp-hero-level-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.bp-level-circle {
+  width: 76px;
+  height: 76px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #f1c40f, #e67e22);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 0 30px rgba(241, 196, 15, 0.4), inset 0 2px 4px rgba(255, 255, 255, 0.3);
+  border: 3px solid rgba(255, 255, 255, 0.15);
+}
+
+.bp-level-num {
+  font-size: 32px;
+  font-weight: 900;
+  line-height: 1;
+  color: #fff;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+.bp-level-label {
+  font-size: 10px;
+  font-weight: 600;
+  opacity: 0.9;
+  letter-spacing: 1px;
+  margin-top: 2px;
+}
+
+.bp-level-progress-area {
+  flex: 1;
+  min-width: 0;
+}
+
+.bp-tabs {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  padding: 18px 20px 0;
+  margin: 0 -20px;
+  background: linear-gradient(180deg, transparent, rgba(0, 0, 0, 0.25));
+  padding-bottom: 16px;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  backdrop-filter: blur(8px);
+}
+
+.bp-tab {
+  padding: 9px 4px;
+  border: none;
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 11.5px;
+  font-weight: 600;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.bp-tab:hover {
+  color: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.bp-tab.active {
+  background: linear-gradient(135deg, #f1c40f, #e67e22);
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(241, 196, 15, 0.3);
+}
+
+.bp-reward-track {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.bp-reward-row {
+  display: grid;
+  grid-template-columns: 48px 1fr 1fr;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.bp-reward-row.is-current-level {
+  margin: 14px 0;
+  padding: 12px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(241, 196, 15, 0.15), rgba(155, 89, 182, 0.1));
+  border: 1.5px solid rgba(241, 196, 15, 0.4);
+  box-shadow: 0 4px 20px rgba(241, 196, 15, 0.1);
+}
+
+.bp-reward-row.is-current-level .bp-reward-level-marker {
+  background: linear-gradient(135deg, #f1c40f, #e67e22);
+  border-color: #fff;
+  box-shadow: 0 0 16px rgba(241, 196, 15, 0.5);
+  color: #fff;
+}
+
+.bp-reward-level-marker {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.06);
+  border: 2px solid rgba(255, 255, 255, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  align-self: center;
+  flex-shrink: 0;
+}
+
+.bp-reward-level-num {
+  font-size: 14px;
+  font-weight: 800;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.bp-reward-card {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1.5px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 10px;
+  cursor: default;
+  transition: all 0.2s ease;
+  overflow: hidden;
+  position: relative;
+}
+
+.bp-reward-card.unlocked {
+  border-color: rgba(46, 204, 113, 0.35);
+  background: rgba(46, 204, 113, 0.08);
+}
+
+.bp-reward-card.claimed {
+  border-color: rgba(149, 165, 166, 0.3);
+  opacity: 0.8;
+}
+
+.bp-reward-card.premium-track {
+  background: linear-gradient(135deg, rgba(155, 89, 182, 0.08), rgba(241, 196, 15, 0.06));
+  border-color: rgba(155, 89, 182, 0.25);
+}
+
+.bp-reward-card.premium-track.unlocked {
+  border-color: rgba(155, 89, 182, 0.5);
+}
+
+.bp-reward-card.premium-track.premium-locked {
+  opacity: 0.5;
+  filter: grayscale(0.4);
+}
+
+.bp-reward-card:not(.claimed).unlocked {
+  cursor: pointer;
+}
+
+.bp-reward-card:not(.claimed).unlocked:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25);
+}
+
+.bp-reward-card-inner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.bp-reward-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1.5px solid rgba(255, 255, 255, 0.1);
+}
+
+.bp-reward-icon.premium {
+  border-color: rgba(241, 196, 15, 0.4);
+  box-shadow: 0 0 12px rgba(155, 89, 182, 0.25);
+}
+
+.bp-reward-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.bp-reward-name {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #fff;
+  margin-bottom: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.bp-reward-name.premium-name {
+  color: #ffe082;
+}
+
+.bp-reward-type {
+  font-size: 10.5px;
+  color: rgba(255, 255, 255, 0.55);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.bp-reward-status {
+  flex-shrink: 0;
+}
+
+.bp-reward-status span {
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 8px;
+  font-size: 10.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.status-claimed {
+  background: rgba(149, 165, 166, 0.2);
+  color: #95a5a6;
+}
+
+.status-can-claim {
+  background: linear-gradient(135deg, #2ecc71, #27ae60);
+  color: #fff;
+  animation: bp-pulse 1.4s ease-in-out infinite;
+}
+
+.status-locked {
+  background: rgba(0, 0, 0, 0.3);
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.status-premium-locked {
+  font-size: 16px !important;
+  padding: 0 !important;
+  background: transparent !important;
+}
+
+@keyframes bp-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(46, 204, 113, 0.4); }
+  50% { box-shadow: 0 0 0 6px rgba(46, 204, 113, 0); }
+}
+
+.bp-task-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.bp-task-card {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1.5px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  padding: 14px;
+  display: grid;
+  grid-template-columns: 52px 1fr auto;
+  gap: 12px;
+  align-items: start;
+  transition: all 0.2s ease;
+}
+
+.bp-task-card.season-task {
+  background: linear-gradient(135deg, rgba(155, 89, 182, 0.1), rgba(241, 196, 15, 0.08));
+  border-color: rgba(155, 89, 182, 0.3);
+}
+
+.bp-task-card.completed:not(.claimed) {
+  border-color: rgba(46, 204, 113, 0.5);
+  box-shadow: 0 0 0 2px rgba(46, 204, 113, 0.08);
+}
+
+.bp-task-card.claimed {
+  opacity: 0.65;
+}
+
+.bp-task-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1.5px solid rgba(255, 255, 255, 0.1);
+}
+
+.bp-task-icon.season {
+  border-color: rgba(241, 196, 15, 0.3);
+  box-shadow: 0 0 16px rgba(155, 89, 182, 0.2);
+}
+
+.bp-task-content {
+  min-width: 0;
+}
+
+.bp-task-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #fff;
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.bp-difficulty-badge {
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-weight: 600;
+}
+
+.bp-difficulty-badge.difficulty-easy {
+  background: rgba(46, 204, 113, 0.2);
+  color: #2ecc71;
+}
+.bp-difficulty-badge.difficulty-medium {
+  background: rgba(52, 152, 219, 0.2);
+  color: #3498db;
+}
+.bp-difficulty-badge.difficulty-hard {
+  background: rgba(243, 156, 18, 0.2);
+  color: #f39c12;
+}
+.bp-difficulty-badge.difficulty-extreme {
+  background: rgba(231, 76, 60, 0.2);
+  color: #e74c3c;
+}
+
+.bp-task-desc {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.6);
+  margin-bottom: 8px;
+  line-height: 1.4;
+}
+
+.bp-task-progress-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.bp-task-progress-bar {
+  flex: 1;
+  height: 8px;
+  background: rgba(0, 0, 0, 0.35);
+  border-radius: 4px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.bp-task-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #3498db, #2ecc71);
+  border-radius: 4px;
+  transition: width 0.5s ease;
+}
+
+.bp-task-progress-fill.season {
+  background: linear-gradient(90deg, #9b59b6, #f1c40f);
+}
+
+.bp-task-progress-text {
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.65);
+  min-width: 48px;
+  text-align: right;
+}
+
+.bp-task-action {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  min-width: 84px;
+}
+
+.bp-task-reward {
+  font-size: 12px;
+  font-weight: 700;
+  color: #f1c40f;
+  padding: 3px 8px;
+  background: rgba(241, 196, 15, 0.12);
+  border-radius: 8px;
+}
+
+.bp-task-reward.big {
+  font-size: 13px;
+  padding: 4px 10px;
+}
+
+.bp-task-extra-reward {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.75);
+  padding: 2px 8px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 6px;
+  margin-top: 2px;
+}
+
+.btn-small {
+  padding: 6px 12px;
+  font-size: 12px;
+  border-radius: 8px;
+  font-weight: 600;
+}
+
+.btn-small.disabled,
+.btn-small:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.bp-empty-state {
+  text-align: center;
+  padding: 40px 20px;
+  color: rgba(255, 255, 255, 0.6);
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 14px;
+  border: 1.5px dashed rgba(255, 255, 255, 0.1);
+}
+
+@media (max-width: 480px) {
+  .bp-tabs {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .bp-reward-row {
+    grid-template-columns: 40px 1fr;
+  }
+  .bp-reward-card.premium-track {
+    grid-column: 2;
+  }
+  .bp-task-card {
+    grid-template-columns: 44px 1fr;
+  }
+  .bp-task-action {
+    grid-column: 1 / -1;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .bp-hero-title {
+    font-size: 22px;
+  }
+  .bp-hero-level-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .bp-level-circle {
+    width: 64px;
+    height: 64px;
+  }
+  .bp-level-num {
+    font-size: 26px;
+  }
 }
 </style>
