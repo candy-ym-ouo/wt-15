@@ -39,6 +39,7 @@ const showArrival = ref(false);
 const arrivalData = ref(null);
 const showReplay = ref(false);
 const currentReplayData = ref(null);
+const previousStats = ref(null);
 
 const currentTheme = computed(() => {
   if (currentLine.value?.theme) {
@@ -88,6 +89,85 @@ const nextStation = computed(() => {
 });
 const recentTasks = computed(() => scoreManager.getRecentTasks());
 const completedTasksCount = computed(() => recentTasks.value.filter(t => t.completed).length);
+
+const routeEarnings = computed(() => {
+  if (!stationResult.value || !previousStats.value) return null;
+
+  const stationScore = stationResult.value.stationScore || 0;
+  const newTotalScore = stats.totalScore;
+  const prevTotalScore = previousStats.value.totalScore;
+  const scoreGained = newTotalScore - prevTotalScore;
+
+  const newTotalStars = scoreManager.getTotalStars();
+  const prevTotalStars = previousStats.value.totalStars;
+  const starsGained = newTotalStars - prevTotalStars;
+
+  const newUnlockedStations = scoreManager.unlockedStations.filter(
+    id => !previousStats.value.unlockedStations.includes(id)
+  );
+  const newUnlockedSkins = scoreManager.unlockedSkins.filter(
+    id => !previousStats.value.unlockedSkins.includes(id)
+  );
+
+  const newMaxCombo = stats.maxCombo > previousStats.value.maxCombo;
+  const comboGained = newMaxCombo ? stats.maxCombo - previousStats.value.maxCombo : 0;
+
+  const newPerfectCount = stats.perfectCount - previousStats.value.perfectCount;
+
+  const milestones = stationResult.value.stationRecord?.milestones || [];
+  const milestoneBonus = milestones.reduce((sum, m) => sum + (m.bonus || 0), 0);
+
+  const graffitiScore = stationResult.value.stationRecord?.graffiti?.score || 0;
+  const patrolScore = stationResult.value.stationRecord?.patrol?.score || 0;
+
+  const newlyCompletedTasks = [];
+  if (previousStats.value) {
+    const prevTasks = previousStats.value.recentTasks || [];
+    const currentTasks = recentTasks.value;
+    currentTasks.forEach(task => {
+      const prevTask = prevTasks.find(t => t.id === task.id);
+      if (task.completed && prevTask && !prevTask.completed) {
+        newlyCompletedTasks.push(task);
+      }
+    });
+  }
+
+  return {
+    stationScore,
+    scoreGained,
+    prevTotalScore,
+    newTotalScore,
+    starsGained,
+    prevTotalStars,
+    newTotalStars,
+    newUnlockedStations,
+    newUnlockedSkins,
+    newMaxCombo,
+    comboGained,
+    newPerfectCount,
+    milestones,
+    milestoneBonus,
+    graffitiScore,
+    patrolScore,
+    newlyCompletedTasks,
+    isFirstClear: stationResult.value.stationRecord?.isFirstClear,
+    isNewHigh: stationResult.value.isNewStationHigh
+  };
+});
+
+function getUnlockedStationName(stationId) {
+  for (const line of LINES) {
+    const station = line.stations.find(s => s.id === stationId);
+    if (station) return station.name;
+  }
+  return stationId;
+}
+
+function getSkinName(skinId) {
+  const skin = GAME_CONFIG.skins.find(s => s.id === skinId);
+  return skin ? skin.name : skinId;
+}
+
 function refreshStats() {
  Object.assign(stats, scoreManager.getStats());
  gameHistory.value = scoreManager.getGameHistory();
@@ -218,23 +298,33 @@ function onScoreUpdate(points, type) {
 function onStateChange(state, data) {
  currentState.value = state;
  if (state === GameState.GRAFFITI || state === GameState.PATROL) {
- phaseInfo.value = data;
- if (data?.line) {
-   currentLine.value = data.line;
- }
+   phaseInfo.value = data;
+   if (data?.line) {
+     currentLine.value = data.line;
+   }
  }
  else if (state === GameState.GAME_OVER) {
- gameResult.value = data;
- refreshStats();
+   gameResult.value = data;
+   refreshStats();
  }
  else if (state === GameState.STATION_COMPLETE) {
- stationResult.value = data;
- if (data?.line) {
-   currentLine.value = data.line;
- }
+   previousStats.value = {
+     totalScore: stats.totalScore,
+     totalStars: scoreManager.getTotalStars(),
+     unlockedStations: [...scoreManager.unlockedStations],
+     unlockedSkins: [...scoreManager.unlockedSkins],
+     maxCombo: stats.maxCombo,
+     perfectCount: stats.perfectCount,
+     recentTasks: JSON.parse(JSON.stringify(recentTasks.value))
+   };
+   stationResult.value = data;
+   if (data?.line) {
+     currentLine.value = data.line;
+   }
+   refreshStats();
  }
  else if (state === GameState.MAP) {
- currentLine.value = null;
+   currentLine.value = null;
  }
 }
 function onTick() {
@@ -1252,17 +1342,180 @@ onUnmounted(() => {
             </div>
           </div>
 
-          <div :style="{ background: `linear-gradient(135deg, ${currentTheme.ui.glowColor}, rgba(52, 152, 219, 0.1))`, borderColor: `${currentTheme.ui.primary}4d` }" style="border-radius: 16px; padding: 24px; border: 2px solid rgba(46, 204, 113, 0.3);">
+          <div :style="{ background: `linear-gradient(135deg, ${currentTheme.ui.glowColor}, rgba(52, 152, 219, 0.1))`, borderColor: `${currentTheme.ui.primary}4d` }" style="border-radius: 16px; padding: 24px; border: 2px solid rgba(46, 204, 113, 0.3); margin-bottom: 16px;">
             <div style="text-align: center;">
-              <div style="font-size: 16px; opacity: 0.7; margin-bottom: 8px;">当前得分</div>
+              <div style="font-size: 16px; opacity: 0.7; margin-bottom: 8px;">本站得分</div>
               <div :style="{ color: currentTheme.ui.primary, textShadow: `0 0 30px ${currentTheme.ui.glowColor}` }" style="font-size: 56px; font-weight: 900;">
-                {{ score.toLocaleString() }}
+                +{{ (stationResult?.stationScore || 0).toLocaleString() }}
+              </div>
+              <div v-if="routeEarnings?.milestoneBonus > 0" style="margin-top: 8px; font-size: 14px; color: #f1c40f;">
+                ✨ 含连击彩蛋奖励 +{{ routeEarnings.milestoneBonus.toLocaleString() }}
               </div>
             </div>
           </div>
 
-          <div style="text-align: center; margin: 20px 0; opacity: 0.7;">
-            已完成 {{ stationResult?.stationsCompleted || 0 }} 个站点
+          <div v-if="routeEarnings" class="earnings-summary">
+            <div class="earnings-section">
+              <div class="earnings-section-title">
+                <span class="earnings-icon">🎁</span>
+                <span>本次解锁</span>
+              </div>
+              
+              <div v-if="routeEarnings.newUnlockedStations.length > 0 || routeEarnings.newUnlockedSkins.length > 0 || routeEarnings.newlyCompletedTasks.length > 0 || routeEarnings.isFirstClear || routeEarnings.isNewHigh">
+                <div v-if="routeEarnings.isFirstClear" class="unlock-item first-clear">
+                  <span class="unlock-icon">🎉</span>
+                  <div class="unlock-info">
+                    <div class="unlock-name">首次通关!</div>
+                    <div class="unlock-desc">{{ stationResult?.station?.name }} 站点首次完成</div>
+                  </div>
+                  <span class="unlock-badge">首次</span>
+                </div>
+                
+                <div v-if="routeEarnings.isNewHigh && !routeEarnings.isFirstClear" class="unlock-item new-record">
+                  <span class="unlock-icon">🏆</span>
+                  <div class="unlock-info">
+                    <div class="unlock-name">新纪录!</div>
+                    <div class="unlock-desc">{{ stationResult?.station?.name }} 最高分刷新</div>
+                  </div>
+                  <span class="unlock-badge">纪录</span>
+                </div>
+
+                <div v-for="stationId in routeEarnings.newUnlockedStations" :key="stationId" class="unlock-item station-unlock">
+                  <span class="unlock-icon">🚇</span>
+                  <div class="unlock-info">
+                    <div class="unlock-name">新站点解锁</div>
+                    <div class="unlock-desc">{{ getUnlockedStationName(stationId) }}</div>
+                  </div>
+                  <span class="unlock-badge">新</span>
+                </div>
+
+                <div v-for="skinId in routeEarnings.newUnlockedSkins" :key="skinId" class="unlock-item skin-unlock">
+                  <span class="unlock-icon">👕</span>
+                  <div class="unlock-info">
+                    <div class="unlock-name">新皮肤解锁</div>
+                    <div class="unlock-desc">{{ getSkinName(skinId) }}</div>
+                  </div>
+                  <span class="unlock-badge">新</span>
+                </div>
+
+                <div v-for="task in routeEarnings.newlyCompletedTasks" :key="task.id" class="unlock-item task-unlock">
+                  <span class="unlock-icon">{{ task.icon }}</span>
+                  <div class="unlock-info">
+                    <div class="unlock-name">任务完成</div>
+                    <div class="unlock-desc">{{ task.name }} · {{ task.description }}</div>
+                  </div>
+                  <span class="unlock-badge" :style="{ background: task.color }">✓</span>
+                </div>
+              </div>
+              
+              <div v-else class="no-unlocks">
+                <span>继续努力，更多奖励等你解锁！</span>
+              </div>
+            </div>
+
+            <div class="earnings-section">
+              <div class="earnings-section-title">
+                <span class="earnings-icon">📊</span>
+                <span>累计分数</span>
+              </div>
+              
+              <div class="score-progress">
+                <div class="score-progress-row">
+                  <span class="score-label">之前累计</span>
+                  <span class="score-value">{{ routeEarnings.prevTotalScore.toLocaleString() }}</span>
+                </div>
+                <div class="score-progress-row highlight">
+                  <span class="score-label">本次获得</span>
+                  <span class="score-value gain">+{{ routeEarnings.scoreGained.toLocaleString() }}</span>
+                </div>
+                <div class="score-progress-divider"></div>
+                <div class="score-progress-row total">
+                  <span class="score-label">最新累计</span>
+                  <span class="score-value total-value">{{ routeEarnings.newTotalScore.toLocaleString() }}</span>
+                </div>
+              </div>
+
+              <div class="score-breakdown">
+                <div class="breakdown-item">
+                  <span class="breakdown-icon">🎨</span>
+                  <span class="breakdown-label">涂鸦阶段</span>
+                  <span class="breakdown-value">{{ routeEarnings.graffitiScore.toLocaleString() }}</span>
+                </div>
+                <div class="breakdown-item">
+                  <span class="breakdown-icon">👮</span>
+                  <span class="breakdown-label">巡逻阶段</span>
+                  <span class="breakdown-value">{{ routeEarnings.patrolScore.toLocaleString() }}</span>
+                </div>
+                <div v-if="routeEarnings.milestoneBonus > 0" class="breakdown-item">
+                  <span class="breakdown-icon">✨</span>
+                  <span class="breakdown-label">彩蛋奖励</span>
+                  <span class="breakdown-value bonus">+{{ routeEarnings.milestoneBonus.toLocaleString() }}</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="earnings-section">
+              <div class="earnings-section-title">
+                <span class="earnings-icon">📈</span>
+                <span>成长变化</span>
+              </div>
+              
+              <div class="growth-grid">
+                <div class="growth-item">
+                  <div class="growth-icon">⭐</div>
+                  <div class="growth-value">
+                    <span v-if="routeEarnings.starsGained > 0" class="growth-gain">+{{ routeEarnings.starsGained }}</span>
+                    <span v-else>{{ routeEarnings.newTotalStars }}</span>
+                  </div>
+                  <div class="growth-label">星星收集</div>
+                  <div class="growth-sub">{{ routeEarnings.prevTotalStars }} → {{ routeEarnings.newTotalStars }}</div>
+                </div>
+                
+                <div class="growth-item">
+                  <div class="growth-icon">🔥</div>
+                  <div class="growth-value">
+                    <span v-if="routeEarnings.newMaxCombo" class="growth-gain">+{{ routeEarnings.comboGained }}</span>
+                    <span v-else>{{ stats.maxCombo }}</span>
+                  </div>
+                  <div class="growth-label">最大连击</div>
+                  <div class="growth-sub">{{ previousStats?.maxCombo || 0 }} → {{ stats.maxCombo }}</div>
+                </div>
+                
+                <div class="growth-item">
+                  <div class="growth-icon">✨</div>
+                  <div class="growth-value">
+                    <span v-if="routeEarnings.newPerfectCount > 0" class="growth-gain">+{{ routeEarnings.newPerfectCount }}</span>
+                    <span v-else>{{ stats.perfectCount }}</span>
+                  </div>
+                  <div class="growth-label">Perfect总数</div>
+                  <div class="growth-sub">{{ previousStats?.perfectCount || 0 }} → {{ stats.perfectCount }}</div>
+                </div>
+                
+                <div class="growth-item">
+                  <div class="growth-icon">🚇</div>
+                  <div class="growth-value">{{ stationResult?.stationsCompleted || 0 }}</div>
+                  <div class="growth-label">已完成站点</div>
+                  <div class="growth-sub">本次巡游进度</div>
+                </div>
+              </div>
+
+              <div v-if="routeEarnings.milestones.length > 0" class="milestones-earned">
+                <div class="milestones-earned-title">🏆 达成里程碑</div>
+                <div class="milestones-earned-list">
+                  <div v-for="(milestone, idx) in routeEarnings.milestones" :key="idx" class="milestone-earned-item" :class="`milestone-tier-${milestone.tier}`">
+                    <span class="milestone-earned-stars">
+                      <span v-for="i in milestone.tier" :key="i">★</span>
+                    </span>
+                    <span class="milestone-earned-name">{{ milestone.name }}</span>
+                    <span class="milestone-earned-bonus">+{{ milestone.bonus.toLocaleString() }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div style="text-align: center; margin: 16px 0; opacity: 0.7;">
+            累计星星: {{ scoreManager.getTotalStars() }}/{{ scoreManager.getMaxStars() }}
           </div>
 
           <div v-if="stationResult?.difficulty === 'hard' && stationResult?.nextDifficultyParams" style="background: rgba(233, 69, 96, 0.1); border: 1px solid rgba(233, 69, 96, 0.3); border-radius: 12px; padding: 16px; margin-bottom: 20px;">
@@ -1999,5 +2252,333 @@ onUnmounted(() => {
   flex-shrink: 0;
   min-width: 60px;
   text-align: right;
+}
+
+.earnings-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.earnings-section {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 16px;
+  padding: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.earnings-section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+  font-weight: bold;
+  color: #fff;
+  margin-bottom: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.earnings-icon {
+  font-size: 20px;
+}
+
+.unlock-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  margin-bottom: 8px;
+  border-left: 3px solid #2ecc71;
+  animation: unlockSlideIn 0.4s ease;
+}
+
+@keyframes unlockSlideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.unlock-item.first-clear {
+  border-left-color: #f1c40f;
+  background: linear-gradient(90deg, rgba(241, 196, 15, 0.15), rgba(255, 255, 255, 0.05));
+}
+
+.unlock-item.new-record {
+  border-left-color: #e94560;
+  background: linear-gradient(90deg, rgba(233, 69, 96, 0.15), rgba(255, 255, 255, 0.05));
+}
+
+.unlock-item.station-unlock {
+  border-left-color: #3498db;
+}
+
+.unlock-item.skin-unlock {
+  border-left-color: #9b59b6;
+}
+
+.unlock-icon {
+  font-size: 28px;
+  flex-shrink: 0;
+}
+
+.unlock-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.unlock-name {
+  font-size: 14px;
+  font-weight: bold;
+  color: #fff;
+  margin-bottom: 2px;
+}
+
+.unlock-desc {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.unlock-badge {
+  padding: 4px 10px;
+  background: #2ecc71;
+  color: #fff;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: bold;
+  flex-shrink: 0;
+}
+
+.unlock-item.first-clear .unlock-badge {
+  background: #f1c40f;
+}
+
+.unlock-item.new-record .unlock-badge {
+  background: #e94560;
+}
+
+.unlock-item.station-unlock .unlock-badge {
+  background: #3498db;
+}
+
+.unlock-item.skin-unlock .unlock-badge {
+  background: #9b59b6;
+}
+
+.no-unlocks {
+  text-align: center;
+  padding: 20px;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 14px;
+}
+
+.score-progress {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 12px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.score-progress-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 0;
+}
+
+.score-progress-row.highlight {
+  background: rgba(46, 204, 113, 0.1);
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin: 4px -10px;
+}
+
+.score-progress-row.total {
+  padding-top: 10px;
+  margin-top: 4px;
+}
+
+.score-label {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.score-value {
+  font-size: 16px;
+  font-weight: bold;
+  color: #fff;
+}
+
+.score-value.gain {
+  color: #2ecc71;
+}
+
+.score-value.total-value {
+  font-size: 20px;
+  color: #f1c40f;
+  text-shadow: 0 0 10px rgba(241, 196, 15, 0.5);
+}
+
+.score-progress-divider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.2);
+  margin: 4px 0;
+}
+
+.score-breakdown {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.breakdown-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 8px;
+}
+
+.breakdown-icon {
+  font-size: 18px;
+}
+
+.breakdown-label {
+  flex: 1;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.breakdown-value {
+  font-size: 14px;
+  font-weight: bold;
+  color: #fff;
+}
+
+.breakdown-value.bonus {
+  color: #f1c40f;
+}
+
+.growth-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.growth-item {
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 12px;
+  padding: 12px;
+  text-align: center;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  transition: all 0.2s ease;
+}
+
+.growth-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+  transform: translateY(-2px);
+}
+
+.growth-icon {
+  font-size: 24px;
+  margin-bottom: 4px;
+}
+
+.growth-value {
+  font-size: 22px;
+  font-weight: 900;
+  color: #fff;
+  margin-bottom: 2px;
+}
+
+.growth-gain {
+  color: #2ecc71;
+  animation: gainPulse 0.6s ease;
+}
+
+@keyframes gainPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.2); }
+}
+
+.growth-label {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.8);
+  font-weight: 500;
+  margin-bottom: 2px;
+}
+
+.growth-sub {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.milestones-earned {
+  margin-top: 8px;
+}
+
+.milestones-earned-title {
+  font-size: 14px;
+  font-weight: bold;
+  color: rgba(255, 255, 255, 0.8);
+  margin-bottom: 8px;
+  text-align: center;
+}
+
+.milestones-earned-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.milestone-earned-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: linear-gradient(90deg, rgba(241, 196, 15, 0.1), rgba(255, 255, 255, 0.02));
+  border-radius: 8px;
+  border-left: 3px solid #f1c40f;
+}
+
+.milestone-earned-item.milestone-tier-1 { border-left-color: #3498db; }
+.milestone-earned-item.milestone-tier-2 { border-left-color: #2ecc71; }
+.milestone-earned-item.milestone-tier-3 { border-left-color: #f39c12; }
+.milestone-earned-item.milestone-tier-4 { border-left-color: #e94560; }
+.milestone-earned-item.milestone-tier-5 { border-left-color: #9b59b6; }
+
+.milestone-earned-stars {
+  font-size: 12px;
+  color: #f1c40f;
+  flex-shrink: 0;
+}
+
+.milestone-earned-item.milestone-tier-1 .milestone-earned-stars { color: #3498db; }
+.milestone-earned-item.milestone-tier-2 .milestone-earned-stars { color: #2ecc71; }
+.milestone-earned-item.milestone-tier-3 .milestone-earned-stars { color: #f39c12; }
+.milestone-earned-item.milestone-tier-4 .milestone-earned-stars { color: #e94560; }
+.milestone-earned-item.milestone-tier-5 .milestone-earned-stars { color: #9b59b6; }
+
+.milestone-earned-name {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 500;
+  color: #fff;
+}
+
+.milestone-earned-bonus {
+  font-size: 13px;
+  font-weight: bold;
+  color: #f1c40f;
 }
 </style>
