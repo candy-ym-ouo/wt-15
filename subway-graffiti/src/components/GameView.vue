@@ -70,6 +70,21 @@ const nextUnlockScore = computed(() => {
  }
  return null;
 });
+
+const goalTrackingTab = ref('skin');
+
+function selectGoalTab(tab) {
+  goalTrackingTab.value = tab;
+  audioManager.playSFX('click');
+}
+
+const nextSkin = computed(() => scoreManager.getNextSkin());
+const nextStation = computed(() => {
+  const stations = scoreManager.getNextStations();
+  return stations.length > 0 ? stations[0] : null;
+});
+const recentTasks = computed(() => scoreManager.getRecentTasks());
+const completedTasksCount = computed(() => recentTasks.value.filter(t => t.completed).length);
 function refreshStats() {
  Object.assign(stats, scoreManager.getStats());
  gameHistory.value = scoreManager.getGameHistory();
@@ -575,6 +590,117 @@ onUnmounted(() => {
             <div class="stat-row">
               <span class="stat-label">👕 已解锁皮肤</span>
               <span class="stat-value">{{ unlockedSkinsCount }}/{{ totalSkinsCount }}</span>
+            </div>
+          </div>
+
+          <div class="goal-tracking-card">
+            <div class="goal-tracking-header">
+              <span class="goal-tracking-title">🎯 目标追踪</span>
+              <span class="goal-tasks-completed">{{ completedTasksCount }}/{{ recentTasks.length }} 已完成</span>
+            </div>
+
+            <div class="goal-tabs">
+              <button
+                class="goal-tab"
+                :class="{ active: goalTrackingTab === 'skin' }"
+                @click="selectGoalTab('skin')"
+              >
+                👕 下一皮肤
+              </button>
+              <button
+                class="goal-tab"
+                :class="{ active: goalTrackingTab === 'station' }"
+                @click="selectGoalTab('station')"
+              >
+                🚇 下一站点
+              </button>
+              <button
+                class="goal-tab"
+                :class="{ active: goalTrackingTab === 'tasks' }"
+                @click="selectGoalTab('tasks')"
+              >
+                ✅ 近期任务
+              </button>
+            </div>
+
+            <div class="goal-content">
+              <div v-if="goalTrackingTab === 'skin'">
+                <div v-if="nextSkin" class="goal-item">
+                  <div class="goal-item-header">
+                    <div class="goal-item-icon" :style="{ background: nextSkin.color }">👕</div>
+                    <div class="goal-item-info">
+                      <div class="goal-item-name">{{ nextSkin.name }}</div>
+                      <div class="goal-item-desc">{{ nextSkin.description }}</div>
+                    </div>
+                    <div class="goal-item-progress-text">
+                      {{ Math.round(nextSkin.progress * 100) }}%
+                    </div>
+                  </div>
+                  <div class="progress-bar">
+                    <div class="progress-fill" :style="{ width: (nextSkin.progress * 100) + '%', background: nextSkin.color }"></div>
+                  </div>
+                  <div class="goal-item-footer">
+                    <span>累计得分: {{ nextSkin.currentScore.toLocaleString() }}</span>
+                    <span v-if="nextSkin.remaining > 0">还需 {{ nextSkin.remaining.toLocaleString() }} 分</span>
+                    <span v-else style="color: #2ecc71;">🎉 已达成!</span>
+                  </div>
+                </div>
+                <div v-else class="goal-all-completed">
+                  <div class="goal-completed-icon">🎉</div>
+                  <div class="goal-completed-text">所有皮肤已解锁!</div>
+                </div>
+              </div>
+
+              <div v-if="goalTrackingTab === 'station'">
+                <div v-if="nextStation" class="goal-item">
+                  <div class="goal-item-header">
+                    <div class="goal-item-icon" :style="{ background: nextStation.lineColor }">🚇</div>
+                    <div class="goal-item-info">
+                      <div class="goal-item-name">{{ nextStation.name }}</div>
+                      <div class="goal-item-desc">{{ nextStation.lineName }} · 前置: {{ nextStation.prerequisiteName }}</div>
+                    </div>
+                    <div class="goal-item-progress-text">
+                      {{ Math.round(nextStation.progress * 100) }}%
+                    </div>
+                  </div>
+                  <div class="progress-bar">
+                    <div class="progress-fill" :style="{ width: (nextStation.progress * 100) + '%', background: nextStation.lineColor }"></div>
+                  </div>
+                  <div class="goal-item-footer">
+                    <span>前置得分: {{ nextStation.currentScore }}</span>
+                    <span v-if="nextStation.remaining > 0">还需 {{ nextStation.remaining }} 分</span>
+                    <span v-else style="color: #2ecc71;">🎉 已达成!</span>
+                  </div>
+                </div>
+                <div v-else class="goal-all-completed">
+                  <div class="goal-completed-icon">🏆</div>
+                  <div class="goal-completed-text">所有站点已解锁!</div>
+                </div>
+              </div>
+
+              <div v-if="goalTrackingTab === 'tasks'" class="tasks-list">
+                <div
+                  v-for="task in recentTasks"
+                  :key="task.id"
+                  class="task-item"
+                  :class="{ completed: task.completed }"
+                >
+                  <div class="task-icon" :style="{ background: task.color }">{{ task.icon }}</div>
+                  <div class="task-info">
+                    <div class="task-name">
+                      {{ task.name }}
+                      <span v-if="task.completed" class="task-completed-badge">✓</span>
+                    </div>
+                    <div class="task-desc">{{ task.description }}</div>
+                    <div class="task-progress-bar">
+                      <div class="task-progress-fill" :style="{ width: (task.progress * 100) + '%', background: task.color }"></div>
+                    </div>
+                  </div>
+                  <div class="task-progress-text">
+                    {{ task.current }}{{ task.unit || '' }}/{{ task.target }}{{ task.unit || '' }}
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -1597,5 +1723,246 @@ onUnmounted(() => {
 @keyframes arrivalOverlayLeave {
   0% { opacity: 1; transform: scale(1); }
   100% { opacity: 0; transform: scale(1.2) translateY(-20px); }
+}
+
+.goal-tracking-card {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 16px;
+  padding: 16px;
+  margin-bottom: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.goal-tracking-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.goal-tracking-title {
+  font-size: 16px;
+  font-weight: bold;
+  color: #fff;
+}
+
+.goal-tasks-completed {
+  font-size: 12px;
+  color: #f39c12;
+  background: rgba(243, 156, 18, 0.15);
+  padding: 4px 10px;
+  border-radius: 12px;
+}
+
+.goal-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 16px;
+  background: rgba(0, 0, 0, 0.2);
+  padding: 4px;
+  border-radius: 10px;
+}
+
+.goal-tab {
+  flex: 1;
+  padding: 8px 6px;
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-weight: 500;
+}
+
+.goal-tab:hover {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.goal-tab.active {
+  background: linear-gradient(135deg, #e94560, #ff6b6b);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(233, 69, 96, 0.3);
+}
+
+.goal-content {
+  min-height: 160px;
+}
+
+.goal-item {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  padding: 14px;
+}
+
+.goal-item-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.goal-item-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.goal-item-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.goal-item-name {
+  font-size: 15px;
+  font-weight: bold;
+  color: #fff;
+  margin-bottom: 2px;
+}
+
+.goal-item-desc {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.6);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.goal-item-progress-text {
+  font-size: 18px;
+  font-weight: bold;
+  color: #e94560;
+  flex-shrink: 0;
+}
+
+.progress-bar {
+  height: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 10px;
+}
+
+.progress-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.5s ease;
+  box-shadow: 0 0 10px currentColor;
+}
+
+.goal-item-footer {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.goal-all-completed {
+  text-align: center;
+  padding: 30px 20px;
+}
+
+.goal-completed-icon {
+  font-size: 48px;
+  margin-bottom: 8px;
+}
+
+.goal-completed-text {
+  font-size: 16px;
+  color: #2ecc71;
+  font-weight: bold;
+}
+
+.tasks-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.task-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
+  padding: 10px;
+  transition: all 0.2s ease;
+}
+
+.task-item.completed {
+  opacity: 0.7;
+}
+
+.task-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.task-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.task-name {
+  font-size: 13px;
+  font-weight: bold;
+  color: #fff;
+  margin-bottom: 2px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.task-completed-badge {
+  background: #2ecc71;
+  color: #fff;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+}
+
+.task-desc {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.5);
+  margin-bottom: 6px;
+}
+
+.task-progress-bar {
+  height: 5px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.task-progress-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.task-progress-text {
+  font-size: 12px;
+  font-weight: bold;
+  color: rgba(255, 255, 255, 0.8);
+  flex-shrink: 0;
+  min-width: 60px;
+  text-align: right;
 }
 </style>

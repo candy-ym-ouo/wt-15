@@ -743,6 +743,109 @@ class ScoreManager {
     return effects.audio
   }
 
+  getNextSkin() {
+    for (const skin of GAME_CONFIG.skins) {
+      if (!this.unlockedSkins.includes(skin.id)) {
+        return {
+          ...skin,
+          currentScore: this.totalScore,
+          requiredScore: skin.unlockScore,
+          remaining: Math.max(0, skin.unlockScore - this.totalScore),
+          progress: Math.min(1, this.totalScore / skin.unlockScore)
+        }
+      }
+    }
+    return null
+  }
+
+  getNextStations() {
+    const nextStations = []
+    for (const line of LINES) {
+      for (const station of line.stations) {
+        if (!this.unlockedStations.includes(station.id) && station.unlockCondition?.type === 'score') {
+          const prereqScore = this.getStationScore(station.unlockCondition.prerequisite)
+          const prereqStation = this._findStationById(station.unlockCondition.prerequisite)
+          nextStations.push({
+            ...station,
+            lineName: line.name,
+            lineColor: line.color,
+            prerequisiteName: prereqStation?.name || station.unlockCondition.prerequisite,
+            currentScore: prereqScore,
+            requiredScore: station.unlockCondition.minScore,
+            remaining: Math.max(0, station.unlockCondition.minScore - prereqScore),
+            progress: Math.min(1, prereqScore / station.unlockCondition.minScore)
+          })
+        }
+      }
+    }
+    nextStations.sort((a, b) => a.progress - b.progress)
+    return nextStations
+  }
+
+  getRecentTasks() {
+    const tasks = []
+    const totalHits = this.perfectCount + this.goodCount + this.missCount
+
+    tasks.push({
+      id: 'perfect_50',
+      name: '完美达人',
+      description: '累计 50 次 Perfect',
+      icon: '✨',
+      current: this.perfectCount,
+      target: 50,
+      progress: Math.min(1, this.perfectCount / 50),
+      completed: this.perfectCount >= 50,
+      color: '#2ecc71'
+    })
+
+    tasks.push({
+      id: 'combo_25',
+      name: '连击高手',
+      description: '达成 25 连击',
+      icon: '🔥',
+      current: this.maxCombo,
+      target: 25,
+      progress: Math.min(1, this.maxCombo / 25),
+      completed: this.maxCombo >= 25,
+      color: '#f39c12'
+    })
+
+    tasks.push({
+      id: 'stations_5',
+      name: '线路探索者',
+      description: '解锁 5 个站点',
+      icon: '🚇',
+      current: this.unlockedStations.length,
+      target: 5,
+      progress: Math.min(1, this.unlockedStations.length / 5),
+      completed: this.unlockedStations.length >= 5,
+      color: '#3498db'
+    })
+
+    tasks.push({
+      id: 'accuracy_80',
+      name: '神射手',
+      description: '命中率达到 80%',
+      icon: '🎯',
+      current: totalHits > 0 ? Math.round((this.perfectCount + this.goodCount) / totalHits * 100) : 0,
+      target: 80,
+      progress: Math.min(1, totalHits > 0 ? ((this.perfectCount + this.goodCount) / totalHits) / 0.8 : 0),
+      completed: totalHits > 0 && ((this.perfectCount + this.goodCount) / totalHits) >= 0.8,
+      unit: '%',
+      color: '#9b59b6'
+    })
+
+    return tasks
+  }
+
+  getGoalTrackingData() {
+    return {
+      nextSkin: this.getNextSkin(),
+      nextStations: this.getNextStations(),
+      recentTasks: this.getRecentTasks()
+    }
+  }
+
   getStats() {
     return {
       highScore: this.highScore,
