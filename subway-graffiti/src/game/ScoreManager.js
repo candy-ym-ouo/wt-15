@@ -1,6 +1,18 @@
 import { GAME_CONFIG, LINES } from './config.js'
 
 const STORAGE_KEY = 'subway_graffiti_save'
+const SAVE_VERSION = 2
+
+const FAIL_REASONS = {
+  CAUGHT_TOO_MANY: 'caught_too_many',
+  LOW_ACCURACY: 'low_accuracy',
+  TIMEOUT: 'timeout',
+  MANUAL_ABORT: 'manual_abort',
+  LOW_SCORE: 'low_score',
+  OTHER: 'other'
+}
+
+export { FAIL_REASONS }
 
 class ScoreManager {
   constructor() {
@@ -20,7 +32,84 @@ class ScoreManager {
     this.stationScores = {}
     this.difficulty = 'normal'
     this.scoreMultiplier = 1
+
+    this.totalMilestones = 0
+    this.totalMilestoneBonus = 0
+    this.gameHistory = []
+    this.missSources = { timeout: 0, early: 0, late: 0 }
+    this.caughtLocations = []
+
+    this.currentStationId = null
+    this.stationMaxCombo = 0
+    this.stationPerfectCount = 0
+    this.stationGoodCount = 0
+    this.stationMissCount = 0
+    this.stationCaughtCount = 0
+    this.stationStartScore = 0
+    this.stationMilestoneBonus = 0
+    this.stationMissSources = { timeout: 0, early: 0, late: 0 }
+    this.stationCaughtLocations = []
+    this.stationMilestones = []
+    this.currentGameStations = []
+    this.currentGamePhaseBreakdown = {
+      graffiti: { score: 0, perfect: 0, good: 0, miss: 0, milestoneBonus: 0 },
+      patrol: { score: 0, caught: 0 }
+    }
+    this.maxPerfectStreak = 0
+    this.currentPerfectStreak = 0
+    this.currentPhaseType = null
+
+    this.MILESTONE_TIERS = [
+      { combo: 10, name: '新手连击', bonus: 200, color: '#3498db', tier: 1, particles: { count: { 1: 30, 2: 50, 3: 80, 4: 120, 5: 200 } }, screenShake: { 1: 5, 2: 10, 3: 15, 4: 25, 5: 40 } },
+      { combo: 25, name: '高手连击', bonus: 600, color: '#2ecc71', tier: 2, particles: { count: { 1: 30, 2: 50, 3: 80, 4: 120, 5: 200 } }, screenShake: { 1: 5, 2: 10, 3: 15, 4: 25, 5: 40 } },
+      { combo: 50, name: '大师连击', bonus: 1500, color: '#f39c12', tier: 3, particles: { count: { 1: 30, 2: 50, 3: 80, 4: 120, 5: 200 } }, screenShake: { 1: 5, 2: 10, 3: 15, 4: 25, 5: 40 } },
+      { combo: 80, name: '传奇连击', bonus: 3500, color: '#e94560', tier: 4, particles: { count: { 1: 30, 2: 50, 3: 80, 4: 120, 5: 200 } }, screenShake: { 1: 5, 2: 10, 3: 15, 4: 25, 5: 40 } },
+      { combo: 120, name: '神话连击', bonus: 8000, color: '#9b59b6', tier: 5, particles: { count: { 1: 30, 2: 50, 3: 80, 4: 120, 5: 200 } }, screenShake: { 1: 5, 2: 10, 3: 15, 4: 25, 5: 40 } }
+    ]
+
     this.load()
+  }
+
+  _migrateStationScores(oldStationScores) {
+    const migrated = {}
+    if (!oldStationScores) return migrated
+    for (const [id, val] of Object.entries(oldStationScores)) {
+      if (typeof val === 'number') {
+        migrated[id] = {
+          highScore: val,
+          bestCombo: 0,
+          firstClearAt: val > 0 ? Date.now() : null,
+          lastPlayedAt: val > 0 ? Date.now() : null,
+          lastFailReason: null,
+          playCount: val > 0 ? 1 : 0,
+          clearCount: val > 0 ? 1 : 0,
+          stars: this._calculateStars(val, id)
+        }
+      } else if (val && typeof val === 'object') {
+        migrated[id] = {
+          highScore: val.highScore || 0,
+          bestCombo: val.bestCombo || 0,
+          firstClearAt: val.firstClearAt || (val.highScore > 0 ? Date.now() : null),
+          lastPlayedAt: val.lastPlayedAt || (val.highScore > 0 ? Date.now() : null),
+          lastFailReason: val.lastFailReason || null,
+          playCount: val.playCount || (val.highScore > 0 ? 1 : 0),
+          clearCount: val.clearCount || (val.highScore > 0 ? 1 : 0),
+          stars: val.stars || this._calculateStars(val.highScore || 0, id)
+        }
+      }
+    }
+    return migrated
+  }
+
+  _calculateStars(score, stationId) {
+    const station = this._findStationById(stationId)
+    const minScore = station?.unlockCondition?.minScore || 500
+    if (score <= 0) return 0
+    if (score >= minScore * 3) return 5
+    if (score >= minScore * 2) return 4
+    if (score >= minScore * 1.5) return 3
+    if (score >= minScore) return 2
+    return 1
   }
 
   load() {
@@ -39,7 +128,12 @@ class ScoreManager {
         this.unlockedSkins = saved.unlockedSkins || ['default']
         this.selectedSkin = saved.selectedSkin || 'default'
         this.unlockedStations = saved.unlockedStations || ['s1-1', 's2-1']
-        this.stationScores = saved.stationScores || {}
+        this.stationScores = this._migrateStationScores(saved.stationScores || {})
+        this.totalMilestones = saved.totalMilestones || 0
+        this.totalMilestoneBonus = saved.totalMilestoneBonus || 0
+        this.gameHistory = saved.gameHistory || []
+        this.missSources = saved.missSources || { timeout: 0, early: 0, late: 0 }
+        this.caughtLocations = saved.caughtLocations || []
       }
     } catch (e) {
       console.warn('读取存档失败:', e)
@@ -49,6 +143,7 @@ class ScoreManager {
   save() {
     try {
       const data = {
+        version: SAVE_VERSION,
         highScore: this.highScore,
         totalScore: this.totalScore,
         maxCombo: this.maxCombo,
@@ -60,7 +155,12 @@ class ScoreManager {
         unlockedSkins: this.unlockedSkins,
         selectedSkin: this.selectedSkin,
         unlockedStations: this.unlockedStations,
-        stationScores: this.stationScores
+        stationScores: this.stationScores,
+        totalMilestones: this.totalMilestones,
+        totalMilestoneBonus: this.totalMilestoneBonus,
+        gameHistory: this.gameHistory,
+        missSources: this.missSources,
+        caughtLocations: this.caughtLocations
       }
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
     } catch (e) {
@@ -73,34 +173,93 @@ class ScoreManager {
     this.combo = 0
     this.difficulty = difficulty
     this.scoreMultiplier = scoreMultiplier
+    this.currentGameStations = []
+    this.currentGamePhaseBreakdown = {
+      graffiti: { score: 0, perfect: 0, good: 0, miss: 0, milestoneBonus: 0 },
+      patrol: { score: 0, caught: 0 }
+    }
+    this.maxPerfectStreak = 0
+    this.currentPerfectStreak = 0
+  }
+
+  startStation(station) {
+    this.currentStationId = station?.id || null
+    this.stationMaxCombo = 0
+    this.stationPerfectCount = 0
+    this.stationGoodCount = 0
+    this.stationMissCount = 0
+    this.stationCaughtCount = 0
+    this.stationStartScore = this.currentScore
+    this.stationMilestoneBonus = 0
+    this.stationMissSources = { timeout: 0, early: 0, late: 0 }
+    this.stationCaughtLocations = []
+    this.stationMilestones = []
+    this.currentPhaseType = null
+  }
+
+  setPhaseType(type) {
+    this.currentPhaseType = type
   }
 
   setScoreMultiplier(multiplier) {
     this.scoreMultiplier = multiplier
   }
 
-  addScore(type) {
+  addScore(type, extra = {}) {
     let points = 0
     switch (type) {
       case 'perfect':
         points = GAME_CONFIG.graffiti.perfectScore
         this.combo++
         this.perfectCount++
+        this.stationPerfectCount++
+        this.currentPerfectStreak++
+        if (this.currentPerfectStreak > this.maxPerfectStreak) {
+          this.maxPerfectStreak = this.currentPerfectStreak
+        }
+        if (this.currentPhaseType === 'graffiti') {
+          this.currentGamePhaseBreakdown.graffiti.perfect++
+        }
         break
       case 'good':
         points = GAME_CONFIG.graffiti.goodScore
         this.combo++
         this.goodCount++
+        this.stationGoodCount++
+        this.currentPerfectStreak = 0
+        if (this.currentPhaseType === 'graffiti') {
+          this.currentGamePhaseBreakdown.graffiti.good++
+        }
         break
       case 'miss':
         points = GAME_CONFIG.graffiti.missScore
         this.combo = 0
         this.missCount++
+        this.stationMissCount++
+        this.currentPerfectStreak = 0
+        const source = extra?.source || 'late'
+        if (this.missSources[source] !== undefined) {
+          this.missSources[source]++
+        }
+        if (this.stationMissSources[source] !== undefined) {
+          this.stationMissSources[source]++
+        }
+        if (this.currentPhaseType === 'graffiti') {
+          this.currentGamePhaseBreakdown.graffiti.miss++
+        }
         break
       case 'caught':
         points = -GAME_CONFIG.patrol.caughtPenalty
         this.combo = 0
         this.caughtCount++
+        this.stationCaughtCount++
+        this.currentPerfectStreak = 0
+        const locData = { x: extra?.x ?? GAME_CONFIG.width / 2, y: extra?.y ?? GAME_CONFIG.height / 2, source: extra?.source || 'other' }
+        this.caughtLocations.push(locData)
+        this.stationCaughtLocations.push(locData)
+        if (this.currentPhaseType === 'patrol') {
+          this.currentGamePhaseBreakdown.patrol.caught++
+        }
         break
     }
 
@@ -118,8 +277,69 @@ class ScoreManager {
     if (this.combo > this.maxCombo) {
       this.maxCombo = this.combo
     }
+    if (this.combo > this.stationMaxCombo) {
+      this.stationMaxCombo = this.combo
+    }
+
+    if (this.currentPhaseType === 'graffiti') {
+      this.currentGamePhaseBreakdown.graffiti.score += points
+    } else if (this.currentPhaseType === 'patrol') {
+      this.currentGamePhaseBreakdown.patrol.score += points
+    }
 
     return points
+  }
+
+  checkComboMilestone() {
+    for (let i = this.MILESTONE_TIERS.length - 1; i >= 0; i--) {
+      const m = this.MILESTONE_TIERS[i]
+      if (this.combo === m.combo) {
+        return { ...m }
+      }
+      if (this.combo > m.combo && i === this.MILESTONE_TIERS.length - 1) {
+        const multiplier = Math.floor(this.combo / m.combo)
+        if (this.combo === m.combo * multiplier) {
+          return {
+            ...m,
+            combo: this.combo,
+            bonus: m.bonus * multiplier,
+            name: `${m.name} x${multiplier}`
+          }
+        }
+      }
+    }
+    return null
+  }
+
+  applyMilestoneBonus(milestone) {
+    if (!milestone) return 0
+    let bonus = milestone.bonus
+    if (this.scoreMultiplier > 1) {
+      bonus = Math.floor(bonus * this.scoreMultiplier)
+    }
+    this.currentScore += bonus
+    this.totalMilestoneBonus += bonus
+    this.totalMilestones++
+    this.stationMilestoneBonus += bonus
+    if (this.currentPhaseType === 'graffiti') {
+      this.currentGamePhaseBreakdown.graffiti.milestoneBonus += bonus
+    }
+    this.stationMilestones.push({
+      name: milestone.name,
+      combo: milestone.combo,
+      bonus: bonus,
+      tier: milestone.tier
+    })
+    return bonus
+  }
+
+  getSkinMilestone() {
+    const skinEffects = this.getSkinEffects()
+    const defaultMilestone = this.MILESTONE_TIERS[0]
+    return {
+      particles: skinEffects?.milestoneParticles || defaultMilestone.particles,
+      screenShake: skinEffects?.milestoneShake || defaultMilestone.screenShake
+    }
   }
 
   endGame() {
@@ -129,6 +349,32 @@ class ScoreManager {
     if (isNewHigh) {
       this.highScore = this.currentScore
     }
+
+    const gameRecord = {
+      id: `g_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+      timestamp: Date.now(),
+      score: this.currentScore,
+      isNewHigh,
+      difficulty: this.difficulty,
+      maxCombo: this.maxCombo,
+      stations: this.currentGameStations.map(s => ({ ...s })),
+      phaseBreakdown: JSON.parse(JSON.stringify(this.currentGamePhaseBreakdown)),
+      milestones: this.currentGameStations.flatMap(s => s.milestones || []),
+      maxPerfectStreak: this.maxPerfectStreak,
+      missSources: this.currentGameStations.reduce((acc, s) => {
+        if (s.missSources) {
+          for (const k of Object.keys(s.missSources)) acc[k] = (acc[k] || 0) + s.missSources[k]
+        }
+        return acc
+      }, { timeout: 0, early: 0, late: 0 }),
+      caughtLocations: this.currentGameStations.flatMap(s => s.caughtLocations || [])
+    }
+
+    this.gameHistory.unshift(gameRecord)
+    if (this.gameHistory.length > 50) {
+      this.gameHistory = this.gameHistory.slice(0, 50)
+    }
+
     this.checkUnlocks()
     this.save()
     return {
@@ -137,13 +383,231 @@ class ScoreManager {
     }
   }
 
+  getGameHistory() {
+    return this.gameHistory
+  }
+
+  getScoreTrend(limit = 10) {
+    return this.gameHistory.slice(0, limit).reverse().map(g => ({
+      score: g.score,
+      timestamp: g.timestamp,
+      difficulty: g.difficulty
+    }))
+  }
+
+  getMissSourceStats() {
+    return this.missSources
+  }
+
+  getCaughtLocationStats() {
+    const buckets = { topLeft: 0, topRight: 0, bottomLeft: 0, bottomRight: 0, center: 0, other: 0 }
+    const sources = { vision: 0, collision: 0, laser: 0, other: 0 }
+    this.caughtLocations.forEach(loc => {
+      const x = loc.x || GAME_CONFIG.width / 2
+      const y = loc.y || GAME_CONFIG.height / 2
+      if (x < 250 && y < GAME_CONFIG.height / 3) buckets.topLeft++
+      else if (x >= 500 && y < GAME_CONFIG.height / 3) buckets.topRight++
+      else if (x < 250 && y >= (GAME_CONFIG.height * 2) / 3) buckets.bottomLeft++
+      else if (x >= 500 && y >= (GAME_CONFIG.height * 2) / 3) buckets.bottomRight++
+      else if (x >= 250 && x < 500 && y >= GAME_CONFIG.height / 3 && y < (GAME_CONFIG.height * 2) / 3) buckets.center++
+      else buckets.other++
+
+      if (loc.source && sources[loc.source] !== undefined) {
+        sources[loc.source]++
+      } else {
+        sources.other++
+      }
+    })
+    return { locations: buckets, sources }
+  }
+
+  getTotalStars() {
+    return Object.values(this.stationScores).reduce((sum, s) => sum + (s.stars || 0), 0)
+  }
+
+  getMaxStars() {
+    let total = 0
+    for (const line of LINES) {
+      total += line.stations.length * 5
+    }
+    return total
+  }
+
+  getStationInfo(stationId) {
+    const info = this.stationScores[stationId]
+    if (!info) {
+      return {
+        highScore: 0,
+        bestCombo: 0,
+        firstClearAt: null,
+        lastPlayedAt: null,
+        lastFailReason: null,
+        playCount: 0,
+        clearCount: 0,
+        stars: 0
+      }
+    }
+    return { ...info }
+  }
+
   getStationScore(stationId) {
-    return this.stationScores[stationId] || 0
+    return this.stationScores[stationId]?.highScore || 0
+  }
+
+  getStationBestCombo(stationId) {
+    return this.stationScores[stationId]?.bestCombo || 0
+  }
+
+  isStationFirstClear(stationId) {
+    return !!this.stationScores[stationId]?.firstClearAt
+  }
+
+  getStationLastFailReason(stationId) {
+    return this.stationScores[stationId]?.lastFailReason || null
+  }
+
+  _determineFailReason(stationScore, stationId) {
+    const station = this._findStationById(stationId)
+    const minScore = station?.unlockCondition?.minScore || 500
+
+    if (this.stationCaughtCount >= 5) {
+      return FAIL_REASONS.CAUGHT_TOO_MANY
+    }
+    const totalHits = this.stationPerfectCount + this.stationGoodCount + this.stationMissCount
+    if (totalHits > 0) {
+      const hitRate = (this.stationPerfectCount + this.stationGoodCount) / totalHits
+      if (hitRate < 0.4) {
+        return FAIL_REASONS.LOW_ACCURACY
+      }
+    }
+    if (stationScore < minScore * 0.5) {
+      return FAIL_REASONS.LOW_SCORE
+    }
+    return null
+  }
+
+  updateStationResult(stationId, stationScore, options = {}) {
+    if (!this.stationScores[stationId]) {
+      this.stationScores[stationId] = {
+        highScore: 0,
+        bestCombo: 0,
+        firstClearAt: null,
+        lastPlayedAt: null,
+        lastFailReason: null,
+        playCount: 0,
+        clearCount: 0,
+        stars: 0
+      }
+    }
+
+    const entry = this.stationScores[stationId]
+    const station = this._findStationById(stationId)
+    const minScore = station?.unlockCondition?.minScore || 500
+
+    entry.playCount = (entry.playCount || 0) + 1
+    entry.lastPlayedAt = Date.now()
+
+    const isSuccess = stationScore >= minScore || options.forceSuccess
+
+    let isNewHigh = false
+    if (stationScore > (entry.highScore || 0)) {
+      entry.highScore = stationScore
+      isNewHigh = true
+    }
+
+    if (this.stationMaxCombo > (entry.bestCombo || 0)) {
+      entry.bestCombo = this.stationMaxCombo
+    }
+
+    if (isSuccess && !entry.firstClearAt) {
+      entry.firstClearAt = Date.now()
+      entry.clearCount = 1
+    } else if (isSuccess) {
+      entry.clearCount = (entry.clearCount || 0) + 1
+    }
+
+    if (!isSuccess && !options.aborted) {
+      const failReason = options.failReason || this._determineFailReason(stationScore, stationId)
+      if (failReason) {
+        entry.lastFailReason = {
+          reason: failReason,
+          score: stationScore,
+          timestamp: Date.now(),
+          details: {
+            misses: this.stationMissCount,
+            caught: this.stationCaughtCount,
+            combo: this.stationMaxCombo
+          }
+        }
+      }
+    } else if (isSuccess) {
+      entry.lastFailReason = null
+    } else if (options.aborted) {
+      entry.lastFailReason = {
+        reason: FAIL_REASONS.MANUAL_ABORT,
+        score: stationScore,
+        timestamp: Date.now(),
+        details: {
+          misses: this.stationMissCount,
+          caught: this.stationCaughtCount,
+          combo: this.stationMaxCombo
+        }
+      }
+    }
+
+    if (isSuccess) {
+      entry.stars = Math.max(entry.stars || 0, this._calculateStars(stationScore, stationId))
+    }
+
+    const stationRecord = {
+      id: stationId,
+      name: station?.name || stationId,
+      score: stationScore,
+      bestCombo: this.stationMaxCombo,
+      graffiti: {
+        score: this.currentGamePhaseBreakdown.graffiti.score,
+        perfect: this.stationPerfectCount,
+        good: this.stationGoodCount,
+        miss: this.stationMissCount,
+        milestoneBonus: this.stationMilestoneBonus
+      },
+      patrol: {
+        score: this.currentGamePhaseBreakdown.patrol.score,
+        caught: this.stationCaughtCount
+      },
+      milestones: [...this.stationMilestones],
+      missSources: { ...this.stationMissSources },
+      caughtLocations: [...this.stationCaughtLocations],
+      stars: entry.stars,
+      isFirstClear: isSuccess && entry.clearCount === 1,
+      isNewHigh
+    }
+    this.currentGameStations.push(stationRecord)
+
+    this.currentGamePhaseBreakdown = {
+      graffiti: { score: 0, perfect: 0, good: 0, miss: 0, milestoneBonus: 0 },
+      patrol: { score: 0, caught: 0 }
+    }
+
+    return { isNewHigh, stationRecord }
   }
 
   setStationScore(stationId, score) {
-    if (score > (this.stationScores[stationId] || 0)) {
-      this.stationScores[stationId] = score
+    if (!this.stationScores[stationId]) {
+      this.stationScores[stationId] = {
+        highScore: 0,
+        bestCombo: 0,
+        firstClearAt: null,
+        lastPlayedAt: null,
+        lastFailReason: null,
+        playCount: 0,
+        clearCount: 0,
+        stars: 0
+      }
+    }
+    if (score > (this.stationScores[stationId].highScore || 0)) {
+      this.stationScores[stationId].highScore = score
+      this.stationScores[stationId].stars = this._calculateStars(score, stationId)
       return true
     }
     return false
@@ -289,9 +753,56 @@ class ScoreManager {
       goodCount: this.goodCount,
       missCount: this.missCount,
       caughtCount: this.caughtCount,
+      totalMilestones: this.totalMilestones,
+      totalMilestoneBonus: this.totalMilestoneBonus,
       accuracy: this.perfectCount + this.goodCount + this.missCount > 0
         ? Math.round((this.perfectCount + this.goodCount) / (this.perfectCount + this.goodCount + this.missCount) * 100)
         : 0
+    }
+  }
+
+  evaluateStation(stationId, stationScore) {
+    const station = this._findStationById(stationId)
+    const minScore = station?.unlockCondition?.minScore || 500
+    const totalHits = this.stationPerfectCount + this.stationGoodCount + this.stationMissCount
+    const hitRate = totalHits > 0
+      ? Math.round((this.stationPerfectCount + this.stationGoodCount) / totalHits * 100)
+      : 0
+
+    let stars = 0
+    let scoreRatio = stationScore / minScore
+    if (scoreRatio >= 3) stars = 5
+    else if (scoreRatio >= 2) stars = 4
+    else if (scoreRatio >= 1.5) stars = 3
+    else if (scoreRatio >= 1) stars = 2
+    else if (scoreRatio >= 0.5) stars = 1
+
+    let rank = '新手'
+    if (stars === 5) rank = '传说'
+    else if (stars === 4) rank = '大师'
+    else if (stars === 3) rank = '精英'
+    else if (stars === 2) rank = '熟练'
+    else if (stars === 1) rank = '入门'
+
+    const hasNoMisses = this.stationMissCount === 0
+    const hasNoCatches = this.stationCaughtCount === 0
+    let perfectBonus = 0
+    if (hasNoMisses) perfectBonus += 10
+    if (hasNoCatches) perfectBonus += 5
+
+    return {
+      stars,
+      rank,
+      score: stationScore,
+      details: {
+        hitRate,
+        combo: this.stationMaxCombo,
+        misses: this.stationMissCount,
+        caught: this.stationCaughtCount,
+        hasNoMisses,
+        hasNoCatches,
+        perfectBonus
+      }
     }
   }
 }

@@ -222,10 +222,12 @@ export class GameEngine {
 
       if (phase === 'graffiti') {
         this.state = GameState.GRAFFITI
+        scoreManager.setPhaseType('graffiti')
         this.graffitiGame.setDifficulty(this.currentDifficultyParams.shrinkSpeedMultiplier)
         this.graffitiGame.start(station)
       } else if (phase === 'patrol') {
         this.state = GameState.PATROL
+        scoreManager.setPhaseType('patrol')
         this.patrolGame.setDifficulty(
           this.currentDifficultyParams.patrolRangeMultiplier,
           this.currentDifficultyParams.extraGuardSpeed
@@ -257,7 +259,11 @@ export class GameEngine {
     this.stationsCompleted++
 
     const stationScore = scoreManager.currentScore - (this.stationStartScore || 0)
-    const isNewStationHigh = scoreManager.setStationScore(this.currentStation.id, stationScore)
+    const { isNewStationHigh, stationRecord } = scoreManager.updateStationResult(
+      this.currentStation.id,
+      stationScore
+    )
+    const evaluation = scoreManager.evaluateStation(this.currentStation.id, stationScore)
     const newUnlocks = scoreManager.checkStationUnlocks()
     scoreManager.save()
 
@@ -269,6 +275,8 @@ export class GameEngine {
       nextDifficultyParams: this.difficulty === 'hard' ? this.computeDifficultyParams() : null,
       stationScore,
       isNewStationHigh,
+      evaluation,
+      stationRecord,
       newUnlocks
     })
   }

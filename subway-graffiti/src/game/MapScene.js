@@ -91,6 +91,7 @@ export class MapScene {
       line.stations.forEach((station, idx) => {
         const isUnlocked = scoreManager.isStationUnlocked(station)
         const stationScore = scoreManager.getStationScore(station.id)
+        const stationInfo = scoreManager.getStationInfo(station.id)
         const unlockReq = !isUnlocked ? scoreManager.getUnlockRequirement(station) : null
 
         const stationContainer = new PIXI.Container()
@@ -143,6 +144,29 @@ export class MapScene {
           stationContainer.addChild(branchTag)
         }
 
+        if (isUnlocked && stationInfo.firstClearAt) {
+          const firstClearBadge = new PIXI.Text('🏆', { fontSize: 14 })
+          firstClearBadge.anchor.set(0.5)
+          firstClearBadge.x = station.isBranch ? 22 : 20
+          firstClearBadge.y = station.isBranch ? -22 : -18
+          stationContainer.addChild(firstClearBadge)
+        }
+
+        if (isUnlocked && stationInfo.stars > 0) {
+          const starsText = '★'.repeat(stationInfo.stars)
+          const starLabel = new PIXI.Text(starsText, {
+            fontFamily: 'Arial',
+            fontSize: 11,
+            fill: 0xf1c40f,
+            stroke: 0x000000,
+            strokeThickness: 2
+          })
+          starLabel.anchor.set(0.5)
+          starLabel.x = station.isBranch ? -22 : -20
+          starLabel.y = station.isBranch ? -22 : -18
+          stationContainer.addChild(starLabel)
+        }
+
         const label = new PIXI.Text(station.name, {
           fontFamily: 'Arial',
           fontSize: 16,
@@ -156,6 +180,7 @@ export class MapScene {
         stationContainer.addChild(label)
 
         if (isUnlocked && stationScore > 0) {
+          const extraY = idx % 2 === 0 ? 50 : -50
           const scoreLabel = new PIXI.Text(`最高分: ${stationScore}`, {
             fontFamily: 'Arial',
             fontSize: 12,
@@ -164,8 +189,35 @@ export class MapScene {
             strokeThickness: 2
           })
           scoreLabel.anchor.set(0.5)
-          scoreLabel.y = (idx % 2 === 0 ? 50 : -50) + 20
+          scoreLabel.y = extraY + 18
           stationContainer.addChild(scoreLabel)
+
+          if (stationInfo.bestCombo > 0) {
+            const comboLabel = new PIXI.Text(`🔥 连击: ${stationInfo.bestCombo}`, {
+              fontFamily: 'Arial',
+              fontSize: 11,
+              fill: 0xe94560,
+              stroke: 0x000000,
+              strokeThickness: 2
+            })
+            comboLabel.anchor.set(0.5)
+            comboLabel.y = extraY + 34
+            stationContainer.addChild(comboLabel)
+          }
+
+          if (stationInfo.lastFailReason) {
+            const failIcon = this._getFailReasonIcon(stationInfo.lastFailReason.reason)
+            const failLabel = new PIXI.Text(`${failIcon} 上次未通过`, {
+              fontFamily: 'Arial',
+              fontSize: 10,
+              fill: 0xff6b6b,
+              stroke: 0x000000,
+              strokeThickness: 2
+            })
+            failLabel.anchor.set(0.5)
+            failLabel.y = extraY + (stationInfo.bestCombo > 0 ? 50 : 48)
+            stationContainer.addChild(failLabel)
+          }
         }
 
         if (!isUnlocked) {
@@ -797,6 +849,7 @@ export class MapScene {
       line.stations.forEach((station, idx) => {
         const isUnlocked = scoreManager.isStationUnlocked(station)
         const stationScore = scoreManager.getStationScore(station.id)
+        const stationInfo = scoreManager.getStationInfo(station.id)
         const unlockReq = !isUnlocked ? scoreManager.getUnlockRequirement(station) : null
 
         const stationContainer = new PIXI.Container()
@@ -849,6 +902,29 @@ export class MapScene {
           stationContainer.addChild(branchTag)
         }
 
+        if (isUnlocked && stationInfo.firstClearAt) {
+          const firstClearBadge = new PIXI.Text('🏆', { fontSize: 14 })
+          firstClearBadge.anchor.set(0.5)
+          firstClearBadge.x = station.isBranch ? 22 : 20
+          firstClearBadge.y = station.isBranch ? -22 : -18
+          stationContainer.addChild(firstClearBadge)
+        }
+
+        if (isUnlocked && stationInfo.stars > 0) {
+          const starsText = '★'.repeat(stationInfo.stars)
+          const starLabel = new PIXI.Text(starsText, {
+            fontFamily: 'Arial',
+            fontSize: 11,
+            fill: 0xf1c40f,
+            stroke: 0x000000,
+            strokeThickness: 2
+          })
+          starLabel.anchor.set(0.5)
+          starLabel.x = station.isBranch ? -22 : -20
+          starLabel.y = station.isBranch ? -22 : -18
+          stationContainer.addChild(starLabel)
+        }
+
         const label = new PIXI.Text(station.name, {
           fontFamily: 'Arial',
           fontSize: 16,
@@ -862,6 +938,7 @@ export class MapScene {
         stationContainer.addChild(label)
 
         if (isUnlocked && stationScore > 0) {
+          const extraY = idx % 2 === 0 ? 50 : -50
           const scoreLabel = new PIXI.Text(`最高分: ${stationScore}`, {
             fontFamily: 'Arial',
             fontSize: 12,
@@ -870,8 +947,35 @@ export class MapScene {
             strokeThickness: 2
           })
           scoreLabel.anchor.set(0.5)
-          scoreLabel.y = (idx % 2 === 0 ? 50 : -50) + 20
+          scoreLabel.y = extraY + 18
           stationContainer.addChild(scoreLabel)
+
+          if (stationInfo.bestCombo > 0) {
+            const comboLabel = new PIXI.Text(`🔥 连击: ${stationInfo.bestCombo}`, {
+              fontFamily: 'Arial',
+              fontSize: 11,
+              fill: 0xe94560,
+              stroke: 0x000000,
+              strokeThickness: 2
+            })
+            comboLabel.anchor.set(0.5)
+            comboLabel.y = extraY + 34
+            stationContainer.addChild(comboLabel)
+          }
+
+          if (stationInfo.lastFailReason) {
+            const failIcon = this._getFailReasonIcon(stationInfo.lastFailReason.reason)
+            const failLabel = new PIXI.Text(`${failIcon} 上次未通过`, {
+              fontFamily: 'Arial',
+              fontSize: 10,
+              fill: 0xff6b6b,
+              stroke: 0x000000,
+              strokeThickness: 2
+            })
+            failLabel.anchor.set(0.5)
+            failLabel.y = extraY + (stationInfo.bestCombo > 0 ? 50 : 48)
+            stationContainer.addChild(failLabel)
+          }
         }
 
         if (!isUnlocked) {
@@ -930,6 +1034,18 @@ export class MapScene {
     })
 
     this.updateNextGoalPreview()
+  }
+
+  _getFailReasonIcon(reason) {
+    const icons = {
+      caught_too_many: '🚨',
+      low_accuracy: '🎯',
+      timeout: '⏰',
+      manual_abort: '⏹️',
+      low_score: '📉',
+      other: '⚠️'
+    }
+    return icons[reason] || '⚠️'
   }
 
   updateNextGoalPreview() {
