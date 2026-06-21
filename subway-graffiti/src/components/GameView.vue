@@ -595,6 +595,16 @@ onUnmounted(() => {
                 <span class="stat-label">🎯 命中率</span>
                 <span class="stat-value">{{ stats.accuracy }}%</span>
               </div>
+              <div v-if="stats.totalMilestones > 0" style="margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.1);">
+                <div class="stat-row">
+                  <span class="stat-label">✨ 连击彩蛋总数</span>
+                  <span class="stat-value" style="color: #f1c40f;">{{ stats.totalMilestones }}</span>
+                </div>
+                <div class="stat-row">
+                  <span class="stat-label">💰 彩蛋奖励总分</span>
+                  <span class="stat-value" style="color: #f39c12;">+{{ stats.totalMilestoneBonus.toLocaleString() }}</span>
+                </div>
+              </div>
             </div>
 
             <div style="background: rgba(255,255,255,0.05); border-radius: 16px; padding: 20px; margin-top: 16px;">
@@ -672,6 +682,9 @@ onUnmounted(() => {
                         <span style="color: #f39c12;">Good {{ selectedGame.phaseBreakdown?.graffiti?.good || 0 }}</span>
                         <span style="color: #ff4444;">Miss {{ selectedGame.phaseBreakdown?.graffiti?.miss || 0 }}</span>
                       </div>
+                      <div v-if="selectedGame.phaseBreakdown?.graffiti?.milestoneBonus > 0" style="margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.1);">
+                        <span style="color: #f1c40f; font-size: 12px;">✨ 连击彩蛋奖励 +{{ selectedGame.phaseBreakdown.graffiti.milestoneBonus.toLocaleString() }}</span>
+                      </div>
                     </div>
                     <div class="phase-card patrol-phase">
                       <div class="phase-card-title">👮 巡逻阶段</div>
@@ -681,6 +694,29 @@ onUnmounted(() => {
                       <div class="phase-card-stats">
                         <span style="color: #e74c3c;">被抓 {{ selectedGame.phaseBreakdown?.patrol?.caught || 0 }}</span>
                         <span style="color: #3498db;">最大P连击 {{ selectedGame.maxPerfectStreak || 0 }}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div v-if="selectedGame.milestones && selectedGame.milestones.length > 0" style="margin-top: 16px;">
+                    <div style="font-size: 14px; font-weight: bold; margin-bottom: 12px; opacity: 0.8;">
+                      ✨ 达成连击里程碑
+                    </div>
+                    <div class="milestones-list">
+                      <div
+                        v-for="(milestone, mIdx) in selectedGame.milestones"
+                        :key="mIdx"
+                        class="milestone-record"
+                        :class="`milestone-tier-${milestone.tier}`"
+                      >
+                        <div class="milestone-record-stars">
+                          <span v-for="i in milestone.tier" :key="i" class="tier-star-small">★</span>
+                        </div>
+                        <div class="milestone-record-info">
+                          <div class="milestone-record-name">{{ milestone.name }}</div>
+                          <div class="milestone-record-combo">{{ milestone.combo }} 连击</div>
+                        </div>
+                        <div class="milestone-record-bonus">+{{ milestone.bonus.toLocaleString() }}</div>
                       </div>
                     </div>
                   </div>
@@ -719,6 +755,16 @@ onUnmounted(() => {
                               ></div>
                             </div>
                             <span class="station-bar-value">{{ (station.patrol?.score || 0).toLocaleString() }}</span>
+                          </div>
+                          <div v-if="station.graffiti?.milestoneBonus > 0" class="station-bar-row">
+                            <span class="station-bar-label">彩蛋</span>
+                            <div class="station-bar-track">
+                              <div
+                                class="station-bar milestone-bar"
+                                :style="{ width: Math.max(4, station.graffiti.milestoneBonus / Math.max(1, station.score) * 100) + '%' }"
+                              ></div>
+                            </div>
+                            <span class="station-bar-value" style="color: #f1c40f;">+{{ station.graffiti.milestoneBonus.toLocaleString() }}</span>
                           </div>
                         </div>
                       </div>

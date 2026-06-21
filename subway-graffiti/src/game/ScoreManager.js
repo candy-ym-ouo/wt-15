@@ -87,7 +87,7 @@ class ScoreManager {
       stations: [],
       currentStation: null,
       phaseBreakdown: {
-        graffiti: { score: 0, perfect: 0, good: 0, miss: 0 },
+        graffiti: { score: 0, perfect: 0, good: 0, miss: 0, milestoneBonus: 0 },
         patrol: { score: 0, caught: 0, escapes: 0 }
       },
       missSources: {
@@ -125,6 +125,18 @@ class ScoreManager {
     this.currentScore += bonus
     if (this.currentGameData) {
       this.currentGameData.score = this.currentScore
+      this.currentGameData.phaseBreakdown.graffiti.score += bonus
+      this.currentGameData.phaseBreakdown.graffiti.milestoneBonus = (this.currentGameData.phaseBreakdown.graffiti.milestoneBonus || 0) + bonus
+      if (!this.currentGameData.milestones) {
+        this.currentGameData.milestones = []
+      }
+      this.currentGameData.milestones.push({
+        combo: milestone.combo,
+        name: milestone.name,
+        tier: milestone.tier,
+        bonus: bonus,
+        timestamp: Date.now()
+      })
     }
     return bonus
   }
@@ -238,7 +250,7 @@ class ScoreManager {
       name: station.name,
       startScore: this.currentScore,
       phases: [],
-      graffiti: { score: 0, perfect: 0, good: 0, miss: 0 },
+      graffiti: { score: 0, perfect: 0, good: 0, miss: 0, milestoneBonus: 0 },
       patrol: { score: 0, caught: 0 }
     }
   }
@@ -261,9 +273,12 @@ class ScoreManager {
         (this.currentGameData._lastGraffitiGood || 0)
       station.graffiti.miss = this.currentGameData.phaseBreakdown.graffiti.miss -
         (this.currentGameData._lastGraffitiMiss || 0)
+      station.graffiti.milestoneBonus = (this.currentGameData.phaseBreakdown.graffiti.milestoneBonus || 0) -
+        (this.currentGameData._lastGraffitiMilestoneBonus || 0)
       this.currentGameData._lastGraffitiPerfect = this.currentGameData.phaseBreakdown.graffiti.perfect
       this.currentGameData._lastGraffitiGood = this.currentGameData.phaseBreakdown.graffiti.good
       this.currentGameData._lastGraffitiMiss = this.currentGameData.phaseBreakdown.graffiti.miss
+      this.currentGameData._lastGraffitiMilestoneBonus = this.currentGameData.phaseBreakdown.graffiti.milestoneBonus || 0
     } else if (phaseType === 'patrol') {
       station.patrol.score = phaseData.score
       station.patrol.caught = this.currentGameData.phaseBreakdown.patrol.caught -
@@ -305,6 +320,7 @@ class ScoreManager {
       delete this.currentGameData._lastGraffitiPerfect
       delete this.currentGameData._lastGraffitiGood
       delete this.currentGameData._lastGraffitiMiss
+      delete this.currentGameData._lastGraffitiMilestoneBonus
       delete this.currentGameData._lastPatrolCaught
       delete this.currentGameData.perfectStreak
       this.gameHistory.push(this.currentGameData)
@@ -463,6 +479,16 @@ class ScoreManager {
   }
 
   getStats() {
+    let totalMilestoneBonus = 0
+    let totalMilestones = 0
+    this.gameHistory.forEach(game => {
+      if (game.phaseBreakdown?.graffiti?.milestoneBonus) {
+        totalMilestoneBonus += game.phaseBreakdown.graffiti.milestoneBonus
+      }
+      if (game.milestones) {
+        totalMilestones += game.milestones.length
+      }
+    })
     return {
       highScore: this.highScore,
       totalScore: this.totalScore,
@@ -474,8 +500,35 @@ class ScoreManager {
       caughtCount: this.caughtCount,
       accuracy: this.perfectCount + this.goodCount + this.missCount > 0
         ? Math.round((this.perfectCount + this.goodCount) / (this.perfectCount + this.goodCount + this.missCount) * 100)
-        : 0
+        : 0,
+      totalMilestoneBonus,
+      totalMilestones
     }
+  }
+
+  getMilestoneStats() {
+    const stats = {
+      totalBonus: 0,
+      totalCount: 0,
+      byTier: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 },
+      latestMilestones: []
+    }
+    this.gameHistory.forEach(game => {
+      if (game.phaseBreakdown?.graffiti?.milestoneBonus) {
+        stats.totalBonus += game.phaseBreakdown.graffiti.milestoneBonus
+      }
+      if (game.milestones) {
+        stats.totalCount += game.milestones.length
+        game.milestones.forEach(m => {
+          stats.byTier[m.tier] = (stats.byTier[m.tier] || 0) + 1
+        })
+        stats.latestMilestones.push(...game.milestones)
+      }
+    })
+    stats.latestMilestones = stats.latestMilestones
+      .sort((a, b) => b.timestamp - a.timestamp)
+      .slice(0, 10)
+    return stats
   }
 
   getGameHistory() {
