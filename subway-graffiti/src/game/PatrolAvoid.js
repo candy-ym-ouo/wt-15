@@ -1517,6 +1517,13 @@ export class PatrolAvoid {
       source
     })
 
+    const rescueResult = scoreManager.rescueResult
+    if (rescueResult && rescueResult.type === 'combo_break_no_rescue' && rescueResult.preservedCombo > 0) {
+      setTimeout(() => {
+        this.showPrompt(`保底 ${rescueResult.preservedCombo} 连击!`, 0xf39c12)
+      }, 600)
+    }
+
     const caughtX = location?.x ?? this.player?.x
     const caughtY = location?.y ?? this.player?.y
 
@@ -1571,6 +1578,12 @@ export class PatrolAvoid {
 
     const remaining = Math.max(0, this.duration - this.gameTime)
     this.updateTimerBar(remaining / this.duration)
+
+    const rescueTimeout = scoreManager.updateRescueWindow(Date.now())
+    if (rescueTimeout && rescueTimeout.type === 'rescue_timeout') {
+      this.showPrompt(`救场失败!`, 0xff4444)
+      audioManager.playSFX('miss')
+    }
 
     const spawnInterval = this.getStationConfig(this.station, 'spawnInterval', GAME_CONFIG.patrol.spawnInterval)
     if (this.spawnTimer >= spawnInterval) {

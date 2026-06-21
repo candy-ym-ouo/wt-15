@@ -226,6 +226,7 @@ class ScoreManager {
     this.stationMilestones = []
     this.currentPhaseType = null
     this.stationRescueCount = 0
+    this.stationPreserveCount = 0
     this.rescueWindowActive = false
     this.rescueWindowStartTime = 0
     this.rescuePerfectStreak = 0
@@ -236,7 +237,19 @@ class ScoreManager {
   }
 
   setPhaseType(type) {
+    const prevPhase = this.currentPhaseType
     this.currentPhaseType = type
+
+    if (prevPhase === 'graffiti' && type !== 'graffiti' && this.rescueWindowActive) {
+      this.rescueWindowActive = false
+      this.rescuePerfectStreak = 0
+      this.totalRescueFail++
+      this.rescueResult = {
+        type: 'rescue_timeout',
+        lastCombo: this.lastComboBeforeBreak,
+        reason: 'phase_switch'
+      }
+    }
   }
 
   setScoreMultiplier(multiplier) {
@@ -331,6 +344,7 @@ class ScoreManager {
           this.preservedCombo = preserved
           this.combo = preserved
           this.totalPreserveTriggered++
+          this.stationPreserveCount++
 
           if (comboConfig.rescueEnabled && this.combo > 0) {
             const canRescue = this.stationRescueCount < comboConfig.rescueMaxPerStation &&
@@ -359,7 +373,6 @@ class ScoreManager {
           this.combo = 0
         }
         break
-
       case 'caught':
         points = -GAME_CONFIG.patrol.caughtPenalty
         this.caughtCount++
@@ -381,8 +394,10 @@ class ScoreManager {
           this.preservedCombo = preserved
           this.combo = preserved
           this.totalPreserveTriggered++
+          this.stationPreserveCount++
 
-          if (comboConfig.rescueEnabled && this.combo > 0) {
+          const canDoRescueWindow = this.currentPhaseType === 'graffiti'
+          if (comboConfig.rescueEnabled && this.combo > 0 && canDoRescueWindow) {
             const canRescue = this.stationRescueCount < comboConfig.rescueMaxPerStation &&
                              this.gameRescueCount < comboConfig.rescueMaxPerGame
             if (canRescue) {
@@ -403,6 +418,12 @@ class ScoreManager {
                 lastCombo: this.lastComboBeforeBreak,
                 preservedCombo: preserved
               }
+            }
+          } else if (!canDoRescueWindow) {
+            this.rescueResult = {
+              type: 'combo_break_no_rescue',
+              lastCombo: this.lastComboBeforeBreak,
+              preservedCombo: preserved
             }
           }
         } else {
@@ -535,6 +556,7 @@ class ScoreManager {
 
     const gameRescueCount = this.gameRescueCount
     const totalPreserveInGame = this.currentGameStations.reduce((acc, s) => acc + (s.preserveCount || 0), 0)
+    const totalRescueInGame = this.currentGameStations.reduce((acc, s) => acc + (s.rescueCount || 0), 0)
 
     const gameRecord = {
       id: `g_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
@@ -554,7 +576,7 @@ class ScoreManager {
         return acc
       }, { timeout: 0, early: 0, late: 0 }),
       caughtLocations: this.currentGameStations.flatMap(s => s.caughtLocations || []),
-      rescueCount: gameRescueCount,
+      rescueCount: totalRescueInGame,
       preserveCount: totalPreserveInGame
     }
 
@@ -747,10 +769,10 @@ class ScoreManager {
       entry.stars = Math.max(entry.stars || 0, this._calculateStars(stationScore, stationId))
     }
 
-    const stationPreserveCount = (entry.preserveCount || 0) + this.totalPreserveTriggered - (entry.totalPreserveCount || 0)
-    const stationRescueCount = this.stationRescueCount
-    entry.totalPreserveCount = this.totalPreserveTriggered
-    entry.totalRescueCount = (entry.totalRescueCount || 0) + stationRescueCount
+    const currentStationPreserveCount = this.stationPreserveCount
+    const currentStationRescueCount = this.stationRescueCount
+    entry.totalRescueCount = (entry.totalRescueCount || 0) + currentStationRescueCount
+    entry.totalPreserveCount = (entry.totalPreserveCount || 0) + currentStationPreserveCount
 
     const stationRecord = {
       id: stationId,
@@ -774,8 +796,8 @@ class ScoreManager {
       stars: entry.stars,
       isFirstClear: isSuccess && entry.clearCount === 1,
       isNewHigh,
-      rescueCount: stationRescueCount,
-      preserveCount: stationPreserveCount
+      rescueCount: currentStationRescueCount,
+      preserveCount: currentStationPreserveCount
     }
     this.currentGameStations.push(stationRecord)
 
