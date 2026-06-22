@@ -4,6 +4,7 @@ import { scoreManager } from './ScoreManager.js'
 import { audioManager } from './AudioManager.js'
 import { replayManager } from './ReplayManager.js'
 import { heatSystem } from './HeatSystem.js'
+import { inventoryManager } from './InventoryManager.js'
 
 export class GraffitiGame {
   constructor(app, callbacks) {
@@ -350,6 +351,7 @@ export class GraffitiGame {
     const x = padding + Math.random() * (GAME_CONFIG.width - padding * 2)
     const y = 200 + Math.random() * (GAME_CONFIG.height - 600)
 
+    const buffEffects = inventoryManager.getCombinedEffects()
     const target = new PIXI.Container()
     target.x = x
     target.y = y
@@ -357,7 +359,8 @@ export class GraffitiGame {
     const baseShrinkSpeed = this.getStationConfig(this.station, 'shrinkSpeed', GAME_CONFIG.graffiti.shrinkSpeed)
     target.shrinkSpeed = baseShrinkSpeed * this.shrinkSpeedMultiplier * (0.8 + Math.random() * 0.4)
     const customAttr = scoreManager.getSkinCustomAttributes()
-    const basePerfectRadius = this.getStationConfig(this.station, 'perfectRadius', GAME_CONFIG.graffiti.perfectRadius)
+    let basePerfectRadius = this.getStationConfig(this.station, 'perfectRadius', GAME_CONFIG.graffiti.perfectRadius)
+    basePerfectRadius = basePerfectRadius * (buffEffects.perfectRadiusMultiplier || 1)
     target.perfectRadius = basePerfectRadius + (customAttr.perfectRadiusBonus || 0)
 
     const colorStr = scoreManager.getSkinColor()

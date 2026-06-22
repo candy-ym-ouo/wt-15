@@ -2192,6 +2192,215 @@ export const QUEST_LINES = {
   }
 }
 
+export const ECONOMY_CONFIG = {
+  currencies: {
+    coin: { id: 'coin', name: '涂鸦币', symbol: '🪙', color: '#f1c40f', icon: 'coin' },
+    spray_token: { id: 'spray_token', name: '喷漆券', symbol: '🎫', color: '#3498db', icon: 'ticket' },
+    legend_shard: { id: 'legend_shard', name: '传说碎片', symbol: '💎', color: '#9b59b6', icon: 'shard' }
+  },
+
+  items: {
+    spray_boost: {
+      id: 'spray_boost',
+      name: '喷漆增强剂',
+      description: '下一局涂鸦分数+20%',
+      category: 'consumable',
+      rarity: 'common',
+      icon: '🧪',
+      basePrice: { coin: 100 },
+      priceGrowth: 1.15,
+      maxPrice: { coin: 500 },
+      stackable: true,
+      maxStack: 99,
+      effects: { scoreMultiplier: 1.2, duration: 'station' },
+      dropChance: { common: 0.08, rare: 0.03, epic: 0.01 }
+    },
+    combo_saver: {
+      id: 'combo_saver',
+      name: '连击保护器',
+      description: '下次断连时保留50%连击',
+      category: 'consumable',
+      rarity: 'rare',
+      icon: '🛡️',
+      basePrice: { coin: 300 },
+      priceGrowth: 1.2,
+      maxPrice: { coin: 1500 },
+      stackable: true,
+      maxStack: 50,
+      effects: { comboPreserveRatio: 0.5, uses: 1 },
+      dropChance: { common: 0.02, rare: 0.06, epic: 0.03 }
+    },
+    heat_cooler: {
+      id: 'heat_cooler',
+      name: '热度冷却剂',
+      description: '立即降低30点热度',
+      category: 'consumable',
+      rarity: 'common',
+      icon: '❄️',
+      basePrice: { coin: 150 },
+      priceGrowth: 1.1,
+      maxPrice: { coin: 600 },
+      stackable: true,
+      maxStack: 50,
+      effects: { heatReduce: 30, instant: true },
+      dropChance: { common: 0.1, rare: 0.05, epic: 0.02 }
+    },
+    patrol_distractor: {
+      id: 'patrol_distractor',
+      name: '巡逻诱饵',
+      description: '下一局巡逻速度-25%，持续30秒',
+      category: 'consumable',
+      rarity: 'rare',
+      icon: '🎯',
+      basePrice: { coin: 250 },
+      priceGrowth: 1.18,
+      maxPrice: { coin: 1200 },
+      stackable: true,
+      maxStack: 30,
+      effects: { guardSpeedMultiplier: 0.75, duration: 30 },
+      dropChance: { common: 0.03, rare: 0.08, epic: 0.04 }
+    },
+    perfect_charm: {
+      id: 'perfect_charm',
+      name: '完美护符',
+      description: '下一局完美判定范围+15%',
+      category: 'consumable',
+      rarity: 'epic',
+      icon: '✨',
+      basePrice: { coin: 500, spray_token: 1 },
+      priceGrowth: 1.25,
+      maxPrice: { coin: 2500, spray_token: 3 },
+      stackable: true,
+      maxStack: 20,
+      effects: { perfectRadiusMultiplier: 1.15, duration: 'station' },
+      dropChance: { rare: 0.02, epic: 0.05, legendary: 0.02 }
+    },
+    lucky_spray: {
+      id: 'lucky_spray',
+      name: '幸运喷漆',
+      description: '下一局掉落率+50%',
+      category: 'consumable',
+      rarity: 'rare',
+      icon: '🍀',
+      basePrice: { coin: 200 },
+      priceGrowth: 1.12,
+      maxPrice: { coin: 1000 },
+      stackable: true,
+      maxStack: 30,
+      effects: { dropRateMultiplier: 1.5, duration: 'station' },
+      dropChance: { common: 0.05, rare: 0.04, epic: 0.02 }
+    },
+    spray_token_pack: {
+      id: 'spray_token_pack',
+      name: '喷漆券礼包',
+      description: '获得3张喷漆券',
+      category: 'currency_pack',
+      rarity: 'epic',
+      icon: '🎁',
+      basePrice: { coin: 800 },
+      priceGrowth: 1.1,
+      maxPrice: { coin: 2000 },
+      stackable: true,
+      maxStack: 10,
+      effects: { grantCurrency: { spray_token: 3 } },
+      dropChance: { epic: 0.03, legendary: 0.05 }
+    },
+    mystery_box: {
+      id: 'mystery_box',
+      name: '神秘宝箱',
+      description: '随机获得1-3件道具或货币',
+      category: 'box',
+      rarity: 'epic',
+      icon: '📦',
+      basePrice: { coin: 400 },
+      priceGrowth: 1.15,
+      maxPrice: { coin: 1500 },
+      stackable: true,
+      maxStack: 20,
+      effects: { randomLoot: true, minItems: 1, maxItems: 3 },
+      dropChance: { rare: 0.01, epic: 0.04, legendary: 0.08 }
+    },
+    phase_booster: {
+      id: 'phase_booster',
+      name: '阶段增益包',
+      description: '涂鸦+巡逻阶段同时获得增益',
+      category: 'consumable',
+      rarity: 'legendary',
+      icon: '⚡',
+      basePrice: { coin: 1000, spray_token: 2 },
+      priceGrowth: 1.3,
+      maxPrice: { coin: 5000, spray_token: 5 },
+      stackable: true,
+      maxStack: 10,
+      effects: {
+        scoreMultiplier: 1.15,
+        guardSpeedMultiplier: 0.85,
+        perfectRadiusMultiplier: 1.1,
+        duration: 'station'
+      },
+      dropChance: { epic: 0.01, legendary: 0.03 }
+    },
+    heat_immunity: {
+      id: 'heat_immunity',
+      name: '热度免疫盾',
+      description: '下一局前60秒热度不增长',
+      category: 'consumable',
+      rarity: 'legendary',
+      icon: '🛡️',
+      basePrice: { coin: 800, legend_shard: 1 },
+      priceGrowth: 1.25,
+      maxPrice: { coin: 4000, legend_shard: 3 },
+      stackable: true,
+      maxStack: 10,
+      effects: { heatImmunityDuration: 60, duration: 'station' },
+      dropChance: { legendary: 0.02 }
+    }
+  },
+
+  dropTable: {
+    stationClear: {
+      baseCoinMin: 50,
+      baseCoinMax: 150,
+      coinPerStar: 20,
+      perfectBonusCoin: 5,
+      comboMilestoneCoin: 30,
+      itemDropChance: 0.4,
+      maxDropsPerStation: 2
+    },
+    patrolPhase: {
+      escapeCoin: 20,
+      zeroCaughtBonus: 100,
+      itemDropChance: 0.15
+    },
+    graffitiPhase: {
+      perfectChainCoin: 10,
+      zeroMissBonus: 150,
+      itemDropChance: 0.2
+    }
+  },
+
+  phaseCosts: {
+    graffiti: { coin: 10 },
+    patrol: { coin: 15 },
+    garage_defense: { coin: 25 }
+  },
+
+  shop: {
+    refreshInterval: 4 * 60 * 60 * 1000,
+    maxItems: 6,
+    discountChance: 0.2,
+    maxDiscount: 0.5,
+    categories: ['consumable', 'box', 'currency_pack'],
+    freeDailyItems: 1
+  },
+
+  priceGrowth: {
+    perPurchase: 1.1,
+    decayPerDay: 0.95,
+    minMultiplier: 1.0
+  }
+}
+
 export const LINE_BRANCHES = {
   1: {
     lineId: 1,

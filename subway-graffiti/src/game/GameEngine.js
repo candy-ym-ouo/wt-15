@@ -10,6 +10,10 @@ import { heatSystem } from './HeatSystem.js'
 import { achievementManager } from './AchievementManager.js'
 import { dailyTaskManager } from './DailyTaskManager.js'
 import { routeBranchManager } from './RouteBranchManager.js'
+import { economySystem } from './EconomySystem.js'
+import { inventoryManager } from './InventoryManager.js'
+import { shopManager } from './ShopManager.js'
+import { dropSystem } from './DropSystem.js'
 import { MapScene } from './MapScene.js'
 import { GraffitiGame } from './GraffitiGame.js'
 import { PatrolAvoid } from './PatrolAvoid.js'
@@ -33,7 +37,9 @@ export const GameState = {
   ACHIEVEMENTS: 'achievements',
   DAILY_TASKS: 'daily_tasks',
   GARAGE_DEFENSE: 'garage_defense',
-  GARAGE_DEFENSE_RESULT: 'garage_defense_result'
+  GARAGE_DEFENSE_RESULT: 'garage_defense_result',
+  SHOP: 'shop',
+  INVENTORY: 'inventory'
 }
 
 export class GameEngine {
@@ -443,6 +449,50 @@ export class GameEngine {
     this.callbacks.onStateChange(this.state)
   }
 
+  showShop() {
+    shopManager.load()
+    this.state = GameState.SHOP
+    this.callbacks.onStateChange(this.state)
+  }
+
+  showInventory() {
+    inventoryManager.load()
+    this.state = GameState.INVENTORY
+    this.callbacks.onStateChange(this.state)
+  }
+
+  getEconomySystem() {
+    return economySystem
+  }
+
+  getInventoryManager() {
+    return inventoryManager
+  }
+
+  getShopManager() {
+    return shopManager
+  }
+
+  getDropSystem() {
+    return dropSystem
+  }
+
+  useItem(itemId, context = {}) {
+    return inventoryManager.useItem(itemId, {
+      ...context,
+      heatSystem,
+      stationId: this.currentStation?.id
+    })
+  }
+
+  purchaseItem(stockId, quantity = 1) {
+    return shopManager.purchase(stockId, quantity)
+  }
+
+  collectDrops() {
+    return dropSystem.collectPendingDrops()
+  }
+
   getDailyTaskManager() {
     return dailyTaskManager
   }
@@ -453,6 +503,9 @@ export class GameEngine {
       questManager.loadProfile(profileId)
       achievementManager.loadProfile(profileId)
       dailyTaskManager.loadProfile(profileId)
+      economySystem.loadProfile(profileId)
+      inventoryManager.loadProfile(profileId)
+      shopManager.loadProfile(profileId)
       this._resetGameEngineState()
       this.showMenu()
       if (this.callbacks.onProfileSwitched) {

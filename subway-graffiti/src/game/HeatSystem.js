@@ -1,4 +1,5 @@
 import { GAME_CONFIG } from './config.js'
+import { inventoryManager } from './InventoryManager.js'
 
 export class HeatSystem {
   constructor() {
@@ -11,6 +12,7 @@ export class HeatSystem {
     this.heatHistory = []
     this.levelUpCallbacks = []
     this.heatChangeCallbacks = []
+    this.stationStartTime = 0
   }
 
   reset() {
@@ -20,11 +22,29 @@ export class HeatSystem {
     this.peakHeat = 0
     this.totalHeatGained = 0
     this.heatHistory = []
+    this.stationStartTime = Date.now()
     this._notifyHeatChange()
   }
 
   addHeat(amount, source = 'unknown', timestamp = null) {
     if (!GAME_CONFIG.heatSystem.enabled) return 0
+    
+    const buffEffects = inventoryManager.getCombinedEffects()
+    if (buffEffects.heatImmunityDuration && buffEffects.heatImmunityDuration > 0) {
+      const elapsed = (Date.now() - this.stationStartTime) / 1000
+      if (elapsed < buffEffects.heatImmunityDuration) {
+        return 0
+      }
+    }
+
+    if (amount < 0) {
+      const prevHeat = this.currentHeat
+      this.currentHeat = Math.max(0, this.currentHeat + amount)
+      if (Math.abs(this.currentHeat - prevHeat) > 0.01) {
+        this._notifyHeatChange(prevHeat)
+      }
+      return this.currentHeat - prevHeat
+    }
     
     const actualAmount = Math.max(0, amount)
     if (actualAmount === 0) return 0
