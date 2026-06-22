@@ -384,6 +384,10 @@ class ScoreManager {
     this._onComboUpdate = callback
   }
 
+  setOnRescueSuccess(callback) {
+    this._onRescueSuccess = callback
+  }
+
   getCityEventEffects() {
     return this.cityEventEffects
   }
@@ -452,6 +456,13 @@ class ScoreManager {
               bonusMultiplier: comboConfig.rescueBonusMultiplier
             }
             points = Math.floor(points * comboConfig.rescueBonusMultiplier)
+            if (this._onRescueSuccess) {
+              try {
+                this._onRescueSuccess(this.rescueResult)
+              } catch (e) {
+                console.warn('救场回调执行失败:', e)
+              }
+            }
           } else if (!canRescue) {
             this.combo++
           } else {

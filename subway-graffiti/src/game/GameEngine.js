@@ -8,6 +8,7 @@ import { cityEventManager } from './CityEventManager.js'
 import { questManager } from './QuestManager.js'
 import { heatSystem } from './HeatSystem.js'
 import { achievementManager } from './AchievementManager.js'
+import { dailyTaskManager } from './DailyTaskManager.js'
 import { MapScene } from './MapScene.js'
 import { GraffitiGame } from './GraffitiGame.js'
 import { PatrolAvoid } from './PatrolAvoid.js'
@@ -27,7 +28,8 @@ export const GameState = {
   WORKSHOP: 'workshop',
   CUTSCENE: 'cutscene',
   CHAPTER_COMPLETE: 'chapter_complete',
-  ACHIEVEMENTS: 'achievements'
+  ACHIEVEMENTS: 'achievements',
+  DAILY_TASKS: 'daily_tasks'
 }
 
 export class GameEngine {
@@ -52,6 +54,7 @@ export class GameEngine {
     this._onResize = this._onResize.bind(this)
     this._setupQuestListeners()
     this._setupAchievementListeners()
+    this._setupDailyTaskListeners()
   }
 
   _setupQuestListeners() {
@@ -99,6 +102,44 @@ export class GameEngine {
     achievementManager.on('achievement_reset', () => {
       if (this.callbacks.onAchievementReset) {
         this.callbacks.onAchievementReset()
+      }
+    })
+  }
+
+  _setupDailyTaskListeners() {
+    dailyTaskManager.on('task_completed', (task) => {
+      if (this.callbacks.onDailyTaskCompleted) {
+        this.callbacks.onDailyTaskCompleted(task)
+      }
+    })
+
+    dailyTaskManager.on('reward_claimed', (data) => {
+      if (this.callbacks.onDailyTaskRewardClaimed) {
+        this.callbacks.onDailyTaskRewardClaimed(data)
+      }
+    })
+
+    dailyTaskManager.on('check_in', (data) => {
+      if (this.callbacks.onDailyCheckIn) {
+        this.callbacks.onDailyCheckIn(data)
+      }
+    })
+
+    dailyTaskManager.on('makeup_check_in', (data) => {
+      if (this.callbacks.onDailyMakeupCheckIn) {
+        this.callbacks.onDailyMakeupCheckIn(data)
+      }
+    })
+
+    dailyTaskManager.on('daily_refreshed', (data) => {
+      if (this.callbacks.onDailyTasksRefreshed) {
+        this.callbacks.onDailyTasksRefreshed(data)
+      }
+    })
+
+    dailyTaskManager.on('tasks_refreshed', (data) => {
+      if (this.callbacks.onDailyTasksManualRefreshed) {
+        this.callbacks.onDailyTasksManualRefreshed(data)
       }
     })
   }
@@ -173,6 +214,11 @@ export class GameEngine {
 
     scoreManager.setOnComboUpdate((combo) => {
       questManager.onComboUpdate(combo)
+      dailyTaskManager.onComboUpdate(combo)
+    })
+
+    scoreManager.setOnRescueSuccess(() => {
+      dailyTaskManager.onRescueSuccess()
     })
 
     window.addEventListener('resize', this._onResize)
@@ -355,11 +401,21 @@ export class GameEngine {
     this.callbacks.onStateChange(this.state)
   }
 
+  showDailyTasks() {
+    this.state = GameState.DAILY_TASKS
+    this.callbacks.onStateChange(this.state)
+  }
+
+  getDailyTaskManager() {
+    return dailyTaskManager
+  }
+
   switchProfile(profileId) {
     if (profileManager.switchProfile(profileId)) {
       scoreManager.loadProfile(profileId)
       questManager.loadProfile(profileId)
       achievementManager.loadProfile(profileId)
+      dailyTaskManager.loadProfile(profileId)
       this._resetGameEngineState()
       this.showMenu()
       if (this.callbacks.onProfileSwitched) {
@@ -603,9 +659,30 @@ export class GameEngine {
       evaluation
     })
 
+    const completedDailyTasks = dailyTaskManager.onStationEnd(this.currentStation.id, {
+      score: stationScore,
+      stars: evaluation.stars || 0,
+      graffiti: {
+        miss: scoreManager.stationMissCount,
+        perfect: scoreManager.stationPerfectCount,
+        good: scoreManager.stationGoodCount
+      },
+      patrol: {
+        caught: scoreManager.stationCaughtCount
+      },
+      phaseBreakdown: scoreManager.currentGamePhaseBreakdown
+    })
+
+    if (scoreManager.stationPerfectCount > 0) {
+      for (let i = 0; i < scoreManager.stationPerfectCount; i++) {
+        dailyTaskManager.onPerfectHit()
+      }
+    }
+
     scoreManager._syncBattlePassSkins()
     scoreManager.save()
     questManager.save()
+    dailyTaskManager.save()
 
     const newlyUnlockedAchievements = achievementManager.checkAchievements()
 
@@ -635,6 +712,10 @@ export class GameEngine {
       },
       achievements: {
         newlyUnlocked: newlyUnlockedAchievements
+      },
+      dailyTasks: {
+        completed: completedDailyTasks,
+        summary: dailyTaskManager.getTaskSummary()
       }
     })
   }
@@ -657,6 +738,9 @@ export class GameEngine {
   }
 
   _onScoreUpdate(points, type) {
+    if (type === 'perfect') {
+      dailyTaskManager.onPerfectHit()
+    }
     if (this.callbacks.onScoreUpdate) {
       this.callbacks.onScoreUpdate(points, type)
     }
