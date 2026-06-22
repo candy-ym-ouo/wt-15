@@ -113,11 +113,18 @@ export class MapScene {
 
   createStations() {
     LINES.forEach((line, lineIdx) => {
+      const currentBranchPath = routeBranchManager.getCurrentBranchPath(line.id)
+      const currentBranch = routeBranchManager.getCurrentBranch(line.id)
+      const branchColor = currentBranch?.color ? parseInt(currentBranch.color.replace('#', '0x')) : null
+      const isJunctionStationSet = new Set(currentBranch?.junctionAt || [])
+
       line.stations.forEach((station, idx) => {
         const isUnlocked = scoreManager.isStationUnlocked(station)
         const stationScore = scoreManager.getStationScore(station.id)
         const stationInfo = scoreManager.getStationInfo(station.id)
         const unlockReq = !isUnlocked ? scoreManager.getUnlockRequirement(station) : null
+        const isInCurrentBranch = currentBranchPath.includes(station.id)
+        const isJunction = isJunctionStationSet.has(station.id)
 
         const stationContainer = new PIXI.Container()
         stationContainer.x = station.x
@@ -125,9 +132,18 @@ export class MapScene {
         stationContainer.eventMode = 'static'
         stationContainer.cursor = 'pointer'
 
+        if (isInCurrentBranch && isUnlocked && branchColor) {
+          const glow = new PIXI.Graphics()
+          glow.beginFill(branchColor, 0.25)
+          glow.drawCircle(0, 0, 36)
+          glow.endFill()
+          stationContainer.addChild(glow)
+        }
+
         const outerRing = new PIXI.Graphics()
         if (station.isBranch) {
-          outerRing.lineStyle(3, isUnlocked ? parseInt(line.color.replace('#', '0x')) : 0x333344, 0.8)
+          const ringColor = isInCurrentBranch && branchColor ? branchColor : (isUnlocked ? parseInt(line.color.replace('#', '0x')) : 0x333344)
+          outerRing.lineStyle(3, ringColor, 0.8)
           const points = []
           for (let i = 0; i < 12; i++) {
             const angle = (i * Math.PI) / 6 - Math.PI / 2
@@ -136,7 +152,8 @@ export class MapScene {
           }
           outerRing.drawPolygon(points)
         } else {
-          outerRing.beginFill(isUnlocked ? parseInt(line.color.replace('#', '0x')) : 0x333344)
+          const ringColor = isInCurrentBranch && branchColor ? branchColor : (isUnlocked ? parseInt(line.color.replace('#', '0x')) : 0x333344)
+          outerRing.beginFill(ringColor)
           outerRing.drawCircle(0, 0, 28)
           outerRing.endFill()
           outerRing.alpha = isUnlocked ? 0.3 : 0.5
@@ -917,11 +934,18 @@ export class MapScene {
     this.stationNodes = []
 
     LINES.forEach((line, lineIdx) => {
+      const currentBranchPath = routeBranchManager.getCurrentBranchPath(line.id)
+      const currentBranch = routeBranchManager.getCurrentBranch(line.id)
+      const branchColor = currentBranch?.color ? parseInt(currentBranch.color.replace('#', '0x')) : null
+      const isJunctionStationSet = new Set(currentBranch?.junctionAt || [])
+
       line.stations.forEach((station, idx) => {
         const isUnlocked = scoreManager.isStationUnlocked(station)
         const stationScore = scoreManager.getStationScore(station.id)
         const stationInfo = scoreManager.getStationInfo(station.id)
         const unlockReq = !isUnlocked ? scoreManager.getUnlockRequirement(station) : null
+        const isInCurrentBranch = currentBranchPath.includes(station.id)
+        const isJunction = isJunctionStationSet.has(station.id)
 
         const stationContainer = new PIXI.Container()
         stationContainer.x = station.x
@@ -929,9 +953,18 @@ export class MapScene {
         stationContainer.eventMode = 'static'
         stationContainer.cursor = 'pointer'
 
+        if (isInCurrentBranch && isUnlocked && branchColor) {
+          const glow = new PIXI.Graphics()
+          glow.beginFill(branchColor, 0.25)
+          glow.drawCircle(0, 0, 36)
+          glow.endFill()
+          stationContainer.addChild(glow)
+        }
+
         const outerRing = new PIXI.Graphics()
         if (station.isBranch) {
-          outerRing.lineStyle(3, isUnlocked ? parseInt(line.color.replace('#', '0x')) : 0x333344, 0.8)
+          const ringColor = isInCurrentBranch && branchColor ? branchColor : (isUnlocked ? parseInt(line.color.replace('#', '0x')) : 0x333344)
+          outerRing.lineStyle(3, ringColor, 0.8)
           const points = []
           for (let i = 0; i < 12; i++) {
             const angle = (i * Math.PI) / 6 - Math.PI / 2
@@ -940,7 +973,8 @@ export class MapScene {
           }
           outerRing.drawPolygon(points)
         } else {
-          outerRing.beginFill(isUnlocked ? parseInt(line.color.replace('#', '0x')) : 0x333344)
+          const ringColor = isInCurrentBranch && branchColor ? branchColor : (isUnlocked ? parseInt(line.color.replace('#', '0x')) : 0x333344)
+          outerRing.beginFill(ringColor)
           outerRing.drawCircle(0, 0, 28)
           outerRing.endFill()
           outerRing.alpha = isUnlocked ? 0.3 : 0.5

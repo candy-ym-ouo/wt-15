@@ -159,6 +159,7 @@ class ScoreManager {
         this.totalRescueSuccess = saved.totalRescueSuccess || 0
         this.totalRescueFail = saved.totalRescueFail || 0
         this.totalPreserveTriggered = saved.totalPreserveTriggered || 0
+        routeBranchManager.loadFromSave(saved.routeBranches)
       }
       battlePassManager.load()
       graffitiWorkshop.load()
@@ -201,6 +202,7 @@ class ScoreManager {
         this.totalRescueSuccess = saved.totalRescueSuccess || 0
         this.totalRescueFail = saved.totalRescueFail || 0
         this.totalPreserveTriggered = saved.totalPreserveTriggered || 0
+        routeBranchManager.loadFromSave(saved.routeBranches)
       } else {
         this._resetProfileData()
       }
@@ -302,7 +304,8 @@ class ScoreManager {
         caughtLocations: this.caughtLocations,
         totalRescueSuccess: this.totalRescueSuccess,
         totalRescueFail: this.totalRescueFail,
-        totalPreserveTriggered: this.totalPreserveTriggered
+        totalPreserveTriggered: this.totalPreserveTriggered,
+        routeBranches: routeBranchManager.exportForSave()
       }
       data.battlePass = battlePassManager.exportForSaveData()
       profileManager.saveProfileData(currentProfile.id, data)

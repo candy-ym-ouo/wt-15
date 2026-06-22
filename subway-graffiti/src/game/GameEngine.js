@@ -9,6 +9,7 @@ import { questManager } from './QuestManager.js'
 import { heatSystem } from './HeatSystem.js'
 import { achievementManager } from './AchievementManager.js'
 import { dailyTaskManager } from './DailyTaskManager.js'
+import { routeBranchManager } from './RouteBranchManager.js'
 import { MapScene } from './MapScene.js'
 import { GraffitiGame } from './GraffitiGame.js'
 import { PatrolAvoid } from './PatrolAvoid.js'
@@ -147,15 +148,27 @@ export class GameEngine {
     })
   }
 
-  computeDifficultyParams() {
+  computeDifficultyParams(station = null) {
     const diffConfig = GAME_CONFIG.difficulty
     if (this.difficulty === 'normal') {
-      return {
+      let params = {
         shrinkSpeedMultiplier: diffConfig.normal.shrinkSpeedMultiplier,
         patrolRangeMultiplier: diffConfig.normal.patrolRangeMultiplier,
         scoreMultiplier: diffConfig.normal.scoreMultiplier,
         extraGuardSpeed: 0
       }
+
+      if (station && this.currentLine) {
+        const branchDiffMultiplier = routeBranchManager.getBranchDifficultyMultiplier(
+          this.currentLine.id,
+          station.id
+        )
+        params.shrinkSpeedMultiplier *= branchDiffMultiplier
+        params.patrolRangeMultiplier *= branchDiffMultiplier
+        params.extraGuardSpeed *= branchDiffMultiplier
+      }
+
+      return params
     }
 
     const hard = diffConfig.hard
@@ -174,12 +187,24 @@ export class GameEngine {
     )
     const extraGuardSpeed = hard.extraGuardSpeed + hard.extraGuardPerStation * progress
 
-    return {
+    let params = {
       shrinkSpeedMultiplier,
       patrolRangeMultiplier,
       scoreMultiplier,
       extraGuardSpeed
     }
+
+    if (station && this.currentLine) {
+      const branchDiffMultiplier = routeBranchManager.getBranchDifficultyMultiplier(
+        this.currentLine.id,
+        station.id
+      )
+      params.shrinkSpeedMultiplier *= branchDiffMultiplier
+      params.patrolRangeMultiplier *= branchDiffMultiplier
+      params.extraGuardSpeed *= branchDiffMultiplier
+    }
+
+    return params
   }
 
   async init() {
@@ -499,7 +524,7 @@ export class GameEngine {
     this.currentLine = line
     this.currentPhase = 0
     this.stationStartScore = scoreManager.currentScore
-    this.currentDifficultyParams = this.computeDifficultyParams()
+    this.currentDifficultyParams = this.computeDifficultyParams(station)
 
     const stationEffects = cityEventManager.getCombinedEffectsForStation(station.id)
     this.currentStationEffects = stationEffects
@@ -507,10 +532,12 @@ export class GameEngine {
     const stationScoreMultiplier = (station.graffiti && station.graffiti.scoreMultiplier) || 1
     const eventScoreMultiplier = stationEffects.scoreMultiplier || 1
     const patrolScoreMultiplier = (station.patrol && station.patrol.scoreMultiplier) || 1
+    const branchScoreMultiplier = routeBranchManager.getBranchScoreMultiplier(line.id, station.id)
     const totalMultiplier = this.currentDifficultyParams.scoreMultiplier *
       stationScoreMultiplier *
       eventScoreMultiplier *
-      patrolScoreMultiplier
+      patrolScoreMultiplier *
+      branchScoreMultiplier
 
     scoreManager.setScoreMultiplier(totalMultiplier)
     scoreManager.setCityEventEffects(stationEffects)
@@ -690,6 +717,18 @@ export class GameEngine {
       }
     }
 
+    const branchCompletion = routeBranchManager.checkBranchCompletion(
+      this.currentLine.id,
+      this.currentStation.id
+    )
+    if (branchCompletion) {
+      const rewards = branchCompletion.rewards || {}
+      if (rewards.completionBonus) {
+        scoreManager.currentScore += rewards.completionBonus
+        scoreManager.totalScore += rewards.completionBonus
+      }
+    }
+
     scoreManager._syncBattlePassSkins()
     scoreManager.save()
     questManager.save()
@@ -727,7 +766,12 @@ export class GameEngine {
       dailyTasks: {
         completed: completedDailyTasks,
         summary: dailyTaskManager.getTaskSummary()
-      }
+      },
+      branchCompletion: branchCompletion ? {
+        branchId: branchCompletion.branch.id,
+        branchName: branchCompletion.branch.name,
+        rewards: branchCompletion.rewards
+      } : null
     })
   }
 
