@@ -4,7 +4,6 @@ import { scoreManager } from './ScoreManager.js'
 import { audioManager } from './AudioManager.js'
 import { replayManager, RiskLevel } from './ReplayManager.js'
 import { heatSystem } from './HeatSystem.js'
-import { inventoryManager } from './InventoryManager.js'
 
 export class PatrolAvoid {
   constructor(app, callbacks) {
@@ -493,12 +492,8 @@ export class PatrolAvoid {
     guard.addChild(body, hat, badge)
 
     const heatEffects = heatSystem.getCurrentEffects()
-    const buffEffects = inventoryManager.getCombinedEffects()
     const baseGuardSpeed = this.getStationConfig(this.station, 'guardSpeed', GAME_CONFIG.patrol.guardSpeed)
     let guardSpeed = (baseGuardSpeed + this.extraGuardSpeed) * (0.8 + Math.random() * 0.4) * heatEffects.guardSpeedMultiplier
-    if (buffEffects.guardSpeedMultiplier) {
-      guardSpeed *= buffEffects.guardSpeedMultiplier
-    }
     if (this.cityEventEffects?.patrol?.chaseSpeedMultiplier) {
       guard.chaseSpeedMultiplier = this.cityEventEffects.patrol.chaseSpeedMultiplier
     }

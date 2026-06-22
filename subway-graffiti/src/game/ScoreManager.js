@@ -1,12 +1,9 @@
-import { GAME_CONFIG, LINES, BATTLE_PASS_CONFIG, ECONOMY_CONFIG } from './config.js'
+import { GAME_CONFIG, LINES, BATTLE_PASS_CONFIG } from './config.js'
 import { profileManager } from './ProfileManager.js'
 import { battlePassManager } from './BattlePassManager.js'
 import { graffitiWorkshop } from './GraffitiWorkshop.js'
 import { heatSystem } from './HeatSystem.js'
 import { routeBranchManager } from './RouteBranchManager.js'
-import { economySystem } from './EconomySystem.js'
-import { inventoryManager } from './InventoryManager.js'
-import { dropSystem } from './DropSystem.js'
 
 const SAVE_VERSION = 3
 
@@ -166,8 +163,6 @@ class ScoreManager {
       }
       battlePassManager.load()
       graffitiWorkshop.load()
-      economySystem.load()
-      inventoryManager.load()
       this._syncBattlePassSkins()
     } catch (e) {
       console.warn('读取存档失败:', e)
@@ -213,8 +208,6 @@ class ScoreManager {
       }
       battlePassManager.loadProfile(profileId)
       graffitiWorkshop.loadProfile(profileId)
-      economySystem.loadProfile(profileId)
-      inventoryManager.loadProfile(profileId)
       this._syncBattlePassSkins()
       this._resetAllTemporaryState()
     } catch (e) {
@@ -383,10 +376,6 @@ class ScoreManager {
         lastCombo: this.lastComboBeforeBreak,
         reason: 'phase_switch'
       }
-    }
-
-    if (type && prevPhase !== type && ECONOMY_CONFIG.phaseCosts[type]) {
-      economySystem.payForPhase(type)
     }
   }
 
@@ -637,11 +626,6 @@ class ScoreManager {
 
     if (points > 0 && customAttr.scoreMultiplier && customAttr.scoreMultiplier > 1) {
       points = Math.floor(points * customAttr.scoreMultiplier)
-    }
-
-    const buffEffects = inventoryManager.getCombinedEffects()
-    if (points > 0 && buffEffects.scoreMultiplier && buffEffects.scoreMultiplier > 1) {
-      points = Math.floor(points * buffEffects.scoreMultiplier)
     }
 
     this.currentScore += points
@@ -1020,17 +1004,6 @@ class ScoreManager {
       preserveCount: currentStationPreserveCount
     }
     this.currentGameStations.push(stationRecord)
-
-    if (isSuccess) {
-      const drops = dropSystem.rollStationDrops({
-        stars: entry.stars,
-        perfectCount: this.stationPerfectCount,
-        milestones: this.stationMilestones,
-        zeroMiss: this.stationMissCount === 0,
-        zeroCaught: this.stationCaughtCount === 0
-      })
-      stationRecord.drops = drops
-    }
 
     this.currentGamePhaseBreakdown = {
       graffiti: { score: 0, perfect: 0, good: 0, miss: 0, milestoneBonus: 0 },

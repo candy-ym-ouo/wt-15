@@ -10,10 +10,10 @@ import { heatSystem } from './HeatSystem.js'
 import { achievementManager } from './AchievementManager.js'
 import { dailyTaskManager } from './DailyTaskManager.js'
 import { routeBranchManager } from './RouteBranchManager.js'
-import { economySystem } from './EconomySystem.js'
 import { inventoryManager } from './InventoryManager.js'
 import { shopManager } from './ShopManager.js'
-import { dropSystem } from './DropSystem.js'
+import { dropManager } from './DropManager.js'
+import { stageCostManager } from './StageCostManager.js'
 import { MapScene } from './MapScene.js'
 import { GraffitiGame } from './GraffitiGame.js'
 import { PatrolAvoid } from './PatrolAvoid.js'
@@ -66,6 +66,57 @@ export class GameEngine {
     this._setupQuestListeners()
     this._setupAchievementListeners()
     this._setupDailyTaskListeners()
+    this._setupEconomyListeners()
+  }
+
+  _setupEconomyListeners() {
+    inventoryManager.on('currency_changed', (data) => {
+      if (this.callbacks.onCurrencyChanged) {
+        this.callbacks.onCurrencyChanged(data)
+      }
+    })
+
+    inventoryManager.on('item_added', (data) => {
+      if (this.callbacks.onItemAdded) {
+        this.callbacks.onItemAdded(data)
+      }
+    })
+
+    inventoryManager.on('effect_activated', (data) => {
+      if (this.callbacks.onEffectActivated) {
+        this.callbacks.onEffectActivated(data)
+      }
+    })
+
+    inventoryManager.on('effect_expired', (data) => {
+      if (this.callbacks.onEffectExpired) {
+        this.callbacks.onEffectExpired(data)
+      }
+    })
+
+    dropManager.on('drop_generated', (data) => {
+      if (this.callbacks.onDropGenerated) {
+        this.callbacks.onDropGenerated(data)
+      }
+    })
+
+    dropManager.on('gold_earned', (data) => {
+      if (this.callbacks.onGoldEarned) {
+        this.callbacks.onGoldEarned(data)
+      }
+    })
+
+    shopManager.on('item_purchased', (data) => {
+      if (this.callbacks.onShopItemPurchased) {
+        this.callbacks.onShopItemPurchased(data)
+      }
+    })
+
+    stageCostManager.on('quota_reset', (data) => {
+      if (this.callbacks.onQuotaReset) {
+        this.callbacks.onQuotaReset(data)
+      }
+    })
   }
 
   _setupQuestListeners() {
@@ -450,47 +501,21 @@ export class GameEngine {
   }
 
   showShop() {
-    shopManager.load()
     this.state = GameState.SHOP
-    this.callbacks.onStateChange(this.state)
-  }
-
-  showInventory() {
-    inventoryManager.load()
-    this.state = GameState.INVENTORY
-    this.callbacks.onStateChange(this.state)
-  }
-
-  getEconomySystem() {
-    return economySystem
-  }
-
-  getInventoryManager() {
-    return inventoryManager
-  }
-
-  getShopManager() {
-    return shopManager
-  }
-
-  getDropSystem() {
-    return dropSystem
-  }
-
-  useItem(itemId, context = {}) {
-    return inventoryManager.useItem(itemId, {
-      ...context,
-      heatSystem,
-      stationId: this.currentStation?.id
+    this.callbacks.onStateChange(this.state, {
+      dailyItems: shopManager.getDailyItems(),
+      recurringPacks: shopManager.getRecurringPacks(),
+      refreshInfo: shopManager.getRefreshInfo()
     })
   }
 
-  purchaseItem(stockId, quantity = 1) {
-    return shopManager.purchase(stockId, quantity)
-  }
-
-  collectDrops() {
-    return dropSystem.collectPendingDrops()
+  showInventory() {
+    this.state = GameState.INVENTORY
+    this.callbacks.onStateChange(this.state, {
+      inventory: inventoryManager.getInventorySummary(),
+      currencies: inventoryManager.getAllCurrencies(),
+      activeEffects: inventoryManager.getActiveEffectsSummary()
+    })
   }
 
   getDailyTaskManager() {
@@ -503,9 +528,9 @@ export class GameEngine {
       questManager.loadProfile(profileId)
       achievementManager.loadProfile(profileId)
       dailyTaskManager.loadProfile(profileId)
-      economySystem.loadProfile(profileId)
       inventoryManager.loadProfile(profileId)
       shopManager.loadProfile(profileId)
+      stageCostManager.loadProfile(profileId)
       this._resetGameEngineState()
       this.showMenu()
       if (this.callbacks.onProfileSwitched) {
@@ -558,6 +583,21 @@ export class GameEngine {
   }
 
   _onStationSelected(station, line) {
+    const entryCost = stageCostManager.consumeStationEntry(station.id, this.difficulty)
+    if (!entryCost.success) {
+      if (this.callbacks.onStationEntryDenied) {
+        this.callbacks.onStationEntryDenied(entryCost)
+      }
+      return
+    }
+
+    if (this.callbacks.onStationEntryConsumed) {
+      this.callbacks.onStationEntryConsumed(entryCost)
+    }
+
+    dropManager.startStation(station.id)
+    stageCostManager.resetStationSessionData(station.id)
+
     this._stationReplayData = []
     this._preStationStatsSnapshot = {
       totalScore: scoreManager.totalScore,
@@ -573,7 +613,8 @@ export class GameEngine {
       highScore: scoreManager.highScore,
       stationScores: JSON.parse(JSON.stringify(scoreManager.stationScores)),
       recentTasks: JSON.parse(JSON.stringify(scoreManager.getRecentTasks())),
-      battlePass: battlePassManager.getSummary()
+      battlePass: battlePassManager.getSummary(),
+      currencies: inventoryManager.getAllCurrencies()
     }
 
     this.currentStation = station
@@ -585,6 +626,8 @@ export class GameEngine {
     const stationEffects = cityEventManager.getCombinedEffectsForStation(station.id)
     this.currentStationEffects = stationEffects
 
+    const inventoryEffects = inventoryManager.getCombinedGameEffects()
+
     const stationScoreMultiplier = (station.graffiti && station.graffiti.scoreMultiplier) || 1
     const eventScoreMultiplier = stationEffects.scoreMultiplier || 1
     const patrolScoreMultiplier = (station.patrol && station.patrol.scoreMultiplier) || 1
@@ -593,7 +636,8 @@ export class GameEngine {
       stationScoreMultiplier *
       eventScoreMultiplier *
       patrolScoreMultiplier *
-      branchScoreMultiplier
+      branchScoreMultiplier *
+      (inventoryEffects.scoreMultiplier || 1)
 
     scoreManager.setScoreMultiplier(totalMultiplier)
     scoreManager.setCityEventEffects(stationEffects)
@@ -602,7 +646,10 @@ export class GameEngine {
     heatSystem.reset()
 
     if (this.callbacks.onStationEffectsApplied) {
-      this.callbacks.onStationEffectsApplied(stationEffects, station.id)
+      this.callbacks.onStationEffectsApplied({
+        ...stationEffects,
+        inventory: inventoryEffects
+      }, station.id)
     }
 
     this._startNextPhase()
@@ -624,23 +671,52 @@ export class GameEngine {
     audioManager.playSFX('click')
     const station = this.currentStation
 
+    const inventoryEffects = inventoryManager.getCombinedGameEffects(phase)
+    const phaseSpecificEffects = inventoryManager.consumePhaseEffects(phase, station?.id)
+
+    const graffitiShrinkMult = inventoryEffects.shrinkSpeedMultiplier || 1
+    const perfectRadiusMult = inventoryEffects.perfectRadiusMultiplier || 1
+    const patrolFlashMult = inventoryEffects.flashRadiusMultiplier || 1
+    const patrolSpeedMult = inventoryEffects.guardSpeedMultiplier || 1
+    const safeZoneMult = inventoryEffects.safeZoneRadiusMultiplier || 1
+
+    this.currentInventoryEffects = inventoryEffects
+
+    if (inventoryEffects.heatFreeze) {
+      heatSystem.frozen = true
+    }
+
     this._fadeTransition(() => {
       this._hideAllScenes()
 
       if (phase === 'graffiti') {
         this.state = GameState.GRAFFITI
         scoreManager.setPhaseType('graffiti')
-        this.graffitiGame.setDifficulty(this.currentDifficultyParams.shrinkSpeedMultiplier)
-        this.graffitiGame.setCityEventEffects(this.currentStationEffects)
+        this.graffitiGame.setDifficulty(this.currentDifficultyParams.shrinkSpeedMultiplier * graffitiShrinkMult)
+        this.graffitiGame.setCityEventEffects({
+          ...this.currentStationEffects,
+          graffiti: {
+            ...(this.currentStationEffects?.graffiti || {}),
+            perfectRadiusMultiplier: (this.currentStationEffects?.graffiti?.perfectRadiusMultiplier || 1) * perfectRadiusMult
+          }
+        })
         this.graffitiGame.start(station)
       } else if (phase === 'patrol') {
         this.state = GameState.PATROL
         scoreManager.setPhaseType('patrol')
         this.patrolGame.setDifficulty(
-          this.currentDifficultyParams.patrolRangeMultiplier,
-          this.currentDifficultyParams.extraGuardSpeed
+          this.currentDifficultyParams.patrolRangeMultiplier * patrolFlashMult,
+          this.currentDifficultyParams.extraGuardSpeed + (1 - patrolSpeedMult) * 50
         )
-        this.patrolGame.setCityEventEffects(this.currentStationEffects)
+        this.patrolGame.setCityEventEffects({
+          ...this.currentStationEffects,
+          patrol: {
+            ...(this.currentStationEffects?.patrol || {}),
+            flashRadiusMultiplier: (this.currentStationEffects?.patrol?.flashRadiusMultiplier || 1) * patrolFlashMult,
+            guardSpeedMultiplier: (this.currentStationEffects?.patrol?.guardSpeedMultiplier || 1) * patrolSpeedMult,
+            safeZoneRadiusMultiplier: (this.currentStationEffects?.patrol?.safeZoneRadiusMultiplier || 1) * safeZoneMult
+          }
+        })
         this.patrolGame.start(station)
       }
 
@@ -652,7 +728,9 @@ export class GameEngine {
         difficulty: this.difficulty,
         difficultyParams: this.currentDifficultyParams,
         stationsCompleted: this.stationsCompleted,
-        feedback: station ? station.feedback : null
+        feedback: station ? station.feedback : null,
+        inventoryEffects: inventoryEffects,
+        phaseSpecificEffects: phaseSpecificEffects
       })
     }, 400)
   }
@@ -733,6 +811,8 @@ export class GameEngine {
   _onStationComplete() {
     this.stationsCompleted++
 
+    heatSystem.frozen = false
+
     const preStationStats = this._preStationStatsSnapshot
 
     const stationScore = scoreManager.currentScore - (this.stationStartScore || 0)
@@ -750,6 +830,30 @@ export class GameEngine {
     const newUnlocks = scoreManager.checkStationUnlocks()
     scoreManager.checkUnlocks()
 
+    inventoryManager.decrementEffectDurations(this.currentStation.id)
+
+    const clearDrops = dropManager.generateStationClearingDrops({
+      stationId: this.currentStation.id,
+      stars: evaluation.stars || 0,
+      score: stationScore,
+      difficulty: this.difficulty
+    })
+
+    const goldEarned = dropManager.generateGoldReward({
+      stationId: this.currentStation.id,
+      stars: evaluation.stars || 0,
+      score: stationScore,
+      difficulty: this.difficulty
+    })
+
+    const collectedDrops = dropManager.collectAllPendingDrops()
+
+    const inventoryEffects = this.currentInventoryEffects || {}
+    let battlePassExpMultiplier = 1
+    if (inventoryEffects.expMultiplier) {
+      battlePassExpMultiplier = inventoryEffects.expMultiplier
+    }
+
     const isFirstClear = stationRecord?.isFirstClear || false
     const battlePassResult = battlePassManager.processStationCompletion({
       stationId: this.currentStation.id,
@@ -760,7 +864,8 @@ export class GameEngine {
       perfectCount: scoreManager.stationPerfectCount,
       maxCombo: scoreManager.stationMaxCombo,
       missCount: scoreManager.stationMissCount,
-      caughtCount: scoreManager.stationCaughtCount
+      caughtCount: scoreManager.stationCaughtCount,
+      expMultiplier: battlePassExpMultiplier
     })
 
     const completedQuests = questManager.onStationComplete(this.currentStation.id, {
@@ -804,10 +909,12 @@ export class GameEngine {
     scoreManager.save()
     questManager.save()
     dailyTaskManager.save()
+    inventoryManager.save()
 
     const newlyUnlockedAchievements = achievementManager.checkAchievements()
 
     const questSummary = questManager.getQuestSummary()
+    const dropSummary = dropManager.getStationDropSummary()
 
     this.state = GameState.STATION_COMPLETE
     this.callbacks.onStateChange(this.state, {
@@ -843,7 +950,15 @@ export class GameEngine {
         branchName: branchCompletion.branch.name,
         rewards: branchCompletion.rewards
       } : null,
-      stationReplayData: this._stationReplayData
+      stationReplayData: this._stationReplayData,
+      economy: {
+        goldEarned,
+        drops: collectedDrops,
+        dropSummary,
+        clearDrops,
+        currencies: inventoryManager.getAllCurrencies(),
+        quota: stageCostManager.getQuotaInfo()
+      }
     })
   }
 
@@ -1005,6 +1120,24 @@ export class GameEngine {
   _onScoreUpdate(points, type) {
     if (type === 'perfect') {
       dailyTaskManager.onPerfectHit()
+      dropManager.tryDropOnEvent('perfect', {
+        stationId: this.currentStation?.id,
+        phase: this.phaseOrder[this.currentPhase]
+      })
+    } else if (type === 'good') {
+      dropManager.tryDropOnEvent('good', {
+        stationId: this.currentStation?.id,
+        phase: this.phaseOrder[this.currentPhase]
+      })
+    } else if (type === 'miss') {
+      if (this.currentInventoryEffects?.hasComboShield) {
+        const consumed = inventoryManager.consumeChargeEffect('comboBreakProtection')
+        if (consumed) {
+          if (this.callbacks.onComboShieldTriggered) {
+            this.callbacks.onComboShieldTriggered(consumed)
+          }
+        }
+      }
     }
     if (this.callbacks.onScoreUpdate) {
       this.callbacks.onScoreUpdate(points, type)
@@ -1012,6 +1145,11 @@ export class GameEngine {
   }
 
   _onMilestone(milestone, bonusPoints) {
+    dropManager.tryDropOnEvent('milestone', {
+      stationId: this.currentStation?.id,
+      combo: milestone.combo,
+      phase: this.phaseOrder[this.currentPhase]
+    })
     if (this.callbacks.onMilestone) {
       this.callbacks.onMilestone(milestone, bonusPoints)
     }
@@ -1142,6 +1280,85 @@ export class GameEngine {
     if (this.callbacks.onCityEventsUpdated) {
       this.callbacks.onCityEventsUpdated(cityEventManager.getActiveEvents())
     }
+  }
+
+  getInventoryManager() {
+    return inventoryManager
+  }
+
+  getShopManager() {
+    return shopManager
+  }
+
+  getDropManager() {
+    return dropManager
+  }
+
+  getStageCostManager() {
+    return stageCostManager
+  }
+
+  getCurrencies() {
+    return inventoryManager.getAllCurrencies()
+  }
+
+  getInventory() {
+    return inventoryManager.getInventorySummary()
+  }
+
+  getActiveEffects() {
+    return inventoryManager.getActiveEffectsSummary()
+  }
+
+  useItem(itemId, context = {}) {
+    return inventoryManager.useItem(itemId, {
+      ...context,
+      stationId: this.currentStation?.id
+    })
+  }
+
+  sellItem(itemId, count = 1) {
+    return inventoryManager.sellItem(itemId, count)
+  }
+
+  purchaseShopItem(uid, count = 1) {
+    return shopManager.purchaseDailyItem(uid, count)
+  }
+
+  refreshShop() {
+    return shopManager.manualRefresh()
+  }
+
+  getShopInfo() {
+    return {
+      dailyItems: shopManager.getDailyItems(),
+      recurringPacks: shopManager.getRecurringPacks(),
+      refreshInfo: shopManager.getRefreshInfo()
+    }
+  }
+
+  purchasePack(packId) {
+    return shopManager.purchaseRecurringPack(packId)
+  }
+
+  luckyDraw(count = 1) {
+    return shopManager.luckyDraw(count)
+  }
+
+  calculateEntryCost(stationId) {
+    return stageCostManager.calculateStationEntryCost(stationId, this.difficulty)
+  }
+
+  getQuotaInfo() {
+    return stageCostManager.getQuotaInfo()
+  }
+
+  reviveStation(stationId, method = 'token') {
+    return stageCostManager.consumeStationRevive(stationId, method)
+  }
+
+  retryPhase(stationId, phaseIndex) {
+    return stageCostManager.consumePhaseRetry(stationId, phaseIndex)
   }
 
   destroy() {
