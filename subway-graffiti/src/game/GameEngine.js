@@ -54,6 +54,7 @@ export class GameEngine {
     this._pendingPhaseResult = null
     this._waitingForReplay = false
     this._preStationStatsSnapshot = null
+    this._stationReplayData = []
 
     this._onResize = this._onResize.bind(this)
     this._setupQuestListeners()
@@ -472,6 +473,7 @@ export class GameEngine {
     this._pendingPhaseResult = null
     this._waitingForReplay = false
     this._preStationStatsSnapshot = null
+    this._stationReplayData = []
   }
 
   createProfile(name, color) {
@@ -503,6 +505,7 @@ export class GameEngine {
   }
 
   _onStationSelected(station, line) {
+    this._stationReplayData = []
     this._preStationStatsSnapshot = {
       totalScore: scoreManager.totalScore,
       currentScore: scoreManager.currentScore,
@@ -602,22 +605,37 @@ export class GameEngine {
   }
 
   _onPhaseComplete(result = {}) {
-    const needsReplay = result.caught || (result.replayData && result.replayData?.problems?.length > 0)
+    const replayData = result.replayData
+    if (replayData) {
+      this._stationReplayData.push({
+        phase: this.currentPhase,
+        phaseName: this.phaseOrder[this.currentPhase],
+        replayData
+      })
+    }
+
+    const hasHighlights = replayData?.highlights?.length > 0
+    const hasProblems = replayData?.problems?.length > 0
+    const hasKeyJudgments = replayData?.summary?.totalKeyJudgments > 0
+    const hasCombos = (replayData?.summary?.maxCombo || 0) >= 5
+    const isCaught = result.caught === true
+
+    const needsReplay = isCaught || hasHighlights || hasProblems || hasKeyJudgments || hasCombos
     
-    if (needsReplay) {
+    if (needsReplay && replayData) {
       this._pendingPhaseResult = result
       this._waitingForReplay = true
       this.currentPhase++
       
-      if (result.replayData && this.callbacks.onReplayAvailable) {
-        this.callbacks.onReplayAvailable(result.replayData)
+      if (this.callbacks.onReplayAvailable) {
+        this.callbacks.onReplayAvailable(replayData)
       }
       
       this.state = GameState.REPLAY
       if (this.callbacks.onStateChange) {
         this.callbacks.onStateChange(this.state, {
           caught: result.caught,
-          replayData: result.replayData,
+          replayData: replayData,
           station: this.currentStation,
           phase: this.currentPhase
         })
@@ -771,12 +789,151 @@ export class GameEngine {
         branchId: branchCompletion.branch.id,
         branchName: branchCompletion.branch.name,
         rewards: branchCompletion.rewards
-      } : null
+      } : null,
+      stationReplayData: this._stationReplayData
     })
   }
 
   continueToNextStation() {
     this.showMap()
+  }
+
+  showStationReplay() {
+    if (this._stationReplayData.length === 0) return false
+
+    const mergedData = this._mergeStationReplayData(this._stationReplayData)
+    if (!mergedData) return false
+
+    this._waitingForReplay = true
+    this._pendingPhaseResult = { caught: false }
+
+    if (this.callbacks.onReplayAvailable) {
+      this.callbacks.onReplayAvailable(mergedData)
+    }
+
+    this.state = GameState.REPLAY
+    if (this.callbacks.onStateChange) {
+      this.callbacks.onStateChange(this.state, {
+        caught: false,
+        replayData: mergedData,
+        station: this.currentStation,
+        isStationSummary: true
+      })
+    }
+    return true
+  }
+
+  _mergeStationReplayData(stationPhases) {
+    if (!stationPhases || stationPhases.length === 0) return null
+
+    const allEvents = []
+    const allFrames = []
+    const allHighlights = []
+    const allProblems = []
+    const allComboSegments = []
+    const allKeyJudgments = []
+    const allCaughtEvents = []
+    let timeOffset = 0
+
+    stationPhases.forEach((phase, phaseIdx) => {
+      const rd = phase.replayData
+      if (!rd) return
+
+      const phaseEvents = (rd.events || []).map(e => ({
+        ...e,
+        timestamp: e.timestamp + timeOffset,
+        phase: phase.phaseName
+      }))
+      allEvents.push(...phaseEvents)
+
+      const phaseFrames = (rd.frames || []).map(f => ({
+        ...f,
+        timestamp: (f.timestamp || 0) + timeOffset,
+        phase: phase.phaseName
+      }))
+      allFrames.push(...phaseFrames)
+
+      const phaseHighlights = (rd.highlights || []).map(h => ({
+        ...h,
+        startTime: (h.startTime || 0) + timeOffset,
+        endTime: (h.endTime || 0) + timeOffset,
+        phase: phase.phaseName
+      }))
+      allHighlights.push(...phaseHighlights)
+
+      const phaseProblems = (rd.problems || []).map(p => ({
+        ...p,
+        timestamp: (p.timestamp || 0) + timeOffset,
+        phase: phase.phaseName
+      }))
+      allProblems.push(...phaseProblems)
+
+      const phaseCombos = (rd.comboSegments || []).map(c => ({
+        ...c,
+        startTime: (c.startTime || 0) + timeOffset,
+        endTime: (c.endTime || 0) + timeOffset,
+        phase: phase.phaseName
+      }))
+      allComboSegments.push(...phaseCombos)
+
+      const phaseJudgments = (rd.keyJudgments || []).map(j => ({
+        ...j,
+        timestamp: (j.timestamp || 0) + timeOffset,
+        phase: phase.phaseName
+      }))
+      allKeyJudgments.push(...phaseJudgments)
+
+      const phaseCaught = (rd.caughtEvents || []).map(c => ({
+        ...c,
+        timestamp: (c.timestamp || 0) + timeOffset,
+        phase: phase.phaseName
+      }))
+      allCaughtEvents.push(...phaseCaught)
+
+      timeOffset += rd.summary?.duration || 0
+    })
+
+    const totalDuration = timeOffset
+    const firstPhase = stationPhases[0]?.replayData
+    const summary = {
+      stationId: this.currentStation?.id,
+      stationName: this.currentStation?.name,
+      phaseCount: stationPhases.length,
+      totalDuration,
+      maxCombo: Math.max(...stationPhases.map(p => p.replayData?.summary?.maxCombo || 0)),
+      totalScore: scoreManager.currentScore - (this.stationStartScore || 0),
+      totalKeyJudgments: allKeyJudgments.length,
+      totalPerfect: allKeyJudgments.filter(j => j.result === 'perfect' || j.result === 'perfect+').length,
+      totalGood: allKeyJudgments.filter(j => j.result === 'good' || j.result === 'good+').length,
+      totalMiss: allKeyJudgments.filter(j => j.result === 'miss' || j.result === 'miss*').length,
+      totalCaught: allCaughtEvents.length,
+      totalProblems: allProblems.length,
+      totalHighlights: allHighlights.length,
+      phaseSummaries: stationPhases.map(p => ({
+        phase: p.phaseName,
+        ...(p.replayData?.summary || {})
+      }))
+    }
+
+    return {
+      id: `station_${Date.now()}`,
+      type: 'station_summary',
+      stationId: this.currentStation?.id,
+      stationName: this.currentStation?.name,
+      station: this.currentStation,
+      line: this.currentLine,
+      metadata: firstPhase?.metadata,
+      summary,
+      events: allEvents,
+      frames: allFrames,
+      highlights: allHighlights,
+      problems: allProblems,
+      comboSegments: allComboSegments,
+      keyJudgments: allKeyJudgments,
+      caughtEvents: allCaughtEvents,
+      coverCandidates: firstPhase?.coverCandidates || [],
+      suggestions: stationPhases.flatMap(p => p.replayData?.suggestions || [])
+    }
   }
 
   endGame() {

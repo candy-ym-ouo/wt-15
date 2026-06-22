@@ -52,6 +52,11 @@ const showReplay = ref(false);
 const currentReplayData = ref(null);
 const comboState = reactive(scoreManager.getComboState());
 
+const hasStationReplayData = computed(() => {
+  const data = stationResult.value?.stationReplayData;
+  return data && data.length > 0;
+});
+
 const heatState = reactive({
   currentHeat: 0,
   currentLevel: 0,
@@ -937,6 +942,14 @@ function selectSkin(id) {
  }
  }
 }
+function showStationReplay() {
+  if (engine) {
+    const ok = engine.showStationReplay();
+    if (!ok) {
+      showGamePrompt('暂无回放数据', '#f39c12');
+    }
+  }
+}
 function continueAfterStation() {
  engine.continueToNextStation();
 }
@@ -1016,7 +1029,7 @@ function backFromSubscreen() {
 }
 
 function onReplayAvailable(replayData) {
-  if (replayData && (replayData.problems?.length > 0 || replayData.summary?.totalProblems > 0)) {
+  if (replayData) {
     currentReplayData.value = replayData;
     setTimeout(() => {
       showReplay.value = true;
@@ -2805,6 +2818,15 @@ onUnmounted(() => {
               <div style="text-align: right; color: #2ecc71;">x{{ stationResult.nextDifficultyParams.scoreMultiplier.toFixed(1) }}</div>
             </div>
           </div>
+
+          <button
+            v-if="hasStationReplayData"
+            class="btn btn-outline"
+            style="width: 100%; margin-bottom: 12px; border-color: var(--line-accent); color: var(--line-accent);"
+            @click="showStationReplay"
+          >
+            🎬 查看高光回放
+          </button>
 
           <button class="btn btn-primary" :style="{ background: currentTheme.ui.gradient }" style="width: 100%;" @click="continueAfterStation">
             🗺️ 前往下一站
