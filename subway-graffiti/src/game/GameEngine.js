@@ -7,6 +7,7 @@ import { battlePassManager } from './BattlePassManager.js'
 import { cityEventManager } from './CityEventManager.js'
 import { questManager } from './QuestManager.js'
 import { heatSystem } from './HeatSystem.js'
+import { achievementManager } from './AchievementManager.js'
 import { MapScene } from './MapScene.js'
 import { GraffitiGame } from './GraffitiGame.js'
 import { PatrolAvoid } from './PatrolAvoid.js'
@@ -25,7 +26,8 @@ export const GameState = {
   SEASON_PASS: 'season_pass',
   WORKSHOP: 'workshop',
   CUTSCENE: 'cutscene',
-  CHAPTER_COMPLETE: 'chapter_complete'
+  CHAPTER_COMPLETE: 'chapter_complete',
+  ACHIEVEMENTS: 'achievements'
 }
 
 export class GameEngine {
@@ -49,6 +51,7 @@ export class GameEngine {
 
     this._onResize = this._onResize.bind(this)
     this._setupQuestListeners()
+    this._setupAchievementListeners()
   }
 
   _setupQuestListeners() {
@@ -81,6 +84,21 @@ export class GameEngine {
     questManager.on('quest_reset', () => {
       if (this.callbacks.onQuestReset) {
         this.callbacks.onQuestReset()
+      }
+    })
+  }
+
+  _setupAchievementListeners() {
+    achievementManager.on('achievement_unlocked', (achievement) => {
+      if (this.callbacks.onAchievementUnlocked) {
+        this.callbacks.onAchievementUnlocked(achievement)
+      }
+      audioManager.playSFX('milestone', { tier: Math.min(achievement.rarityInfo?.id === 'legendary' ? 5 : achievement.rarityInfo?.id === 'epic' ? 4 : 3, 5) })
+    })
+
+    achievementManager.on('achievement_reset', () => {
+      if (this.callbacks.onAchievementReset) {
+        this.callbacks.onAchievementReset()
       }
     })
   }
@@ -328,10 +346,20 @@ export class GameEngine {
     return questManager
   }
 
+  getAchievementManager() {
+    return achievementManager
+  }
+
+  showAchievements() {
+    this.state = GameState.ACHIEVEMENTS
+    this.callbacks.onStateChange(this.state)
+  }
+
   switchProfile(profileId) {
     if (profileManager.switchProfile(profileId)) {
       scoreManager.loadProfile(profileId)
       questManager.loadProfile(profileId)
+      achievementManager.loadProfile(profileId)
       this._resetGameEngineState()
       this.showMenu()
       if (this.callbacks.onProfileSwitched) {
@@ -579,6 +607,8 @@ export class GameEngine {
     scoreManager.save()
     questManager.save()
 
+    const newlyUnlockedAchievements = achievementManager.checkAchievements()
+
     const questSummary = questManager.getQuestSummary()
 
     this.state = GameState.STATION_COMPLETE
@@ -602,6 +632,9 @@ export class GameEngine {
         completedQuests,
         summary: questSummary,
         pendingCutscene: questManager.currentCutscene
+      },
+      achievements: {
+        newlyUnlocked: newlyUnlockedAchievements
       }
     })
   }
@@ -612,9 +645,15 @@ export class GameEngine {
 
   endGame() {
     const result = scoreManager.endGame()
+    const newlyUnlockedAchievements = achievementManager.checkAchievements()
     audioManager.stopMusic()
     this.state = GameState.GAME_OVER
-    this.callbacks.onStateChange(this.state, result)
+    this.callbacks.onStateChange(this.state, {
+      ...result,
+      achievements: {
+        newlyUnlocked: newlyUnlockedAchievements
+      }
+    })
   }
 
   _onScoreUpdate(points, type) {

@@ -9,6 +9,7 @@ import { battlePassManager } from '@/game/BattlePassManager.js';
 import { graffitiWorkshop } from '@/game/GraffitiWorkshop.js';
 import { questManager } from '@/game/QuestManager.js';
 import { heatSystem } from '@/game/HeatSystem.js';
+import { achievementManager, AchievementCategory, CATEGORY_INFO } from '@/game/AchievementManager.js';
 import ReplayView from './ReplayView.vue';
 import GraffitiWorkshopView from './GraffitiWorkshop.vue';
 const canvasRef = ref(null);
@@ -69,6 +70,51 @@ const questSummary = reactive({
   nextQuest: null,
   activeQuest: null
 });
+
+const achievementSummary = reactive(achievementManager.getStats());
+const selectedAchievementCategory = ref(AchievementCategory.PERFORMANCE);
+const currentCategoryAchievements = ref([]);
+const showAchievementNotification = ref(false);
+const notificationAchievement = ref(null);
+const recentAchievements = ref([]);
+
+function refreshAchievementSummary() {
+  Object.assign(achievementSummary, achievementManager.getStats());
+  currentCategoryAchievements.value = achievementManager.getAchievementsByCategory(selectedAchievementCategory.value);
+  recentAchievements.value = achievementManager.getRecentUnlocks(5);
+}
+
+function selectAchievementCategory(category) {
+  audioManager.playSFX('click');
+  selectedAchievementCategory.value = category;
+  currentCategoryAchievements.value = achievementManager.getAchievementsByCategory(category);
+}
+
+function showAchievementScreen() {
+  audioManager.playSFX('click');
+  refreshAchievementSummary();
+  engine.showAchievements();
+}
+
+function getAchievementRarityStyle(rarity) {
+  return rarity || { color: '#95a5a6', glow: 'rgba(149, 165, 166, 0.4)', name: '普通' };
+}
+
+function formatAchievementDate(timestamp) {
+  if (!timestamp) return '';
+  const d = new Date(timestamp);
+  return `${d.getMonth() + 1}/${d.getDate()} ${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
+}
+
+function handleAchievementUnlocked(achievement) {
+  notificationAchievement.value = achievement;
+  showAchievementNotification.value = true;
+  setTimeout(() => {
+    showAchievementNotification.value = false;
+    notificationAchievement.value = null;
+  }, 4000);
+  refreshAchievementSummary();
+}
 
 const chapters = ref([]);
 const selectedChapterId = ref(null);
@@ -758,7 +804,11 @@ function onStateChange(state, data) {
    currentChapterComplete.value = data?.chapter || null;
    chapterCompleteReward.value = data?.reward || null;
  }
+ else if (state === GameState.ACHIEVEMENTS) {
+   refreshAchievementSummary();
+ }
  refreshQuestSummary();
+ refreshAchievementSummary();
 }
 function onTick() {
  score.value = scoreManager.currentScore;
@@ -1043,10 +1093,12 @@ onMounted(async () => {
  onCityEventExpired,
  onCityEventsCleared,
  onCityEventsUpdated,
- onStationEffectsApplied
+ onStationEffectsApplied,
+ onAchievementUnlocked: handleAchievementUnlocked
  });
  await engine.init();
  refreshQuestSummary();
+ refreshAchievementSummary();
 });
 onUnmounted(() => {
  if (_cityEventUpdateInterval.value) {
@@ -1162,6 +1214,34 @@ onUnmounted(() => {
           </div>
           <div class="milestone-rays" :class="`rays-tier-${currentMilestone.tier}`">
             <div v-for="i in 12" :key="i" class="ray" :style="{ '--ray-index': i }"></div>
+          </div>
+        </div>
+      </transition>
+
+      <transition name="achievement-notification">
+        <div v-if="showAchievementNotification && notificationAchievement" class="achievement-notification-overlay">
+          <div 
+            class="achievement-notification-card" 
+            :style="{ 
+              '--achievement-color': getAchievementRarityStyle(notificationAchievement.rarityInfo).color,
+              '--achievement-glow': getAchievementRarityStyle(notificationAchievement.rarityInfo).glow
+            }"
+          >
+            <div class="achievement-notification-badge">🏆</div>
+            <div class="achievement-notification-content">
+              <div class="achievement-notification-title">成就解锁！</div>
+              <div class="achievement-notification-icon">{{ notificationAchievement.icon }}</div>
+              <div class="achievement-notification-name" :style="{ color: getAchievementRarityStyle(notificationAchievement.rarityInfo).color }">
+                {{ notificationAchievement.name }}
+              </div>
+              <div class="achievement-notification-desc">{{ notificationAchievement.description }}</div>
+              <div 
+                class="achievement-notification-rarity" 
+                :style="{ background: getAchievementRarityStyle(notificationAchievement.rarityInfo).color }"
+              >
+                {{ getAchievementRarityStyle(notificationAchievement.rarityInfo).name }}
+              </div>
+            </div>
           </div>
         </div>
       </transition>
@@ -1506,6 +1586,10 @@ onUnmounted(() => {
             </button>
             <button class="btn btn-secondary" @click="showStatsScreen">
               📊 统计
+            </button>
+            <button class="btn btn-secondary" @click="showAchievementScreen" style="position: relative;">
+              🏆 成就
+              <span v-if="achievementSummary.unlocked < achievementSummary.total" class="btn-notification-dot" style="background: #f1c40f;"></span>
             </button>
           </div>
 
@@ -1963,6 +2047,166 @@ onUnmounted(() => {
               </div>
               <div v-else style="text-align: center; padding: 20px; opacity: 0.5;">
                 暂无位置数据
+              </div>
+            </div>
+          </div>
+
+          <button class="btn btn-outline" style="width: 100%; margin-top: 20px;" @click="backFromSubscreen">
+            ← 返回主菜单
+          </button>
+        </div>
+      </div>
+
+      <div v-if="currentState === GameState.ACHIEVEMENTS" class="screen achievements-screen">
+        <div class="screen-title" style="font-size: 32px;">🏆 成就图鉴</div>
+        <div class="screen-subtitle">ACHIEVEMENTS</div>
+
+        <div class="screen-content">
+          <div class="achievement-summary-card">
+            <div class="achievement-overall-progress">
+              <div class="achievement-progress-ring">
+                <svg viewBox="0 0 100 100" class="progress-ring">
+                  <circle class="progress-ring-bg" cx="50" cy="50" r="42"></circle>
+                  <circle 
+                    class="progress-ring-fill" 
+                    cx="50" cy="50" r="42"
+                    :style="{ 
+                      strokeDasharray: 264,
+                      strokeDashoffset: 264 - (264 * achievementSummary.percent / 100)
+                    }"
+                  ></circle>
+                </svg>
+                <div class="progress-ring-text">
+                  <div class="progress-percent">{{ achievementSummary.percent }}%</div>
+                  <div class="progress-subtext">完成度</div>
+                </div>
+              </div>
+              <div class="achievement-counts">
+                <div class="achievement-count-item">
+                  <div class="count-value" style="color: #f1c40f;">{{ achievementSummary.unlocked }}</div>
+                  <div class="count-label">已解锁</div>
+                </div>
+                <div class="achievement-count-divider"></div>
+                <div class="achievement-count-item">
+                  <div class="count-value">{{ achievementSummary.total }}</div>
+                  <div class="count-label">总成就</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="achievement-rarity-stats">
+              <div 
+                v-for="(rarity, rarityId) in achievementSummary.byRarity" 
+                :key="rarityId"
+                class="rarity-stat-item"
+                v-if="rarity.total > 0"
+              >
+                <div class="rarity-dot" :style="{ background: rarity.color, boxShadow: `0 0 8px ${rarity.glow}` }"></div>
+                <div class="rarity-name">{{ rarity.name }}</div>
+                <div class="rarity-count">{{ rarity.unlocked }}/{{ rarity.total }}</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="achievement-category-tabs">
+            <button
+              v-for="(cat, catId) in CATEGORY_INFO"
+              :key="catId"
+              class="achievement-category-tab"
+              :class="{ active: selectedAchievementCategory === catId }"
+              @click="selectAchievementCategory(catId)"
+            >
+              <span class="cat-icon">{{ cat.icon }}</span>
+              <span class="cat-name">{{ cat.name }}</span>
+              <span class="cat-count">
+                {{ achievementSummary.byCategory[catId]?.unlocked || 0 }}/{{ achievementSummary.byCategory[catId]?.total || 0 }}
+              </span>
+            </button>
+          </div>
+
+          <div class="achievement-list">
+            <div
+              v-for="achievement in currentCategoryAchievements"
+              :key="achievement.id"
+              class="achievement-card"
+              :class="{ 
+                unlocked: achievement.unlocked,
+                locked: !achievement.unlocked,
+                hidden_locked: !achievement.unlocked && achievement.category === AchievementCategory.HIDDEN
+              }"
+            >
+              <div 
+                class="achievement-icon" 
+                :style="{ 
+                  borderColor: getAchievementRarityStyle(achievement.rarityInfo).color,
+                  boxShadow: achievement.unlocked ? `0 0 15px ${getAchievementRarityStyle(achievement.rarityInfo).glow}` : 'none'
+                }"
+              >
+                <span v-if="achievement.unlocked || achievement.category !== AchievementCategory.HIDDEN">
+                  {{ achievement.icon }}
+                </span>
+                <span v-else>❓</span>
+              </div>
+              <div class="achievement-info">
+                <div class="achievement-header">
+                  <div class="achievement-name" :style="{ color: achievement.unlocked ? getAchievementRarityStyle(achievement.rarityInfo).color : '#666' }">
+                    <span v-if="achievement.unlocked || achievement.category !== AchievementCategory.HIDDEN">
+                      {{ achievement.name }}
+                    </span>
+                    <span v-else>??? 隐藏成就 ???</span>
+                  </div>
+                  <div 
+                    class="achievement-rarity-badge"
+                    :style="{ background: getAchievementRarityStyle(achievement.rarityInfo).color }"
+                  >
+                    {{ getAchievementRarityStyle(achievement.rarityInfo).name }}
+                  </div>
+                </div>
+                <div class="achievement-description">
+                  <span v-if="achievement.unlocked || achievement.category !== AchievementCategory.HIDDEN">
+                    {{ achievement.description }}
+                  </span>
+                  <span v-else>完成特殊条件后解锁，敬请探索...</span>
+                </div>
+                <div v-if="!achievement.unlocked && (achievement.category !== AchievementCategory.HIDDEN)" class="achievement-progress">
+                  <div class="achievement-progress-bar">
+                    <div 
+                      class="achievement-progress-fill" 
+                      :style="{ 
+                        width: achievement.progress.percent + '%',
+                        background: getAchievementRarityStyle(achievement.rarityInfo).color
+                      }"
+                    ></div>
+                  </div>
+                  <div class="achievement-progress-text">
+                    {{ achievement.progress.current }}{{ achievement.progress.unit || '' }} / {{ achievement.progress.total }}{{ achievement.progress.unit || '' }}
+                    <span class="progress-percent-text">({{ achievement.progress.percent }}%)</span>
+                  </div>
+                </div>
+                <div v-if="achievement.unlocked && achievement.unlockTimestamp" class="achievement-unlock-time">
+                  ✅ {{ formatAchievementDate(achievement.unlockTimestamp) }} 解锁
+                </div>
+              </div>
+            </div>
+
+            <div v-if="currentCategoryAchievements.length === 0" style="text-align: center; padding: 40px; opacity: 0.5;">
+              暂无该分类成就
+            </div>
+          </div>
+
+          <div v-if="recentAchievements.length > 0" class="recent-achievements-section">
+            <div class="section-header">
+              <span>🕐 最近解锁</span>
+            </div>
+            <div class="recent-achievements-row">
+              <div 
+                v-for="ach in recentAchievements" 
+                :key="ach.id"
+                class="recent-achievement-item"
+                :style="{ borderColor: getAchievementRarityStyle(ach.rarityInfo).color }"
+                :title="ach.name"
+              >
+                <span>{{ ach.icon }}</span>
               </div>
             </div>
           </div>
@@ -6530,5 +6774,427 @@ onUnmounted(() => {
   font-size: 11px;
   color: rgba(255, 255, 255, 0.6);
   text-align: center;
+}
+
+.achievement-notification-overlay {
+  position: absolute;
+  top: 100px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 100;
+  pointer-events: none;
+}
+
+.achievement-notification-card {
+  background: linear-gradient(135deg, rgba(0, 0, 0, 0.95) 0%, rgba(30, 30, 50, 0.95) 100%);
+  border: 2px solid var(--achievement-color, #f1c40f);
+  border-radius: 16px;
+  padding: 16px 24px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  box-shadow: 0 8px 40px var(--achievement-glow, rgba(241, 196, 15, 0.4));
+  backdrop-filter: blur(10px);
+  min-width: 280px;
+}
+
+.achievement-notification-badge {
+  font-size: 48px;
+  flex-shrink: 0;
+  animation: achievementBounce 0.6s ease infinite alternate;
+}
+
+@keyframes achievementBounce {
+  from { transform: scale(1); }
+  to { transform: scale(1.1); }
+}
+
+.achievement-notification-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.achievement-notification-title {
+  font-size: 12px;
+  color: var(--achievement-color, #f1c40f);
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 4px;
+}
+
+.achievement-notification-icon {
+  font-size: 20px;
+  margin-bottom: 2px;
+}
+
+.achievement-notification-name {
+  font-size: 16px;
+  font-weight: bold;
+  margin-bottom: 4px;
+}
+
+.achievement-notification-desc {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.7);
+  margin-bottom: 6px;
+}
+
+.achievement-notification-rarity {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: bold;
+  color: #fff;
+}
+
+.achievement-notification-enter-active {
+  animation: achievementSlideIn 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+.achievement-notification-leave-active {
+  animation: achievementSlideOut 0.4s ease forwards;
+}
+
+@keyframes achievementSlideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-50px) scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1);
+  }
+}
+
+@keyframes achievementSlideOut {
+  from {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-30px) scale(0.9);
+  }
+}
+
+.achievements-screen {
+  background: linear-gradient(180deg, #0a0a1a 0%, #1a1a3e 100%);
+}
+
+.achievement-summary-card {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 20px;
+  padding: 20px;
+  margin-bottom: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.achievement-overall-progress {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  margin-bottom: 16px;
+}
+
+.achievement-progress-ring {
+  position: relative;
+  width: 100px;
+  height: 100px;
+  flex-shrink: 0;
+}
+
+.progress-ring {
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+
+.progress-ring-bg {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.1);
+  stroke-width: 8;
+}
+
+.progress-ring-fill {
+  fill: none;
+  stroke: url(#progressGradient);
+  stroke: #f1c40f;
+  stroke-width: 8;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.5s ease;
+}
+
+.progress-ring-text {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+}
+
+.progress-percent {
+  font-size: 24px;
+  font-weight: 900;
+  color: #f1c40f;
+  text-shadow: 0 0 10px rgba(241, 196, 15, 0.5);
+}
+
+.progress-subtext {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.achievement-counts {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+}
+
+.achievement-count-item {
+  text-align: center;
+}
+
+.count-value {
+  font-size: 32px;
+  font-weight: 900;
+}
+
+.count-label {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.6);
+  margin-top: 2px;
+}
+
+.achievement-count-divider {
+  width: 1px;
+  height: 40px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.achievement-rarity-stats {
+  display: flex;
+  justify-content: space-around;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.rarity-stat-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.rarity-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.rarity-name {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.rarity-count {
+  font-size: 11px;
+  font-weight: bold;
+  color: #fff;
+}
+
+.achievement-category-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.achievement-category-tab {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 14px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.achievement-category-tab.active {
+  background: linear-gradient(135deg, #e94560 0%, #ff6b6b 100%);
+  border-color: transparent;
+  color: #fff;
+  box-shadow: 0 4px 15px rgba(233, 69, 96, 0.4);
+}
+
+.cat-icon {
+  font-size: 16px;
+}
+
+.cat-count {
+  font-size: 10px;
+  padding: 2px 6px;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  font-weight: bold;
+}
+
+.achievement-category-tab.active .cat-count {
+  background: rgba(0, 0, 0, 0.25);
+}
+
+.achievement-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.achievement-card {
+  display: flex;
+  gap: 14px;
+  padding: 14px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  transition: all 0.3s ease;
+}
+
+.achievement-card.unlocked {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.achievement-card.locked {
+  opacity: 0.7;
+}
+
+.achievement-card.hidden_locked {
+  opacity: 0.5;
+  filter: grayscale(0.5);
+}
+
+.achievement-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 2px solid;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  flex-shrink: 0;
+}
+
+.achievement-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.achievement-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 4px;
+  gap: 8px;
+}
+
+.achievement-name {
+  font-size: 15px;
+  font-weight: bold;
+  flex: 1;
+}
+
+.achievement-rarity-badge {
+  padding: 2px 8px;
+  border-radius: 8px;
+  font-size: 10px;
+  font-weight: bold;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.achievement-description {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.6);
+  margin-bottom: 8px;
+  line-height: 1.4;
+}
+
+.achievement-progress {
+  margin-top: 6px;
+}
+
+.achievement-progress-bar {
+  height: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 4px;
+}
+
+.achievement-progress-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.achievement-progress-text {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.progress-percent-text {
+  opacity: 0.7;
+}
+
+.achievement-unlock-time {
+  font-size: 11px;
+  color: #2ecc71;
+  margin-top: 4px;
+}
+
+.recent-achievements-section {
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 14px;
+  padding: 16px;
+  margin-bottom: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.section-header {
+  font-size: 14px;
+  font-weight: bold;
+  margin-bottom: 12px;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.recent-achievements-row {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.recent-achievement-item {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 2px solid;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  flex-shrink: 0;
 }
 </style>
