@@ -2783,7 +2783,9 @@ export const COMPANION_CONFIG = {
     good: 0.5,
     milestone: 5,
     noMissStation: 30,
-    useCompanionStation: 20
+    useCompanionStation: 20,
+    patrolSuccess: 15,
+    patrolCaught: 2
   },
 
   rarityConfig: {
@@ -3016,5 +3018,228 @@ export const COMPANION_CONFIG = {
       }
     }
   ]
+}
+
+export const BLACK_MARKET_CONFIG = {
+  reputation: {
+    minReputation: 0,
+    maxReputation: 1000,
+    defaultReputation: 50,
+    decayPerDay: 2,
+    levels: [
+      { threshold: 0, name: '无名小卒', color: '#95a5a6', discountMultiplier: 1.0, riskMultiplier: 1.5, accessTier: 0 },
+      { threshold: 100, name: '街头跑腿', color: '#3498db', discountMultiplier: 0.95, riskMultiplier: 1.2, accessTier: 1 },
+      { threshold: 300, name: '地下商人', color: '#2ecc71', discountMultiplier: 0.9, riskMultiplier: 1.0, accessTier: 2 },
+      { threshold: 500, name: '黑市掮客', color: '#9b59b6', discountMultiplier: 0.85, riskMultiplier: 0.8, accessTier: 3 },
+      { threshold: 750, name: '幕后老板', color: '#e67e22', discountMultiplier: 0.8, riskMultiplier: 0.6, accessTier: 4 },
+      { threshold: 900, name: '涂鸦教父', color: '#f1c40f', discountMultiplier: 0.75, riskMultiplier: 0.4, accessTier: 5 }
+    ],
+    gainSources: {
+      successfulTrade: 5,
+      largeTrade: 15,
+      riskAvoided: 10,
+      rareItemSold: 25,
+      legendaryItemSold: 50,
+      profileRecovery: 20
+    },
+    lossSources: {
+      caughtTrading: 30,
+      riskFailed: 20,
+      fraudulentTrade: 50,
+      profileRecoveryFailed: 10
+    }
+  },
+
+  sprayMaterials: {
+    categories: {
+      basic: { name: '基础喷漆', tier: 1, reputationRequired: 0 },
+      neon: { name: '霓虹喷漆', tier: 2, reputationRequired: 100 },
+      metallic: { name: '金属喷漆', tier: 3, reputationRequired: 300 },
+      legendary: { name: '传说喷漆', tier: 4, reputationRequired: 500 },
+      contraband: { name: '违禁喷漆', tier: 5, reputationRequired: 750 }
+    },
+    blackMarketSprays: [
+      { id: 'spray_basic_black', name: '午夜黑', color: '#2c3e50', category: 'basic', rarity: 'common', basePrice: { gold: 120 }, attributes: { particleBoost: 2, colorVibrancy: 1.1, dripChance: 0.12 }, description: '黑市流通的基础黑色喷漆', contraband: false },
+      { id: 'spray_basic_white', name: '纯白', color: '#ecf0f1', category: 'basic', rarity: 'common', basePrice: { gold: 120 }, attributes: { particleBoost: 2, colorVibrancy: 1.1, dripChance: 0.12 }, description: '黑市流通的基础白色喷漆', contraband: false },
+      { id: 'spray_basic_orange', name: '街头橙', color: '#e67e22', category: 'basic', rarity: 'common', basePrice: { gold: 150 }, attributes: { particleBoost: 3, colorVibrancy: 1.2, dripChance: 0.15 }, description: '街头风格橙色喷漆', contraband: false },
+      { id: 'spray_neon_pink', name: '热粉霓虹', color: '#ff0080', category: 'neon', rarity: 'rare', basePrice: { gold: 400, gem: 2 }, attributes: { particleBoost: 8, colorVibrancy: 1.6, dripChance: 0.18, glowIntensity: 1.4 }, description: '黑市特供热粉色霓虹喷漆', contraband: false },
+      { id: 'spray_neon_green', name: '毒绿霓虹', color: '#39ff14', category: 'neon', rarity: 'rare', basePrice: { gold: 400, gem: 2 }, attributes: { particleBoost: 8, colorVibrancy: 1.6, dripChance: 0.18, glowIntensity: 1.4 }, description: '黑市特供毒绿色霓虹喷漆', contraband: false },
+      { id: 'spray_neon_orange', name: '烈焰霓虹', color: '#ff6600', category: 'neon', rarity: 'rare', basePrice: { gold: 500, gem: 3 }, attributes: { particleBoost: 10, colorVibrancy: 1.7, dripChance: 0.2, glowIntensity: 1.5, scoreBonus: 0.02 }, description: '高亮度霓虹橙喷漆', contraband: false },
+      { id: 'spray_metal_copper', name: '红铜', color: '#b87333', category: 'metallic', rarity: 'epic', basePrice: { gold: 1200, gem: 5 }, attributes: { particleBoost: 14, colorVibrancy: 1.9, dripChance: 0.06, metallic: true, scoreBonus: 0.06 }, description: '复古红铜金属喷漆', contraband: false },
+      { id: 'spray_metal_rose', name: '玫瑰金', color: '#b76e79', category: 'metallic', rarity: 'epic', basePrice: { gold: 1500, gem: 6 }, attributes: { particleBoost: 15, colorVibrancy: 2.0, dripChance: 0.05, metallic: true, scoreBonus: 0.07 }, description: '奢华玫瑰金喷漆', contraband: false },
+      { id: 'spray_metal_titanium', name: '钛银', color: '#878681', category: 'metallic', rarity: 'epic', basePrice: { gold: 1800, gem: 8 }, attributes: { particleBoost: 16, colorVibrancy: 2.1, dripChance: 0.04, metallic: true, scoreBonus: 0.08, perfectBonus: 0.03 }, description: '工业级钛银金属喷漆', contraband: false },
+      { id: 'spray_legendary_phoenix', name: '凤凰烈焰', color: '#ff4500', category: 'legendary', rarity: 'legendary', basePrice: { gold: 8000, gem: 25 }, attributes: { particleBoost: 28, colorVibrancy: 2.5, dripChance: 0.25, rainbow: false, scoreBonus: 0.12, comboBonus: 0.06, fireEffect: true }, description: '传说中凤凰涅槃之火', contraband: true },
+      { id: 'spray_legendary_void', name: '虚空深渊', color: '#0d0d0d', category: 'legendary', rarity: 'legendary', basePrice: { gold: 10000, gem: 30 }, attributes: { particleBoost: 30, colorVibrancy: 2.3, dripChance: 0.02, metallic: true, scoreBonus: 0.15, perfectBonus: 0.08, voidEffect: true }, description: '吸收光线的虚空黑色喷漆', contraband: true },
+      { id: 'spray_legendary_aurora', name: '极光幻彩', color: '#00ffcc', category: 'legendary', rarity: 'legendary', basePrice: { gold: 12000, gem: 35 }, attributes: { particleBoost: 32, colorVibrancy: 2.8, dripChance: 0.22, rainbow: true, scoreBonus: 0.18, comboBonus: 0.08, auroraEffect: true }, description: '流动极光效果的传奇喷漆', contraband: true },
+      { id: 'spray_contraband_acid', name: '腐蚀酸液', color: '#7fff00', category: 'contraband', rarity: 'legendary', basePrice: { gold: 15000, gem: 40, token: 3 }, attributes: { particleBoost: 40, colorVibrancy: 3.0, dripChance: 0.35, rainbow: false, scoreBonus: 0.2, comboBonus: 0.1, perfectBonus: 0.1, acidEffect: true }, description: '违禁腐蚀喷漆，效果极强但风险极高', contraband: true },
+      { id: 'spray_contraband_inferno', name: '地狱业火', color: '#8b0000', category: 'contraband', rarity: 'legendary', basePrice: { gold: 20000, gem: 50, token: 5 }, attributes: { particleBoost: 50, colorVibrancy: 3.5, dripChance: 0.4, rainbow: false, scoreBonus: 0.25, comboBonus: 0.12, perfectBonus: 0.12, infernoEffect: true }, description: '传说中来自地狱的火焰喷漆', contraband: true }
+    ]
+  },
+
+  flashSales: {
+    enabled: true,
+    checkInterval: 30 * 60 * 1000,
+    chancePerCheck: 0.25,
+    minDuration: 15 * 60 * 1000,
+    maxDuration: 60 * 60 * 1000,
+    discountRanges: [
+      { rarity: 'common', minDiscount: 0.4, maxDiscount: 0.6 },
+      { rarity: 'rare', minDiscount: 0.45, maxDiscount: 0.65 },
+      { rarity: 'epic', minDiscount: 0.5, maxDiscount: 0.7 },
+      { rarity: 'legendary', minDiscount: 0.55, maxDiscount: 0.8 }
+    ],
+    maxFlashItems: 3,
+    notification: true
+  },
+
+  riskEvents: {
+    enabled: true,
+    baseChance: 0.15,
+    cooldown: 5 * 60 * 1000,
+    eventTypes: {
+      police_raid: {
+        id: 'police_raid',
+        name: '警察突击',
+        description: '黑市遭到警察突袭！交易可能被打断...',
+        icon: '🚨',
+        color: '#e74c3c',
+        rarity: 'common',
+        baseChance: 0.35,
+        minReputationAffected: 0,
+        effects: {
+          itemLossChance: 0.3,
+          currencyLossChance: 0.4,
+          currencyLossPercent: { min: 0.05, max: 0.2 },
+          reputationLoss: 30,
+          canAvoid: true,
+          avoidReputationThreshold: 500,
+          avoidCost: { gold: 500 }
+        }
+      },
+      undercut_deal: {
+        id: 'undercut_deal',
+        name: '杀价陷阱',
+        description: '对方想压价，你接受吗？',
+        icon: '💰',
+        color: '#f39c12',
+        rarity: 'common',
+        baseChance: 0.25,
+        minReputationAffected: 0,
+        effects: {
+          priceReduction: { min: 0.15, max: 0.35 },
+          reputationGainOnAccept: 2,
+          reputationLossOnReject: 5
+        }
+      },
+      counterfeit_goods: {
+        id: 'counterfeit_goods',
+        name: '假货风险',
+        description: '这批货可能有问题...',
+        icon: '⚠️',
+        color: '#e67e22',
+        rarity: 'rare',
+        baseChance: 0.15,
+        minReputationAffected: 100,
+        effects: {
+          fakeChance: 0.4,
+          fakeItemValueMultiplier: 0.3,
+          reputationGainOnDetect: 10,
+          canDetect: true,
+          detectReputationThreshold: 300,
+          detectCost: { gold: 200 }
+        }
+      },
+      secret_stash: {
+        id: 'secret_stash',
+        name: '秘密存货',
+        description: '商家拿出了私藏好货！',
+        icon: '🎁',
+        color: '#2ecc71',
+        rarity: 'rare',
+        baseChance: 0.1,
+        minReputationAffected: 300,
+        effects: {
+          bonusItemChance: 1.0,
+          bonusRarityBoost: 1,
+          reputationGain: 15
+        }
+      },
+      informant_tip: {
+        id: 'informant_tip',
+        name: '线人情报',
+        description: '线人透露了即将到来的搜查情报',
+        icon: '🔍',
+        color: '#3498db',
+        rarity: 'epic',
+        baseChance: 0.08,
+        minReputationAffected: 500,
+        effects: {
+          riskImmunityDuration: 30 * 60 * 1000,
+          reputationGain: 20,
+          cost: { gold: 800, gem: 5 }
+        }
+      },
+      kingpin_blessing: {
+        id: 'kingpin_blessing',
+        name: '大佬眷顾',
+        description: '黑市老大注意到了你，赐予祝福！',
+        icon: '👑',
+        color: '#f1c40f',
+        rarity: 'legendary',
+        baseChance: 0.05,
+        minReputationAffected: 750,
+        effects: {
+          allTradesDiscount: 0.5,
+          duration: 60 * 60 * 1000,
+          reputationGain: 50,
+          bonusRareItem: true
+        }
+      }
+    }
+  },
+
+  profileRecovery: {
+    enabled: true,
+    baseCost: { gold: 2000, gem: 20 },
+    reputationMultiplierPerLevel: 0.1,
+    minReputation: 100,
+    recoverableItems: {
+      currencies: { gold: 0.7, gem: 0.5, token: 0.3 },
+      items: {
+        common: 0.8,
+        rare: 0.6,
+        epic: 0.4,
+        legendary: 0.2
+      }
+    },
+    maxRecoveryAgeDays: 30,
+    feeDiscountPerReputationLevel: 0.03,
+    historyLimit: 10
+  },
+
+  trading: {
+    marketRefreshInterval: 2 * 60 * 60 * 1000,
+    maxListings: 8,
+    listingFeePercent: 0.05,
+    minListingFee: { gold: 50 },
+    autoPriceRange: {
+      common: { min: 0.8, max: 1.2 },
+      rare: { min: 0.7, max: 1.4 },
+      epic: { min: 0.6, max: 1.6 },
+      legendary: { min: 0.5, max: 2.0 }
+    },
+    priceFluctuation: {
+      enabled: true,
+      updateInterval: 30 * 60 * 1000,
+      volatility: 0.15
+    },
+    buybackCooldown: 10 * 60 * 1000
+  },
+
+  ui: {
+    accentColor: '#8e44ad',
+    warningColor: '#c0392b',
+    successColor: '#27ae60'
+  }
 }
 

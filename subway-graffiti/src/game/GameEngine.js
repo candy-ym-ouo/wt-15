@@ -12,6 +12,7 @@ import { dailyTaskManager } from './DailyTaskManager.js'
 import { routeBranchManager } from './RouteBranchManager.js'
 import { inventoryManager } from './InventoryManager.js'
 import { shopManager } from './ShopManager.js'
+import { blackMarketManager } from './BlackMarketManager.js'
 import { dropManager } from './DropManager.js'
 import { stageCostManager } from './StageCostManager.js'
 import { MapScene } from './MapScene.js'
@@ -41,7 +42,8 @@ export const GameState = {
   GARAGE_DEFENSE_RESULT: 'garage_defense_result',
   SHOP: 'shop',
   INVENTORY: 'inventory',
-  COMPANIONS: 'companions'
+  COMPANIONS: 'companions',
+  BLACK_MARKET: 'black_market'
 }
 
 export class GameEngine {
@@ -111,6 +113,42 @@ export class GameEngine {
     shopManager.on('item_purchased', (data) => {
       if (this.callbacks.onShopItemPurchased) {
         this.callbacks.onShopItemPurchased(data)
+      }
+    })
+
+    blackMarketManager.on('reputation_changed', (data) => {
+      if (this.callbacks.onBlackMarketReputationChanged) {
+        this.callbacks.onBlackMarketReputationChanged(data)
+      }
+    })
+
+    blackMarketManager.on('spray_purchased', (data) => {
+      if (this.callbacks.onBlackMarketSprayPurchased) {
+        this.callbacks.onBlackMarketSprayPurchased(data)
+      }
+    })
+
+    blackMarketManager.on('risk_event_triggered', (data) => {
+      if (this.callbacks.onBlackMarketRiskEventTriggered) {
+        this.callbacks.onBlackMarketRiskEventTriggered(data)
+      }
+    })
+
+    blackMarketManager.on('risk_event_resolved', (data) => {
+      if (this.callbacks.onBlackMarketRiskEventResolved) {
+        this.callbacks.onBlackMarketRiskEventResolved(data)
+      }
+    })
+
+    blackMarketManager.on('flash_sale_started', (data) => {
+      if (this.callbacks.onBlackMarketFlashSaleStarted) {
+        this.callbacks.onBlackMarketFlashSaleStarted(data)
+      }
+    })
+
+    blackMarketManager.on('profile_recovered', (data) => {
+      if (this.callbacks.onBlackMarketProfileRecovered) {
+        this.callbacks.onBlackMarketProfileRecovered(data)
       }
     })
 
@@ -323,7 +361,7 @@ export class GameEngine {
       audioManager.playSFX('milestone', { tier: 2 })
     })
 
-    companionManager.on('companion_equipped', (data) => {
+    companionManager.on('companion_changed', (data) => {
       if (this.callbacks.onCompanionEquipped) {
         this.callbacks.onCompanionEquipped(data)
       }
@@ -583,6 +621,7 @@ export class GameEngine {
       dailyTaskManager.loadProfile(profileId)
       inventoryManager.loadProfile(profileId)
       shopManager.loadProfile(profileId)
+      blackMarketManager.loadProfile(profileId)
       stageCostManager.loadProfile(profileId)
       this._resetGameEngineState()
       this.showMenu()
@@ -622,6 +661,9 @@ export class GameEngine {
       const newCurrent = profileManager.getCurrentProfile()
       if (newCurrent) {
         scoreManager.loadProfile(newCurrent.id)
+        inventoryManager.loadProfile(newCurrent.id)
+        shopManager.loadProfile(newCurrent.id)
+        blackMarketManager.loadProfile(newCurrent.id)
         this._resetGameEngineState()
       }
     }
@@ -675,6 +717,8 @@ export class GameEngine {
     this.currentPhase = 0
     this.stationStartScore = scoreManager.currentScore
     this.currentDifficultyParams = this.computeDifficultyParams(station)
+    this._preCompanionExp = companionManager.activeCompanionId ?
+      (companionManager.companionExp[companionManager.activeCompanionId] || 0) : 0
 
     const stationEffects = cityEventManager.getCombinedEffectsForStation(station.id)
     this.currentStationEffects = stationEffects
@@ -966,6 +1010,15 @@ export class GameEngine {
 
     const newlyUnlockedAchievements = achievementManager.checkAchievements()
 
+    companionManager.checkUnlocks()
+    companionManager.addExpForEvent('station_complete', {
+      noMiss: scoreManager.stationMissCount === 0,
+      noCaught: scoreManager.stationCaughtCount === 0
+    })
+
+    const companionSummary = companionManager.getStats()
+    const activeCompanion = companionManager.getActiveCompanion()
+
     const questSummary = questManager.getQuestSummary()
     const dropSummary = dropManager.getStationDropSummary()
 
@@ -1011,6 +1064,12 @@ export class GameEngine {
         clearDrops,
         currencies: inventoryManager.getAllCurrencies(),
         quota: stageCostManager.getQuotaInfo()
+      },
+      companion: {
+        active: activeCompanion,
+        summary: companionSummary,
+        gainedExp: activeCompanion ?
+          (companionManager.companionExp[activeCompanion.id] || 0) - (this._preCompanionExp || 0) : 0
       }
     })
   }
@@ -1396,6 +1455,38 @@ export class GameEngine {
 
   luckyDraw(count = 1) {
     return shopManager.luckyDraw(count)
+  }
+
+  getBlackMarketInfo() {
+    return blackMarketManager.getMarketInfo()
+  }
+
+  purchaseBlackMarketSpray(listingUid, count = 1) {
+    return blackMarketManager.purchaseSpray(listingUid, count)
+  }
+
+  refreshBlackMarket() {
+    return blackMarketManager.refreshMarket()
+  }
+
+  getBlackMarketRiskEvent() {
+    return blackMarketManager.getActiveRiskEvent()
+  }
+
+  resolveBlackMarketRiskEvent(action, params = {}) {
+    return blackMarketManager.resolveRiskEvent(action, params)
+  }
+
+  getBlackMarketRecoveryHistory() {
+    return blackMarketManager.getRecoveryHistory()
+  }
+
+  recoverBlackMarketProfile(profileSnapshot) {
+    return blackMarketManager.recoverDeletedProfile(profileSnapshot)
+  }
+
+  getBlackMarketManager() {
+    return blackMarketManager
   }
 
   calculateEntryCost(stationId) {

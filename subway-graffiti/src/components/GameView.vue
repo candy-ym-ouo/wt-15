@@ -1139,26 +1139,39 @@ const showCompanionUnlock = ref(false);
 const unlockedCompanionData = ref(null);
 const showBondUp = ref(false);
 const bondUpData = ref(null);
+const selectedCompanionDetail = ref(null);
 
 function refreshCompanions() {
   if (!engine) return;
   companions.value = engine.getCompanions() || [];
   unlockedCompanions.value = engine.getUnlockedCompanions() || [];
   activeCompanion.value = engine.getActiveCompanion() || null;
+  if (selectedCompanionDetail.value) {
+    const updated = companions.value.find(c => c.id === selectedCompanionDetail.value.id);
+    if (updated) {
+      selectedCompanionDetail.value = updated;
+    }
+  }
 }
 
 function showCompanionsScreen() {
   audioManager.playSFX('click');
   refreshCompanions();
+  selectedCompanionDetail.value = null;
   engine?.showCompanions();
 }
 
 function selectCompanion(companionId) {
   if (!engine) return;
   audioManager.playSFX('click');
+  const target = companions.value.find(c => c.id === companionId);
+  if (!target || !target.unlocked) return;
   const result = engine.equipCompanion(companionId);
   if (result) {
     refreshCompanions();
+    selectedCompanionDetail.value = target;
+  } else {
+    selectedCompanionDetail.value = target;
   }
 }
 
@@ -1559,6 +1572,64 @@ onUnmounted(() => {
                 >
                   {{ reward.type === 'score' ? `🏆+${reward.value}分` : reward.type === 'battle_pass_exp' ? `🎖️+${reward.value}EXP` : reward.type === 'skin_trial' ? `👕试用${reward.durationHours}h` : '💰' + reward.value }}
                 </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </transition>
+
+      <transition name="achievement-notification">
+        <div v-if="showCompanionUnlock && unlockedCompanionData" class="achievement-notification-overlay">
+          <div 
+            class="achievement-notification-card companion-unlock-notif" 
+            :style="{ 
+              '--achievement-color': getCompanionRarityStyle(unlockedCompanionData.rarity).color,
+              '--achievement-glow': getCompanionRarityStyle(unlockedCompanionData.rarity).glow
+            }"
+          >
+            <div class="achievement-notification-badge">🎉</div>
+            <div class="achievement-notification-content">
+              <div class="achievement-notification-title">新伙伴解锁！</div>
+              <div class="achievement-notification-icon" style="font-size: 56px;">{{ unlockedCompanionData.icon }}</div>
+              <div class="achievement-notification-name" :style="{ color: getCompanionRarityStyle(unlockedCompanionData.rarity).color }">
+                {{ unlockedCompanionData.name }}
+              </div>
+              <div class="achievement-notification-desc">{{ unlockedCompanionData.title }}</div>
+              <div 
+                class="achievement-notification-rarity" 
+                :style="{ background: getCompanionRarityStyle(unlockedCompanionData.rarity).color }"
+              >
+                {{ getCompanionRarityStyle(unlockedCompanionData.rarity).name }}
+              </div>
+            </div>
+          </div>
+        </div>
+      </transition>
+
+      <transition name="achievement-notification">
+        <div v-if="showBondUp && bondUpData" class="achievement-notification-overlay">
+          <div 
+            class="achievement-notification-card bond-up-notif" 
+            :style="{ 
+              '--achievement-color': getCompanionRarityStyle(bondUpData.companion?.rarity || 'rare').color,
+              '--achievement-glow': getCompanionRarityStyle(bondUpData.companion?.rarity || 'rare').glow
+            }"
+          >
+            <div class="achievement-notification-badge">💖</div>
+            <div class="achievement-notification-content">
+              <div class="achievement-notification-title">羁绊升级！</div>
+              <div class="achievement-notification-icon" style="font-size: 48px;">{{ bondUpData.companion?.icon }}</div>
+              <div class="achievement-notification-name" :style="{ color: getCompanionRarityStyle(bondUpData.companion?.rarity || 'rare').color }">
+                {{ bondUpData.companion?.name }}
+              </div>
+              <div class="achievement-notification-desc">
+                Lv.{{ bondUpData.prevLevel }} → Lv.{{ bondUpData.newLevel }}
+              </div>
+              <div 
+                class="achievement-notification-rarity" 
+                :style="{ background: getCompanionRarityStyle(bondUpData.companion?.rarity || 'rare').color }"
+              >
+                {{ bondUpData.bondName }}
               </div>
             </div>
           </div>
@@ -2065,6 +2136,168 @@ onUnmounted(() => {
         @item-purchased="handleItemPurchased"
         @currency-updated="handleCurrencyUpdated"
       />
+
+      <div v-if="currentState === GameState.COMPANIONS" class="screen">
+        <div class="screen-title" style="font-size: 32px;">角色伙伴</div>
+        <div class="screen-subtitle">收集伙伴，解锁专属羁绊技能</div>
+
+        <div v-if="activeCompanion" class="active-companion-banner" :style="{ borderColor: getCompanionRarityStyle(activeCompanion.rarity).color }">
+          <div class="active-companion-icon">{{ activeCompanion.icon }}</div>
+          <div class="active-companion-info">
+            <div class="active-companion-name" :style="{ color: getCompanionRarityStyle(activeCompanion.rarity).color }">{{ activeCompanion.name }}</div>
+            <div class="active-companion-bond">羁绊等级 Lv.{{ activeCompanion.bondLevel }} - {{ activeCompanion.bondName }}</div>
+          </div>
+          <div class="active-companion-voice-preview" @click="() => { const v = activeCompanion.voices?.perfect; if (v) audioManager.playVoice(v) }">
+            🔊 试听
+          </div>
+        </div>
+        <div v-else class="no-active-companion">
+          暂无装备中的伙伴，选择下方伙伴开始冒险吧！
+        </div>
+
+        <div class="screen-content">
+          <div class="companion-grid">
+            <div
+              v-for="c in companions"
+              :key="c.id"
+              class="companion-card"
+              :class="{
+                selected: activeCompanion?.id === c.id,
+                locked: !c.unlocked
+              }"
+              :style="{
+                borderColor: getCompanionRarityStyle(c.rarity).color,
+                boxShadow: c.unlocked ? `0 0 16px ${getCompanionRarityStyle(c.rarity).glow}` : 'none'
+              }"
+              @click="c.unlocked && selectCompanion(c.id)"
+            >
+              <div class="companion-rarity-badge" :style="{ background: getCompanionRarityStyle(c.rarity).color }">
+                {{ getCompanionRarityStyle(c.rarity).name }}
+              </div>
+
+              <div v-if="!c.unlocked" class="companion-locked-overlay">
+                <div style="font-size: 48px; margin-bottom: 12px;">🔒</div>
+                <div style="font-size: 13px; opacity: 0.85;">{{ c.unlockHint }}</div>
+              </div>
+
+              <div class="companion-icon">{{ c.icon }}</div>
+              <div class="companion-name">{{ c.name }}</div>
+              <div class="companion-title">{{ c.title }}</div>
+
+              <div v-if="c.unlocked" class="companion-bond-bar">
+                <div class="bond-bar-bg">
+                  <div
+                    class="bond-bar-fill"
+                    :style="{
+                      width: `${Math.min(100, c.expProgress * 100)}%`,
+                      background: `linear-gradient(90deg, ${getCompanionRarityStyle(c.rarity).color}, #f1c40f)`
+                    }"
+                  ></div>
+                </div>
+                <div class="bond-info">
+                  <span class="bond-level">Lv.{{ c.bondLevel }}</span>
+                  <span class="bond-name">{{ c.bondName }}</span>
+                  <span class="bond-exp">{{ c.currentExp }}/{{ c.expToNext }}</span>
+                </div>
+              </div>
+
+              <div v-if="c.unlocked" class="companion-skills">
+                <div class="skill-tag" v-if="c.effectiveSkills.graffiti?.perfectRadiusBonus">
+                  🎯 判定圈 +{{ Math.round(c.effectiveSkills.graffiti.perfectRadiusBonus) }}
+                </div>
+                <div class="skill-tag" v-if="c.effectiveSkills.graffiti?.goodRadiusBonus">
+                  ✨ Good判定 +{{ Math.round(c.effectiveSkills.graffiti.goodRadiusBonus) }}
+                </div>
+                <div class="skill-tag" v-if="c.effectiveSkills.graffiti?.hitHint">
+                  💡 命中提示
+                </div>
+                <div class="skill-tag" v-if="c.effectiveSkills.patrol?.guardWarning">
+                  👁️ 守卫预警
+                </div>
+                <div class="skill-tag" v-if="c.effectiveSkills.patrol?.laserWarning">
+                  ⚡ 激光预警
+                </div>
+                <div class="skill-tag" v-if="c.effectiveSkills.patrol?.safeZoneHint">
+                  🏠 安全区高亮
+                </div>
+              </div>
+
+              <div v-if="activeCompanion?.id === c.id" class="companion-equipped-tag">✓ 已装备</div>
+            </div>
+          </div>
+
+          <div v-if="selectedCompanionDetail" class="companion-detail-panel">
+            <div class="detail-title">{{ selectedCompanionDetail.name }} · 羁绊详情</div>
+            <div class="detail-section">
+              <div class="detail-section-title">📖 人物介绍</div>
+              <div class="detail-content">{{ selectedCompanionDetail.description }}</div>
+            </div>
+            <div class="detail-section">
+              <div class="detail-section-title">🎯 涂鸦技能</div>
+              <div class="detail-list">
+                <div v-if="selectedCompanionDetail.skills.graffiti?.perfectRadiusBonus" class="detail-row">
+                  <span>判定圈扩大</span>
+                  <span :style="{ color: '#2ecc71' }">+{{ selectedCompanionDetail.effectiveSkills.graffiti.perfectRadiusBonus }}px</span>
+                </div>
+                <div v-if="selectedCompanionDetail.skills.graffiti?.goodRadiusBonus" class="detail-row">
+                  <span>Good判定扩大</span>
+                  <span :style="{ color: '#f39c12' }">+{{ selectedCompanionDetail.effectiveSkills.graffiti.goodRadiusBonus }}px</span>
+                </div>
+                <div v-if="selectedCompanionDetail.skills.graffiti?.hitHint" class="detail-row">
+                  <span>命中时机提示</span>
+                  <span :style="{ color: '#3498db' }">提前 {{ (selectedCompanionDetail.effectiveSkills.graffiti.hitHint * 100).toFixed(0) }}%</span>
+                </div>
+              </div>
+            </div>
+            <div class="detail-section">
+              <div class="detail-section-title">🚓 巡逻技能</div>
+              <div class="detail-list">
+                <div v-if="selectedCompanionDetail.skills.patrol?.guardWarning" class="detail-row">
+                  <span>守卫接近预警</span>
+                  <span :style="{ color: '#e74c3c' }">{{ (selectedCompanionDetail.effectiveSkills.patrol.guardWarning * 150).toFixed(0) }}px</span>
+                </div>
+                <div v-if="selectedCompanionDetail.skills.patrol?.laserWarning" class="detail-row">
+                  <span>激光预警延长</span>
+                  <span :style="{ color: '#9b59b6' }">+{{ selectedCompanionDetail.effectiveSkills.patrol.laserWarning.toFixed(1) }}s</span>
+                </div>
+                <div v-if="selectedCompanionDetail.skills.patrol?.safeZoneHint" class="detail-row">
+                  <span>安全区高亮</span>
+                  <span :style="{ color: '#2ecc71' }">{{ (selectedCompanionDetail.effectiveSkills.patrol.safeZoneHint * 100).toFixed(0) }}%强化</span>
+                </div>
+              </div>
+            </div>
+            <div class="detail-section">
+              <div class="detail-section-title">🎵 语音台词</div>
+              <div class="voice-grid">
+                <div class="voice-item" @click="() => selectedCompanionDetail.voices?.perfect && audioManager.playVoice(selectedCompanionDetail.voices.perfect)">
+                  <span>🎯 命中Perfect</span>
+                  <span class="voice-play-btn">▶</span>
+                </div>
+                <div class="voice-item" @click="() => selectedCompanionDetail.voices?.good && audioManager.playVoice(selectedCompanionDetail.voices.good)">
+                  <span>✨ 命中Good</span>
+                  <span class="voice-play-btn">▶</span>
+                </div>
+                <div class="voice-item" @click="() => selectedCompanionDetail.voices?.miss && audioManager.playVoice(selectedCompanionDetail.voices.miss)">
+                  <span>❌ 失误</span>
+                  <span class="voice-play-btn">▶</span>
+                </div>
+                <div class="voice-item" @click="() => selectedCompanionDetail.voices?.guard_warning && audioManager.playVoice(selectedCompanionDetail.voices.guard_warning)">
+                  <span>⚠ 守卫预警</span>
+                  <span class="voice-play-btn">▶</span>
+                </div>
+                <div class="voice-item" @click="() => selectedCompanionDetail.voices?.laser_warning && audioManager.playVoice(selectedCompanionDetail.voices.laser_warning)">
+                  <span>⚡ 激光预警</span>
+                  <span class="voice-play-btn">▶</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <button class="btn btn-outline" style="width: 100%; margin-top: 24px;" @click="backFromSubscreen">
+            ← 返回主菜单
+          </button>
+        </div>
+      </div>
 
       <div v-if="currentState === GameState.STATS" class="screen stats-screen">
         <div class="screen-title" style="font-size: 32px;">游戏统计</div>
@@ -7401,6 +7634,280 @@ onUnmounted(() => {
     opacity: 0;
     transform: translateX(-50%) translateY(-30px) scale(0.9);
   }
+}
+
+.companion-unlock-notif {
+  min-width: 320px;
+}
+.bond-up-notif {
+  min-width: 320px;
+}
+
+.active-companion-banner {
+  background: linear-gradient(135deg, rgba(30,30,60,0.95), rgba(50,30,80,0.95));
+  border: 2px solid #f1c40f;
+  border-radius: 16px;
+  padding: 20px 24px;
+  margin: 0 0 24px 0;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  backdrop-filter: blur(10px);
+}
+.active-companion-icon {
+  font-size: 64px;
+  flex-shrink: 0;
+}
+.active-companion-info {
+  flex: 1;
+}
+.active-companion-name {
+  font-size: 26px;
+  font-weight: 900;
+  color: #f1c40f;
+  margin-bottom: 6px;
+}
+.active-companion-bond {
+  font-size: 14px;
+  color: rgba(255,255,255,0.8);
+}
+.active-companion-voice-preview {
+  background: rgba(255,255,255,0.1);
+  border: 1px solid rgba(255,255,255,0.2);
+  padding: 10px 16px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 14px;
+  color: rgba(255,255,255,0.9);
+}
+.active-companion-voice-preview:hover {
+  background: rgba(255,255,255,0.18);
+  transform: scale(1.05);
+}
+.no-active-companion {
+  background: rgba(255,255,255,0.05);
+  border: 1px dashed rgba(255,255,255,0.2);
+  border-radius: 12px;
+  padding: 24px;
+  margin: 0 0 24px 0;
+  text-align: center;
+  color: rgba(255,255,255,0.6);
+  font-size: 14px;
+}
+
+.companion-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px;
+}
+.companion-card {
+  position: relative;
+  background: linear-gradient(180deg, rgba(40,40,70,0.9), rgba(25,25,50,0.95));
+  border: 2px solid #555;
+  border-radius: 14px;
+  padding: 18px 16px 16px;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  overflow: hidden;
+}
+.companion-card:hover:not(.locked) {
+  transform: translateY(-3px);
+  border-color: rgba(255,255,255,0.4);
+}
+.companion-card.selected {
+  border-color: #fff !important;
+  box-shadow: 0 0 24px rgba(255,255,255,0.2), 0 0 40px rgba(255,255,255,0.1) !important;
+  background: linear-gradient(180deg, rgba(60,60,100,0.95), rgba(40,40,80,0.95));
+}
+.companion-card.locked {
+  cursor: not-allowed;
+  opacity: 0.75;
+  filter: grayscale(0.4);
+}
+.companion-rarity-badge {
+  position: absolute;
+  top: 0;
+  right: 0;
+  padding: 3px 12px;
+  font-size: 10px;
+  font-weight: 700;
+  color: #fff;
+  border-bottom-left-radius: 12px;
+  letter-spacing: 0.5px;
+}
+.companion-locked-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.7);
+  backdrop-filter: blur(3px);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 5;
+  text-align: center;
+  padding: 12px;
+  color: rgba(255,255,255,0.9);
+}
+.companion-icon {
+  font-size: 56px;
+  text-align: center;
+  margin: 6px 0 10px 0;
+}
+.companion-name {
+  font-size: 18px;
+  font-weight: 900;
+  color: #fff;
+  text-align: center;
+  margin-bottom: 2px;
+}
+.companion-title {
+  font-size: 12px;
+  color: rgba(255,255,255,0.55);
+  text-align: center;
+  margin-bottom: 12px;
+}
+.companion-bond-bar {
+  margin-bottom: 10px;
+}
+.bond-bar-bg {
+  width: 100%;
+  height: 6px;
+  background: rgba(255,255,255,0.1);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 6px;
+}
+.bond-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #f1c40f, #e67e22);
+  border-radius: 3px;
+  transition: width 0.3s;
+}
+.bond-info {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  color: rgba(255,255,255,0.7);
+}
+.bond-level {
+  font-weight: 800;
+  color: #f1c40f;
+}
+.bond-name {
+  font-weight: 700;
+}
+.bond-exp {
+  color: rgba(255,255,255,0.5);
+}
+.companion-skills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 4px;
+}
+.skill-tag {
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.12);
+  padding: 3px 8px;
+  border-radius: 7px;
+  font-size: 11px;
+  color: rgba(255,255,255,0.85);
+}
+.companion-equipped-tag {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  background: linear-gradient(135deg, #2ecc71, #27ae60);
+  color: #fff;
+  padding: 3px 10px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 700;
+}
+.companion-detail-panel {
+  margin-top: 28px;
+  background: linear-gradient(180deg, rgba(45,45,85,0.95), rgba(30,30,65,0.95));
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 16px;
+  padding: 24px;
+}
+.detail-title {
+  font-size: 22px;
+  font-weight: 900;
+  color: #fff;
+  margin-bottom: 18px;
+  text-align: center;
+}
+.detail-section {
+  margin-bottom: 18px;
+}
+.detail-section:last-child {
+  margin-bottom: 0;
+}
+.detail-section-title {
+  font-size: 13px;
+  color: rgba(255,255,255,0.65);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 10px;
+  font-weight: 700;
+}
+.detail-content {
+  font-size: 14px;
+  line-height: 1.7;
+  color: rgba(255,255,255,0.85);
+}
+.detail-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.detail-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  background: rgba(255,255,255,0.05);
+  border-radius: 10px;
+  font-size: 13px;
+  color: rgba(255,255,255,0.85);
+}
+.voice-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 8px;
+}
+.voice-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 12px;
+  color: rgba(255,255,255,0.85);
+  transition: all 0.2s;
+}
+.voice-item:hover {
+  background: rgba(255,255,255,0.12);
+  border-color: rgba(255,255,255,0.2);
+}
+.voice-play-btn {
+  background: rgba(46, 204, 113, 0.2);
+  color: #2ecc71;
+  width: 26px;
+  height: 26px;
+  border-radius: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
 }
 
 .achievements-screen {

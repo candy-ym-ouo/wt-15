@@ -305,12 +305,15 @@ class CompanionManager {
     if (newBondLevel !== prevBondLevel) {
       this.companionBonds[companionId] = newBondLevel
       const companion = this.getCompanion(companionId)
+      const bondInfo = this.getBondLevelInfo(newBondLevel)
       this._emit('bond_level_up', {
         companionId,
         previousLevel: prevBondLevel,
         newLevel: newBondLevel,
+        prevLevel: prevBondLevel,
         companion,
-        bonuses: this.getBondLevelInfo(newBondLevel).bonuses
+        bondName: bondInfo.name,
+        bonuses: bondInfo.bonuses
       })
     }
 
@@ -383,6 +386,47 @@ class CompanionManager {
     if (!voiceLines || !Array.isArray(voiceLines) || voiceLines.length === 0) return null
 
     return voiceLines[Math.floor(Math.random() * voiceLines.length)]
+  }
+
+  getVoiceForEvent(eventType) {
+    return this.getVoiceLine(eventType)
+  }
+
+  onPatrolResult(resultType) {
+    if (!this.activeCompanionId) return
+
+    const expSources = COMPANION_CONFIG.expSources
+    let amount = 0
+
+    switch (resultType) {
+      case 'success':
+        amount = expSources.patrolSuccess
+        break
+      case 'caught':
+        amount = expSources.patrolCaught
+        break
+    }
+
+    if (amount > 0) {
+      this.addExpToActiveCompanion(amount, `patrol_${resultType}`)
+    }
+  }
+
+  addExpForEvent(eventType, details = {}) {
+    switch (eventType) {
+      case 'graffiti_hit':
+        this.onGraffitiResult(details.result || 'good')
+        break
+      case 'patrol_success':
+        this.onPatrolResult('success')
+        break
+      case 'patrol_caught':
+        this.onPatrolResult('caught')
+        break
+      case 'station_complete':
+        this.onStationComplete(details)
+        break
+    }
   }
 
   getStats() {
