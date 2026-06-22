@@ -2191,3 +2191,168 @@ export const QUEST_LINES = {
     multi_station: { name: '多站挑战', description: '完成多个站点挑战' }
   }
 }
+
+export const LINE_BRANCHES = {
+  1: {
+    lineId: 1,
+    branches: [
+      {
+        id: 'line1_main',
+        type: 'main',
+        name: '主线 · 标准路线',
+        description: '标准难度，循序渐进的官方推荐路线',
+        icon: '🚇',
+        color: '#e94560',
+        stationOrder: ['s1-1', 's1-2', 's1-3', 's1-5', 's1-6', 's1-8'],
+        difficultyGrowth: 1.0,
+        scoreMultiplier: 1.0,
+        unlockCondition: null,
+        junctionAt: ['s1-3', 's1-6'],
+        rewards: {
+          completionBonus: 2000,
+          completionExp: 300,
+          title: '1号线征服者'
+        }
+      },
+      {
+        id: 'line1_art',
+        type: 'easy',
+        name: '艺术支线 · 创作之路',
+        description: '经过艺术区和河畔公园，难度较低但奖励丰富',
+        icon: '🎨',
+        color: '#9b59b6',
+        stationOrder: ['s1-1', 's1-2', 's1-3', 's1-4', 's1-6', 's1-7', 's1-8'],
+        difficultyGrowth: 0.75,
+        scoreMultiplier: 0.85,
+        unlockCondition: null,
+        junctionAt: ['s1-3', 's1-6'],
+        rewards: {
+          completionBonus: 2500,
+          completionExp: 400,
+          unlockSpray: 'spray_neon_magenta',
+          title: '艺术漫游者'
+        }
+      },
+      {
+        id: 'line1_campus',
+        type: 'hard',
+        name: '学霸支线 · 知识殿堂',
+        description: '经过大学城和科技园，高难度高回报',
+        icon: '🎓',
+        color: '#f39c12',
+        stationOrder: ['s1-1', 's1-2', 's1-3', 's1-5', 's1-6', 's1-8'],
+        difficultyGrowth: 1.5,
+        scoreMultiplier: 1.6,
+        unlockCondition: { type: 'score', stationId: 's1-3', minScore: 1000 },
+        junctionAt: ['s1-3', 's1-6'],
+        rewards: {
+          completionBonus: 4000,
+          completionExp: 600,
+          unlockSkins: ['neon'],
+          title: '学霸级涂鸦人'
+        }
+      },
+      {
+        id: 'line1_secret',
+        type: 'secret',
+        name: '秘境支线 · 全图探索',
+        description: '隐藏路线，途经所有站点，需要15颗星解锁',
+        icon: '🔮',
+        color: '#00bcd4',
+        stationOrder: ['s1-1', 's1-2', 's1-3', 's1-4', 's1-5', 's1-6', 's1-7', 's1-8'],
+        difficultyGrowth: 1.2,
+        scoreMultiplier: 2.0,
+        unlockCondition: { type: 'stars', minStars: 15 },
+        junctionAt: ['s1-3', 's1-6'],
+        rewards: {
+          completionBonus: 8000,
+          completionExp: 1000,
+          unlockSpray: 'spray_legendary_rainbow',
+          unlockPattern: 'pattern_mural_master',
+          title: '1号线探索大师'
+        }
+      }
+    ]
+  },
+  2: {
+    lineId: 2,
+    branches: [
+      {
+        id: 'line2_main',
+        type: 'main',
+        name: '主线 · 经典路线',
+        description: '标准难度，贯穿2号线核心站点',
+        icon: '🚇',
+        color: '#3498db',
+        stationOrder: ['s2-1', 's2-2', 's2-3', 's2-5', 's2-7', 's2-8'],
+        difficultyGrowth: 1.0,
+        scoreMultiplier: 1.0,
+        unlockCondition: null,
+        junctionAt: ['s2-3', 's2-5'],
+        rewards: {
+          completionBonus: 2500,
+          completionExp: 350,
+          title: '2号线征服者'
+        }
+      },
+      {
+        id: 'line2_music',
+        type: 'easy',
+        name: '艺术支线 · 文化之旅',
+        description: '经过音乐厅和美术馆，文艺气息满满',
+        icon: '🎵',
+        color: '#1abc9c',
+        stationOrder: ['s2-1', 's2-2', 's2-3', 's2-4', 's2-5', 's2-6', 's2-7', 's2-8'],
+        difficultyGrowth: 0.8,
+        scoreMultiplier: 0.9,
+        unlockCondition: null,
+        junctionAt: ['s2-3', 's2-5'],
+        rewards: {
+          completionBonus: 3000,
+          completionExp: 450,
+          unlockPattern: 'pattern_3d_block',
+          title: '文化艺术达人'
+        }
+      },
+      {
+        id: 'line2_stage',
+        type: 'hard',
+        name: '舞台支线 · 聚光灯下',
+        description: '经体育馆和大剧院，挑战舞台级别的操作',
+        icon: '🎭',
+        color: '#e67e22',
+        stationOrder: ['s2-1', 's2-2', 's2-3', 's2-5', 's2-7', 's2-8'],
+        difficultyGrowth: 1.6,
+        scoreMultiplier: 1.7,
+        unlockCondition: { type: 'score', stationId: 's2-3', minScore: 1200 },
+        junctionAt: ['s2-3', 's2-5'],
+        rewards: {
+          completionBonus: 5000,
+          completionExp: 700,
+          unlockSkins: ['royal'],
+          title: '舞台之星'
+        }
+      },
+      {
+        id: 'line2_secret',
+        type: 'secret',
+        name: '秘境支线 · 深度探索',
+        description: '隐藏路线，探索2号线每个角落，需要20颗星解锁',
+        icon: '✨',
+        color: '#e84393',
+        stationOrder: ['s2-1', 's2-2', 's2-3', 's2-4', 's2-5', 's2-6', 's2-7', 's2-8'],
+        difficultyGrowth: 1.3,
+        scoreMultiplier: 2.2,
+        unlockCondition: { type: 'stars', minStars: 20 },
+        junctionAt: ['s2-3', 's2-5'],
+        rewards: {
+          completionBonus: 10000,
+          completionExp: 1200,
+          unlockSpray: 'spray_legendary_chrome',
+          unlockPattern: 'pattern_mural_master',
+          title: '2号线探索大师'
+        }
+      }
+    ]
+  }
+}

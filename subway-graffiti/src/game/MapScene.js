@@ -2,6 +2,7 @@ import * as PIXI from 'pixi.js'
 import { GAME_CONFIG, LINES } from './config.js'
 import { scoreManager } from './ScoreManager.js'
 import { audioManager } from './AudioManager.js'
+import { routeBranchManager, BRANCH_TYPE_CONFIG } from './RouteBranchManager.js'
 
 export class MapScene {
   constructor(app, callbacks) {
@@ -20,6 +21,9 @@ export class MapScene {
     this.stationDetailContainer = null
     this.stationDetailData = null
     this.stationDetailCloseTarget = null
+    this.branchSelectorContainer = null
+    this.branchSelectorData = null
+    this.currentBranchIndicator = null
     this.setup()
   }
 
@@ -65,6 +69,9 @@ export class MapScene {
     LINES.forEach(line => {
       const mainGraphics = new PIXI.Graphics()
       const branchGraphics = new PIXI.Graphics()
+      const currentBranchPath = routeBranchManager.getCurrentBranchPath(line.id)
+      const currentBranch = routeBranchManager.getCurrentBranch(line.id)
+      const currentBranchColor = currentBranch?.color ? parseInt(currentBranch.color.replace('#', '0x')) : null
 
       const lineColor = parseInt(line.color.replace('#', '0x'))
 
@@ -73,10 +80,23 @@ export class MapScene {
           const prereqStation = line.stations.find(s => s.id === station.unlockCondition.prerequisite)
           if (prereqStation) {
             const g = station.isBranch ? branchGraphics : mainGraphics
+            const isInCurrentPath = currentBranchPath.includes(prereqStation.id) && currentBranchPath.includes(station.id)
+            const prereqIdx = currentBranchPath.indexOf(prereqStation.id)
+            const stationIdx = currentBranchPath.indexOf(station.id)
+            const isConsecutiveInBranch = prereqIdx >= 0 && stationIdx >= 0 && stationIdx === prereqIdx + 1
+
             if (station.isBranch) {
-              g.lineStyle(4, 0x9b59b6, 0.7)
+              if (isConsecutiveInBranch && currentBranchColor) {
+                g.lineStyle(6, currentBranchColor, 0.9)
+              } else {
+                g.lineStyle(4, 0x9b59b6, 0.7)
+              }
             } else {
-              g.lineStyle(6, lineColor, 0.8)
+              if (isConsecutiveInBranch && currentBranchColor) {
+                g.lineStyle(8, currentBranchColor, 0.95)
+              } else {
+                g.lineStyle(6, lineColor, 0.8)
+              }
             }
             g.moveTo(prereqStation.x, prereqStation.y)
             g.lineTo(station.x, station.y)
@@ -87,6 +107,8 @@ export class MapScene {
       this.container.addChild(mainGraphics)
       this.container.addChild(branchGraphics)
     })
+
+    this.drawCurrentBranchIndicator()
   }
 
   createStations() {
@@ -428,13 +450,18 @@ export class MapScene {
       audioManager.playSFX('unlock')
     }
 
-    this.playArrivalSequence(line, station, idx)
+    const availableBranches = routeBranchManager.getAvailableBranchesAtStation(line.id, station.id)
+    if (availableBranches.length > 1) {
+      this.playArrivalSequence(line, station, idx, true)
+    } else {
+      this.playArrivalSequence(line, station, idx, false)
+    }
   }
 
-  playArrivalSequence(line, station, idx) {
+  playArrivalSequence(line, station, idx, showBranchSelector = false) {
     this.trainArrivalPhase = 'braking'
     this.trainArrivalTimer = 0
-    this.trainArrivalData = { line, station, idx }
+    this.trainArrivalData = { line, station, idx, showBranchSelector }
 
     audioManager.playSFX('trainArrival')
 
@@ -656,8 +683,22 @@ export class MapScene {
       }
 
       if (this.trainArrivalTimer >= 1.5) {
-        this.trainArrivalPhase = 'depart'
-        this.trainArrivalTimer = 0
+        if (this.trainArrivalData.showBranchSelector) {
+          this.trainArrivalPhase = 'branch_select'
+          this.trainArrivalTimer = 0
+          const { line, station } = this.trainArrivalData
+          this.showBranchSelector(line, station)
+        } else {
+          this.trainArrivalPhase = 'depart'
+          this.trainArrivalTimer = 0
+        }
+      }
+    } else if (this.trainArrivalPhase === 'branch_select') {
+      if (this.arrivalBroadcastContainer) {
+        this.arrivalBroadcastContainer.alpha = Math.max(0.3, this.arrivalBroadcastContainer.alpha - 0.02)
+      }
+      if (this.rewardContainer) {
+        this.rewardContainer.alpha = Math.max(0.3, this.rewardContainer.alpha - 0.02)
       }
     } else if (this.trainArrivalPhase === 'depart') {
       const t = Math.min(this.trainArrivalTimer / 0.5, 1)
@@ -1712,7 +1753,525 @@ export class MapScene {
     return stations
   }
 
+  drawCurrentBranchIndicator() {
+    if (this.currentBranchIndicator) {
+      this.container.removeChild(this.currentBranchIndicator)
+      this.currentBranchIndicator.destroy({ children: true })
+    }
+
+    this.currentBranchIndicator = new PIXI.Container()
+
+    LINES.forEach(line => {
+      const currentBranch = routeBranchManager.getCurrentBranch(line.id)
+      if (!currentBranch) return
+
+      const branchColor = parseInt(currentBranch.color.replace('#', '0x'))
+      const iconY = 65
+      let iconX = 50
+
+      if (line.id === 2) {
+        iconX = GAME_CONFIG.width - 50
+      }
+
+      const bg = new PIXI.Graphics()
+      bg.beginFill(0x000000, 0.7)
+      bg.drawRoundedRect(iconX - 90, iconY - 18, 180, 36, 8)
+      bg.endFill()
+      bg.lineStyle(2, branchColor, 0.8)
+      bg.drawRoundedRect(iconX - 90, iconY - 18, 180, 36, 8)
+      this.currentBranchIndicator.addChild(bg)
+
+      const icon = new PIXI.Text(currentBranch.icon || '🚇', { fontSize: 20, fill: 0xffffff })
+      icon.anchor.set(0, 0.5)
+      icon.x = iconX - 80
+      icon.y = iconY
+      this.currentBranchIndicator.addChild(icon)
+
+      const name = new PIXI.Text(currentBranch.name, {
+        fontFamily: 'Arial',
+        fontSize: 13,
+        fontWeight: 'bold',
+        fill: branchColor
+      })
+      name.anchor.set(0, 0.5)
+      name.x = iconX - 50
+      name.y = iconY
+      this.currentBranchIndicator.addChild(name)
+
+      bg.eventMode = 'static'
+      bg.cursor = 'pointer'
+      bg.hitArea = new PIXI.Rectangle(iconX - 90, iconY - 18, 180, 36)
+      bg.on('pointertap', () => {
+        if (!this.isTransitioning) {
+          this.showBranchOverview(line)
+        }
+      })
+    })
+
+    this.container.addChild(this.currentBranchIndicator)
+  }
+
+  showBranchSelector(line, station) {
+    this.closeBranchSelector()
+
+    const availableBranches = routeBranchManager.getAvailableBranchesAtStation(line.id, station.id)
+    this.branchSelectorData = { line, station, branches: availableBranches }
+
+    this.branchSelectorContainer = new PIXI.Container()
+
+    const overlay = new PIXI.Graphics()
+    overlay.beginFill(0x000000, 0.7)
+    overlay.drawRect(0, 0, GAME_CONFIG.width, GAME_CONFIG.height)
+    overlay.endFill()
+    overlay.eventMode = 'static'
+    this.branchSelectorContainer.addChild(overlay)
+
+    const panelW = 680
+    const panelH = 520
+    const panelX = (GAME_CONFIG.width - panelW) / 2
+    const panelY = (GAME_CONFIG.height - panelH) / 2
+
+    const panelBg = new PIXI.Graphics()
+    panelBg.beginFill(0x0d0d1f, 0.98)
+    panelBg.drawRoundedRect(panelX, panelY, panelW, panelH, 24)
+    panelBg.endFill()
+    panelBg.lineStyle(3, 0xf39c12, 0.8)
+    panelBg.drawRoundedRect(panelX, panelY, panelW, panelH, 24)
+    this.branchSelectorContainer.addChild(panelBg)
+
+    let curY = panelY + 30
+
+    const titleIcon = new PIXI.Text('🔀', { fontSize: 36, fill: 0xffffff })
+    titleIcon.anchor.set(0.5)
+    titleIcon.x = GAME_CONFIG.width / 2
+    titleIcon.y = curY
+    this.branchSelectorContainer.addChild(titleIcon)
+    curY += 44
+
+    const title = new PIXI.Text('路线分支选择', {
+      fontFamily: 'Arial',
+      fontSize: 32,
+      fontWeight: '900',
+      fill: 0xffffff,
+      letterSpacing: 3
+    })
+    title.anchor.set(0.5)
+    title.x = GAME_CONFIG.width / 2
+    title.y = curY
+    this.branchSelectorContainer.addChild(title)
+    curY += 36
+
+    const subtitle = new PIXI.Text(`在「${station.name}」选择接下来的路线`, {
+      fontFamily: 'Arial',
+      fontSize: 16,
+      fill: 0xaaaaaa
+    })
+    subtitle.anchor.set(0.5)
+    subtitle.x = GAME_CONFIG.width / 2
+    subtitle.y = curY
+    this.branchSelectorContainer.addChild(subtitle)
+    curY += 36
+
+    const divider = new PIXI.Graphics()
+    divider.lineStyle(1, 0xffffff, 0.15)
+    divider.moveTo(panelX + 40, curY)
+    divider.lineTo(panelX + panelW - 40, curY)
+    this.branchSelectorContainer.addChild(divider)
+    curY += 24
+
+    availableBranches.forEach((branch, idx) => {
+      const branchColor = parseInt(branch.color.replace('#', '0x'))
+      const isActive = branch.isActive
+      const cardH = 130
+      const cardY = curY
+
+      const cardBg = new PIXI.Graphics()
+      cardBg.beginFill(0xffffff, isActive ? 0.12 : 0.04)
+      cardBg.drawRoundedRect(panelX + 30, cardY, panelW - 60, cardH, 14)
+      cardBg.endFill()
+      cardBg.lineStyle(2, branchColor, isActive ? 1 : 0.5)
+      cardBg.drawRoundedRect(panelX + 30, cardY, panelW - 60, cardH, 14)
+      this.branchSelectorContainer.addChild(cardBg)
+
+      const icon = new PIXI.Text(branch.icon || '🚇', { fontSize: 32, fill: 0xffffff })
+      icon.anchor.set(0, 0.5)
+      icon.x = panelX + 55
+      icon.y = cardY + cardH / 2
+      this.branchSelectorContainer.addChild(icon)
+
+      const name = new PIXI.Text(branch.name, {
+        fontFamily: 'Arial',
+        fontSize: 20,
+        fontWeight: 'bold',
+        fill: branchColor
+      })
+      name.x = panelX + 105
+      name.y = cardY + 20
+      this.branchSelectorContainer.addChild(name)
+
+      const desc = new PIXI.Text(branch.description, {
+        fontFamily: 'Arial',
+        fontSize: 13,
+        fill: 0xaaaaaa,
+        wordWrap: true,
+        wordWrapWidth: 380
+      })
+      desc.x = panelX + 105
+      desc.y = cardY + 48
+      this.branchSelectorContainer.addChild(desc)
+
+      const multiplierLabel = new PIXI.Text(
+        `分数 x${branch.scoreMultiplier}  难度 x${branch.difficultyGrowth.toFixed(1)}`,
+        {
+          fontFamily: 'Arial',
+          fontSize: 12,
+          fill: 0x888899
+        }
+      )
+      multiplierLabel.x = panelX + 105
+      multiplierLabel.y = cardY + 95
+      this.branchSelectorContainer.addChild(multiplierLabel)
+
+      if (isActive) {
+        const activeTag = new PIXI.Text('当前', {
+          fontFamily: 'Arial',
+          fontSize: 12,
+          fontWeight: 'bold',
+          fill: 0xffffff
+        })
+        const tagW = activeTag.width + 20
+        const tagBg = new PIXI.Graphics()
+        tagBg.beginFill(branchColor)
+        tagBg.drawRoundedRect(panelX + panelW - 30 - tagW, cardY + 20, tagW, 26, 6)
+        tagBg.endFill()
+        this.branchSelectorContainer.addChild(tagBg)
+        activeTag.anchor.set(0.5, 0.5)
+        activeTag.x = panelX + panelW - 30 - tagW / 2
+        activeTag.y = cardY + 33
+        this.branchSelectorContainer.addChild(activeTag)
+      }
+
+      const nextStationId = branch.nextStationId
+      const nextStation = line.stations.find(s => s.id === nextStationId)
+      if (nextStation) {
+        const nextLabel = new PIXI.Text(`下一站: ${nextStation.name}`, {
+          fontFamily: 'Arial',
+          fontSize: 12,
+          fill: branchColor
+        })
+        nextLabel.anchor.set(1, 0)
+        nextLabel.x = panelX + panelW - 45
+        nextLabel.y = cardY + 95
+        this.branchSelectorContainer.addChild(nextLabel)
+      }
+
+      cardBg.eventMode = 'static'
+      cardBg.cursor = branch.isUnlocked ? 'pointer' : 'not-allowed'
+      cardBg.hitArea = new PIXI.Rectangle(panelX + 30, cardY, panelW - 60, cardH)
+      cardBg.on('pointertap', () => {
+        if (branch.isUnlocked) {
+          this.selectBranch(branch, line, station)
+        }
+      })
+
+      curY += cardH + 16
+    })
+
+    this.container.addChild(this.branchSelectorContainer)
+  }
+
+  selectBranch(branch, line, station) {
+    const success = routeBranchManager.selectBranch(line.id, branch.id)
+    if (!success) return
+
+    audioManager.playSFX('milestone', { tier: 2 })
+
+    const branchColor = parseInt(branch.color.replace('#', '0x'))
+    this.showPrompt(`已选择「${branch.name}」`, branchColor)
+
+    this.closeBranchSelector()
+
+    this.drawLines()
+    this.refreshStationStatus()
+    this.drawCurrentBranchIndicator()
+
+    this.trainArrivalPhase = 'depart'
+    this.trainArrivalTimer = 0
+  }
+
+  closeBranchSelector() {
+    if (this.branchSelectorContainer) {
+      this.container.removeChild(this.branchSelectorContainer)
+      this.branchSelectorContainer.destroy({ children: true })
+      this.branchSelectorContainer = null
+      this.branchSelectorData = null
+    }
+  }
+
+  showBranchOverview(line) {
+    this.closeBranchSelector()
+
+    const lineBranches = routeBranchManager.getLineBranches(line.id)
+    this.branchSelectorData = { line, station: null, branches: lineBranches }
+
+    this.branchSelectorContainer = new PIXI.Container()
+
+    const overlay = new PIXI.Graphics()
+    overlay.beginFill(0x000000, 0.7)
+    overlay.drawRect(0, 0, GAME_CONFIG.width, GAME_CONFIG.height)
+    overlay.endFill()
+    overlay.eventMode = 'static'
+    overlay.on('pointertap', () => this.closeBranchSelector())
+    this.branchSelectorContainer.addChild(overlay)
+
+    const panelW = 680
+    const panelH = 600
+    const panelX = (GAME_CONFIG.width - panelW) / 2
+    const panelY = (GAME_CONFIG.height - panelH) / 2
+
+    const panelBg = new PIXI.Graphics()
+    panelBg.beginFill(0x0d0d1f, 0.98)
+    panelBg.drawRoundedRect(panelX, panelY, panelW, panelH, 24)
+    panelBg.endFill()
+    const lineColor = parseInt(line.color.replace('#', '0x'))
+    panelBg.lineStyle(3, lineColor, 0.8)
+    panelBg.drawRoundedRect(panelX, panelY, panelW, panelH, 24)
+    this.branchSelectorContainer.addChild(panelBg)
+
+    let curY = panelY + 30
+
+    const titleIcon = new PIXI.Text('🗺️', { fontSize: 32, fill: 0xffffff })
+    titleIcon.anchor.set(0.5)
+    titleIcon.x = GAME_CONFIG.width / 2
+    titleIcon.y = curY
+    this.branchSelectorContainer.addChild(titleIcon)
+    curY += 40
+
+    const title = new PIXI.Text(`${line.name} · 路线分支`, {
+      fontFamily: 'Arial',
+      fontSize: 28,
+      fontWeight: '900',
+      fill: 0xffffff,
+      letterSpacing: 2
+    })
+    title.anchor.set(0.5)
+    title.x = GAME_CONFIG.width / 2
+    title.y = curY
+    this.branchSelectorContainer.addChild(title)
+    curY += 32
+
+    const completionRate = routeBranchManager.getBranchCompletionRate(line.id)
+    const progressText = new PIXI.Text(
+      `分支完成度: ${Math.round(completionRate * 100)}% (${lineBranches.filter(b => b.isCompleted).length}/${lineBranches.length})`,
+      {
+        fontFamily: 'Arial',
+        fontSize: 14,
+        fill: 0xf39c12
+      }
+    )
+    progressText.anchor.set(0.5)
+    progressText.x = GAME_CONFIG.width / 2
+    progressText.y = curY
+    this.branchSelectorContainer.addChild(progressText)
+    curY += 28
+
+    const divider = new PIXI.Graphics()
+    divider.lineStyle(1, 0xffffff, 0.15)
+    divider.moveTo(panelX + 40, curY)
+    divider.lineTo(panelX + panelW - 40, curY)
+    this.branchSelectorContainer.addChild(divider)
+    curY += 20
+
+    lineBranches.forEach((branch, idx) => {
+      const branchColor = parseInt(branch.color.replace('#', '0x'))
+      const cardH = 110
+      const cardY = curY
+
+      const cardBg = new PIXI.Graphics()
+      const alpha = branch.isUnlocked ? (branch.isActive ? 0.15 : 0.06) : 0.03
+      cardBg.beginFill(0xffffff, alpha)
+      cardBg.drawRoundedRect(panelX + 30, cardY, panelW - 60, cardH, 12)
+      cardBg.endFill()
+      cardBg.lineStyle(2, branchColor, branch.isUnlocked ? (branch.isActive ? 1 : 0.5) : 0.2)
+      cardBg.drawRoundedRect(panelX + 30, cardY, panelW - 60, cardH, 12)
+      this.branchSelectorContainer.addChild(cardBg)
+
+      const icon = new PIXI.Text(branch.icon || '🚇', { fontSize: 28, fill: branch.isUnlocked ? 0xffffff : 0x555566 })
+      icon.anchor.set(0, 0.5)
+      icon.x = panelX + 55
+      icon.y = cardY + cardH / 2
+      this.branchSelectorContainer.addChild(icon)
+
+      const name = new PIXI.Text(branch.name, {
+        fontFamily: 'Arial',
+        fontSize: 18,
+        fontWeight: 'bold',
+        fill: branch.isUnlocked ? branchColor : 0x555566
+      })
+      name.x = panelX + 100
+      name.y = cardY + 18
+      this.branchSelectorContainer.addChild(name)
+
+      const desc = new PIXI.Text(branch.description, {
+        fontFamily: 'Arial',
+        fontSize: 12,
+        fill: branch.isUnlocked ? 0xaaaaaa : 0x444455,
+        wordWrap: true,
+        wordWrapWidth: 360
+      })
+      desc.x = panelX + 100
+      desc.y = cardY + 44
+      this.branchSelectorContainer.addChild(desc)
+
+      const stationCount = branch.stationOrder.length
+      const stats = new PIXI.Text(
+        `${stationCount} 站  |  分数 x${branch.scoreMultiplier}  |  难度 x${branch.difficultyGrowth.toFixed(1)}`,
+        {
+          fontFamily: 'Arial',
+          fontSize: 11,
+          fill: branch.isUnlocked ? 0x888899 : 0x444455
+        }
+      )
+      stats.x = panelX + 100
+      stats.y = cardY + 82
+      this.branchSelectorContainer.addChild(stats)
+
+      let tagX = panelX + panelW - 45
+      if (branch.isCompleted) {
+        const doneTag = new PIXI.Text('✓ 已完成', {
+          fontFamily: 'Arial',
+          fontSize: 11,
+          fontWeight: 'bold',
+          fill: 0x2ecc71
+        })
+        doneTag.anchor.set(1, 0)
+        doneTag.x = tagX
+        doneTag.y = cardY + 20
+        this.branchSelectorContainer.addChild(doneTag)
+      }
+
+      if (branch.isActive) {
+        const activeTag = new PIXI.Text('当前', {
+          fontFamily: 'Arial',
+          fontSize: 11,
+          fontWeight: 'bold',
+          fill: 0xffffff
+        })
+        const tagW = activeTag.width + 16
+        const tagBg = new PIXI.Graphics()
+        tagBg.beginFill(branchColor)
+        tagBg.drawRoundedRect(tagX - tagW, cardY + 45, tagW, 22, 5)
+        tagBg.endFill()
+        this.branchSelectorContainer.addChild(tagBg)
+        activeTag.anchor.set(0.5, 0.5)
+        activeTag.x = tagX - tagW / 2
+        activeTag.y = cardY + 56
+        this.branchSelectorContainer.addChild(activeTag)
+      }
+
+      if (!branch.isUnlocked) {
+        const lockIcon = new PIXI.Text('🔒', { fontSize: 18, fill: 0x555566 })
+        lockIcon.anchor.set(1, 0.5)
+        lockIcon.x = tagX
+        lockIcon.y = cardY + cardH / 2
+        this.branchSelectorContainer.addChild(lockIcon)
+
+        if (branch.unlockCondition) {
+          let reqText = ''
+          if (branch.unlockCondition.type === 'stars') {
+            reqText = `需要 ${branch.unlockCondition.minStars} 颗星`
+          } else if (branch.unlockCondition.type === 'score') {
+            if (branch.unlockCondition.stationId) {
+              const prereqStation = line.stations.find(s => s.id === branch.unlockCondition.stationId)
+              reqText = `需要「${prereqStation?.name || branch.unlockCondition.stationId}」 ${branch.unlockCondition.minScore} 分`
+            } else {
+              reqText = `需要总分 ${branch.unlockCondition.minTotalScore}`
+            }
+          }
+          const reqLabel = new PIXI.Text(reqText, {
+            fontFamily: 'Arial',
+            fontSize: 10,
+            fill: 0x666677
+          })
+          reqLabel.anchor.set(1, 0)
+          reqLabel.x = tagX
+          reqLabel.y = cardY + 78
+          this.branchSelectorContainer.addChild(reqLabel)
+        }
+      }
+
+      curY += cardH + 12
+    })
+
+    const closeBtnBg = new PIXI.Graphics()
+    closeBtnBg.beginFill(lineColor, 0.3)
+    closeBtnBg.drawRoundedRect(GAME_CONFIG.width / 2 - 80, panelY + panelH - 64, 160, 40, 10)
+    closeBtnBg.endFill()
+    closeBtnBg.lineStyle(2, lineColor, 0.6)
+    closeBtnBg.drawRoundedRect(GAME_CONFIG.width / 2 - 80, panelY + panelH - 64, 160, 40, 10)
+    closeBtnBg.eventMode = 'static'
+    closeBtnBg.cursor = 'pointer'
+    closeBtnBg.on('pointertap', () => this.closeBranchSelector())
+    this.branchSelectorContainer.addChild(closeBtnBg)
+
+    const closeBtnText = new PIXI.Text('关闭', {
+      fontFamily: 'Arial',
+      fontSize: 15,
+      fontWeight: 'bold',
+      fill: 0xffffff
+    })
+    closeBtnText.anchor.set(0.5)
+    closeBtnText.x = GAME_CONFIG.width / 2
+    closeBtnText.y = panelY + panelH - 44
+    this.branchSelectorContainer.addChild(closeBtnText)
+
+    this.container.addChild(this.branchSelectorContainer)
+  }
+
+  showPrompt(text, color = 0xffffff) {
+    if (this._promptText) {
+      this.container.removeChild(this._promptText)
+      this._promptText.destroy()
+    }
+
+    const promptText = new PIXI.Text(text, {
+      fontFamily: 'Arial',
+      fontSize: 32,
+      fontWeight: '900',
+      fill: color,
+      stroke: 0x000000,
+      strokeThickness: 4
+    })
+    promptText.anchor.set(0.5)
+    promptText.x = GAME_CONFIG.width / 2
+    promptText.y = GAME_CONFIG.height / 2
+    promptText.alpha = 1
+    promptText.scale.set(1.2)
+    this.container.addChild(promptText)
+    this._promptText = promptText
+
+    const startTime = performance.now()
+    const animate = () => {
+      const elapsed = (performance.now() - startTime) / 1000
+      if (elapsed < 0.2) {
+        promptText.scale.set(1.2 - (elapsed / 0.2) * 0.2)
+      } else if (elapsed < 0.8) {
+        promptText.alpha = 1 - (elapsed - 0.2) / 0.6
+      } else {
+        if (this._promptText === promptText) {
+          this.container.removeChild(promptText)
+          promptText.destroy()
+          this._promptText = null
+        }
+        return
+      }
+      requestAnimationFrame(animate)
+    }
+    animate()
+  }
+
   destroy() {
+    this.closeBranchSelector()
     this.container.destroy({ children: true })
   }
 }

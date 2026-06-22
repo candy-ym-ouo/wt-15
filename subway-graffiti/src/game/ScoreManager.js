@@ -3,6 +3,7 @@ import { profileManager } from './ProfileManager.js'
 import { battlePassManager } from './BattlePassManager.js'
 import { graffitiWorkshop } from './GraffitiWorkshop.js'
 import { heatSystem } from './HeatSystem.js'
+import { routeBranchManager } from './RouteBranchManager.js'
 
 const SAVE_VERSION = 3
 
@@ -1615,6 +1616,55 @@ class ScoreManager {
         }
       }
     }
+  }
+
+  getLineForStation(stationId) {
+    for (const line of LINES) {
+      const station = line.stations.find(s => s.id === stationId)
+      if (station) return line
+    }
+    return null
+  }
+
+  getBranchScoreMultiplier(stationId) {
+    const line = this.getLineForStation(stationId)
+    if (!line) return 1
+    return routeBranchManager.getBranchDifficultyMultiplier(line.id, stationId)
+  }
+
+  checkAndRecordBranchCompletion(lineId, stationId, stationScore) {
+    const branchResult = routeBranchManager.checkStationCompletion(lineId, stationId)
+    if (!branchResult?.completed) return null
+
+    const branch = routeBranchManager.getCurrentBranch(lineId)
+    if (!branch) return null
+
+    const branchRewards = routeBranchManager.getBranchRewards(lineId)
+    const baseBonus = branchRewards.completionBonus || 0
+    const expBonus = branchRewards.completionExp || 0
+
+    const scoreBonus = Math.floor(baseBonus)
+    this.currentScore += scoreBonus
+    this.totalScore += scoreBonus
+
+    return {
+      branchId: branch.id,
+      branchName: branch.name,
+      title: branchRewards.title,
+      scoreBonus,
+      expBonus
+    }
+  }
+
+  applyBranchScoreMultiplier(stationId, baseScore) {
+    const line = this.getLineForStation(stationId)
+    if (!line) return baseScore
+
+    const branch = routeBranchManager.getCurrentBranch(line.id)
+    if (!branch || !branch.scoreMultiplier) return baseScore
+
+    const multiplier = branch.scoreMultiplier
+    return Math.floor(baseScore * multiplier)
   }
 }
 
