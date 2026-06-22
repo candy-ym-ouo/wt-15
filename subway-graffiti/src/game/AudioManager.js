@@ -8,9 +8,11 @@ class AudioManager {
     this.sfxVolume = GAME_CONFIG.audio.sfxVolume
     this.musicVolume = GAME_CONFIG.audio.musicVolume
     this.voiceVolume = GAME_CONFIG.audio.voiceVolume
+    this.ambientVolume = GAME_CONFIG.audio.ambientVolume ?? 0.5
     this.enabled = true
     this.musicNodes = []
     this.currentMusic = null
+    this.soundscapeActive = false
     this._voiceTypes = ['click', 'unlock', 'station', 'milestone', 'trainArrival', 'cityEventStart', 'cityEventEnd']
   }
 
@@ -52,6 +54,9 @@ class AudioManager {
       case 'voice':
         this.voiceVolume = clampedValue
         break
+      case 'ambient':
+        this.ambientVolume = clampedValue
+        break
     }
   }
 
@@ -61,6 +66,7 @@ class AudioManager {
       case 'sfx': return this.sfxVolume
       case 'music': return this.musicVolume
       case 'voice': return this.voiceVolume
+      case 'ambient': return this.ambientVolume
       default: return 1
     }
   }
@@ -70,6 +76,7 @@ class AudioManager {
       case 'sfx': return this.sfxVolume
       case 'music': return this.musicVolume
       case 'voice': return this.voiceVolume
+      case 'ambient': return this.ambientVolume
       default: return 1
     }
   }
@@ -236,6 +243,7 @@ class AudioManager {
 
   startMusic() {
     if (!this.enabled || !this.ctx || this.currentMusic) return
+    if (this.soundscapeActive) return
 
     const playNote = (time, freq, duration, vol = 0.1) => {
       const osc = this.ctx.createOscillator()
@@ -273,6 +281,10 @@ class AudioManager {
         this.stopMusic()
         return
       }
+      if (this.soundscapeActive) {
+        this.stopMusic()
+        return
+      }
       const t = this.ctx.currentTime
       const melIdx = beat % melody.length
       const bassIdx = Math.floor(beat / 1.5) % bass.length
@@ -286,6 +298,13 @@ class AudioManager {
     if (this.currentMusic) {
       clearInterval(this.currentMusic)
       this.currentMusic = null
+    }
+  }
+
+  setSoundscapeActive(active) {
+    this.soundscapeActive = active
+    if (active && this.currentMusic) {
+      this.stopMusic()
     }
   }
 }

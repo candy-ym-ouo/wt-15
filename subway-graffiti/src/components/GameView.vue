@@ -11,6 +11,7 @@ import { questManager } from '@/game/QuestManager.js';
 import { heatSystem } from '@/game/HeatSystem.js';
 import { achievementManager, AchievementCategory, CATEGORY_INFO } from '@/game/AchievementManager.js';
 import { dailyTaskManager } from '@/game/DailyTaskManager.js';
+import { citySoundscape } from '@/game/CitySoundscape.js';
 import ReplayView from './ReplayView.vue';
 import GraffitiWorkshopView from './GraffitiWorkshop.vue';
 import DailyTasksView from './DailyTasks.vue';
@@ -35,6 +36,17 @@ const showVolumePanel = ref(false);
 const musicVolume = ref(GAME_CONFIG.audio.musicVolume);
 const sfxVolume = ref(GAME_CONFIG.audio.sfxVolume);
 const voiceVolume = ref(GAME_CONFIG.audio.voiceVolume);
+const ambientVolume = ref(GAME_CONFIG.audio.ambientVolume);
+const soundscapeInfo = reactive({
+  station: null,
+  line: null,
+  phase: 'menu',
+  atmosphere: null,
+  crisisLevel: 0,
+  crisisInfo: null,
+  musicTempo: 120,
+  activeEvents: []
+});
 const gameResult = ref(null);
 const garageDefenseResult = ref(null);
 const stationResult = ref(null);
@@ -1071,6 +1083,7 @@ function onStateChange(state, data) {
  }
  refreshQuestSummary();
  refreshAchievementSummary();
+ _updateSoundscapeInfo();
 }
 function onTick() {
  score.value = scoreManager.currentScore;
@@ -1082,6 +1095,19 @@ function onTick() {
  heatState.currentLevel = summary.currentLevel;
  heatState.levelInfo = summary.levelInfo;
  heatState.effects = summary.effects;
+ _updateSoundscapeInfo();
+}
+
+function _updateSoundscapeInfo() {
+  const info = citySoundscape.getCurrentSoundscapeInfo();
+  soundscapeInfo.station = info.station;
+  soundscapeInfo.line = info.line;
+  soundscapeInfo.phase = info.phase;
+  soundscapeInfo.atmosphere = info.atmosphere;
+  soundscapeInfo.crisisLevel = info.crisisLevel;
+  soundscapeInfo.crisisInfo = info.crisisInfo;
+  soundscapeInfo.musicTempo = info.musicState?.tempo || 120;
+  soundscapeInfo.activeEvents = info.activeEvents || [];
 }
 function onMilestone(milestone, bonusPoints) {
   currentMilestone.value = milestone;
@@ -1097,6 +1123,7 @@ function onTrainArrival(station, line) {
   arrivalData.value = { station, line };
   currentLine.value = line;
   showArrival.value = true;
+  citySoundscape.playFeedback('train_arrival', { station, line });
   setTimeout(() => {
     showArrival.value = false;
   }, 2800);
@@ -1187,6 +1214,7 @@ function toggleAudio() {
     musicVolume.value = audioManager.getVolume('music');
     sfxVolume.value = audioManager.getVolume('sfx');
     voiceVolume.value = audioManager.getVolume('voice');
+    ambientVolume.value = audioManager.getVolume('ambient');
   }
 }
 
@@ -1206,6 +1234,9 @@ function setVolume(type, value) {
       break;
     case 'voice':
       voiceVolume.value = numValue;
+      break;
+    case 'ambient':
+      ambientVolume.value = numValue;
       break;
   }
   engine.setVolume(type, numValue);
@@ -1346,12 +1377,18 @@ function onCityEventStarted(event) {
   currentCityEvent.value = event;
   showCityEventAnnouncement.value = true;
   audioManager.playSFX('cityEventStart', { rarity: event.eventType.rarity });
+  citySoundscape.playFeedback('event_start', {
+    event,
+    rarity: event.eventType.rarity
+  });
+  _updateSoundscapeInfo();
   
   if (_cityEventUpdateInterval.value) {
     clearInterval(_cityEventUpdateInterval.value);
   }
   _cityEventUpdateInterval.value = setInterval(() => {
     activeCityEvents.value = [...cityEventManager.getActiveEvents()];
+    _updateSoundscapeInfo();
   }, 1000);
   
   setTimeout(() => {
@@ -1362,7 +1399,9 @@ function onCityEventStarted(event) {
 function onCityEventExpired(event) {
   activeCityEvents.value = cityEventManager.getActiveEvents();
   audioManager.playSFX('cityEventEnd', { freq: event.eventType.audio?.start?.baseFreq || 440 });
+  citySoundscape.playFeedback('event_end', { event });
   showGamePrompt(`${event.eventType.icon} ${event.eventType.name} 已结束`, event.eventType.color);
+  _updateSoundscapeInfo();
 }
 
 function onCityEventsCleared() {
@@ -1867,6 +1906,22 @@ onUnmounted(() => {
                 step="0.01"
                 :value="voiceVolume"
                 @input="setVolume('voice', $event.target.value)"
+                class="volume-slider"
+              />
+            </div>
+
+            <div class="volume-item">
+              <div class="volume-item-header">
+                <span>🏙️ 环境音</span>
+                <span class="volume-value">{{ Math.round(ambientVolume * 100) }}%</span>
+              </div>
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.01"
+                :value="ambientVolume"
+                @input="setVolume('ambient', $event.target.value)"
                 class="volume-slider"
               />
             </div>

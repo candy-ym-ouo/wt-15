@@ -20,6 +20,7 @@ import { GraffitiGame } from './GraffitiGame.js'
 import { PatrolAvoid } from './PatrolAvoid.js'
 import { GarageDefense } from './GarageDefense.js'
 import { companionManager } from './CompanionManager.js'
+import { citySoundscape } from './CitySoundscape.js'
 
 export const GameState = {
   MENU: 'menu',
@@ -322,18 +323,23 @@ export class GameEngine {
         if (this.callbacks.onCityEventStarted) {
           this.callbacks.onCityEventStarted(event)
         }
+        citySoundscape.setCityEvents(cityEventManager.getActiveEvents())
       },
       onEventExpired: (event) => {
         if (this.callbacks.onCityEventExpired) {
           this.callbacks.onCityEventExpired(event)
         }
+        citySoundscape.setCityEvents(cityEventManager.getActiveEvents())
       },
       onEventsCleared: () => {
         if (this.callbacks.onCityEventsCleared) {
           this.callbacks.onCityEventsCleared()
         }
+        citySoundscape.setCityEvents([])
       }
     })
+
+    citySoundscape.init()
 
     this._setupScenes()
     this._setupTicker()
@@ -448,7 +454,10 @@ export class GameEngine {
   startNewGame(difficulty = 'normal') {
     audioManager.init()
     audioManager.resume()
-    audioManager.startMusic()
+    audioManager.setSoundscapeActive(true)
+    citySoundscape.setPhase('menu')
+    citySoundscape.setCityEvents(cityEventManager.getActiveEvents())
+    citySoundscape.start()
     this.difficulty = difficulty
     this.stationsCompleted = 0
     this.currentDifficultyParams = this.computeDifficultyParams()
@@ -460,6 +469,7 @@ export class GameEngine {
   showMenu() {
     this._hideAllScenes()
     this.state = GameState.MENU
+    citySoundscape.setPhase('menu')
     this.callbacks.onStateChange(this.state)
   }
 
@@ -468,10 +478,12 @@ export class GameEngine {
     if (this.callbacks.onCityEventsUpdated) {
       this.callbacks.onCityEventsUpdated(cityEventManager.getActiveEvents())
     }
+    citySoundscape.setCityEvents(cityEventManager.getActiveEvents())
     this._fadeTransition(() => {
       this._hideAllScenes()
       this.mapScene.show()
       this.state = GameState.MAP
+      citySoundscape.setPhase('map')
       this.callbacks.onStateChange(this.state)
     })
   }
@@ -723,6 +735,10 @@ export class GameEngine {
     const stationEffects = cityEventManager.getCombinedEffectsForStation(station.id)
     this.currentStationEffects = stationEffects
 
+    citySoundscape.setStation(line, station)
+    citySoundscape.playFeedback('station_enter', { station, line })
+    citySoundscape.setCityEvents(cityEventManager.getEventsForStation(station.id) || [])
+
     const inventoryEffects = inventoryManager.getCombinedGameEffects()
 
     const stationScoreMultiplier = (station.graffiti && station.graffiti.scoreMultiplier) || 1
@@ -766,6 +782,8 @@ export class GameEngine {
 
     const phase = this.phaseOrder[this.currentPhase]
     audioManager.playSFX('click')
+    citySoundscape.setPhase(phase)
+    citySoundscape.playFeedback('phase_switch', { phase, prevPhase: this.currentPhase > 0 ? this.phaseOrder[this.currentPhase - 1] : null })
     const station = this.currentStation
 
     const inventoryEffects = inventoryManager.getCombinedGameEffects(phase)
@@ -1022,6 +1040,14 @@ export class GameEngine {
     const questSummary = questManager.getQuestSummary()
     const dropSummary = dropManager.getStationDropSummary()
 
+    citySoundscape.setPhase('result')
+    citySoundscape.playFeedback('station_clear', {
+      station: this.currentStation,
+      stars: evaluation.stars || 0,
+      score: stationScore,
+      isNewRecord: isNewStationHigh
+    })
+
     this.state = GameState.STATION_COMPLETE
     this.callbacks.onStateChange(this.state, {
       station: this.currentStation,
@@ -1075,6 +1101,7 @@ export class GameEngine {
   }
 
   continueToNextStation() {
+    citySoundscape.setStation(null, null)
     this.showMap()
   }
 
@@ -1220,6 +1247,8 @@ export class GameEngine {
     const result = scoreManager.endGame()
     const newlyUnlockedAchievements = achievementManager.checkAchievements()
     audioManager.stopMusic()
+    audioManager.setSoundscapeActive(false)
+    citySoundscape.stop()
     this.state = GameState.GAME_OVER
     this.callbacks.onStateChange(this.state, {
       ...result,
@@ -1261,6 +1290,10 @@ export class GameEngine {
       stationId: this.currentStation?.id,
       combo: milestone.combo,
       phase: this.phaseOrder[this.currentPhase]
+    })
+    citySoundscape.playFeedback('combo_milestone', {
+      combo: milestone.combo,
+      bonusPoints
     })
     if (this.callbacks.onMilestone) {
       this.callbacks.onMilestone(milestone, bonusPoints)
