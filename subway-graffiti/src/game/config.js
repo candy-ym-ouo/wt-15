@@ -916,7 +916,8 @@ export const GAME_CONFIG = {
   audio: {
     masterVolume: 0.7,
     sfxVolume: 0.8,
-    musicVolume: 0.4
+    musicVolume: 0.4,
+    voiceVolume: 0.6
   },
 
   difficulty: {
@@ -2765,5 +2766,255 @@ export const ITEM_CONFIG = {
     freePlayDailyQuota: 5,
     quotaRefreshHour: 4
   }
+}
+
+export const COMPANION_CONFIG = {
+  bondLevels: [
+    { level: 1, expRequired: 0, name: '初识', bonuses: {} },
+    { level: 2, expRequired: 100, name: '熟悉', bonuses: { skillBonus: 0.1 } },
+    { level: 3, expRequired: 300, name: '默契', bonuses: { skillBonus: 0.2, unlockVoice: true } },
+    { level: 4, expRequired: 600, name: '信任', bonuses: { skillBonus: 0.35 } },
+    { level: 5, expRequired: 1000, name: '羁绊', bonuses: { skillBonus: 0.5, unlockExclusiveSkin: true } }
+  ],
+
+  expSources: {
+    stationClear: 10,
+    perfect: 1,
+    good: 0.5,
+    milestone: 5,
+    noMissStation: 30,
+    useCompanionStation: 20
+  },
+
+  rarityConfig: {
+    common: { color: '#95a5a6', glow: 'rgba(149, 165, 166, 0.4)', name: '普通', bonusMultiplier: 1.0 },
+    rare: { color: '#3498db', glow: 'rgba(52, 152, 219, 0.4)', name: '稀有', bonusMultiplier: 1.2 },
+    epic: { color: '#9b59b6', glow: 'rgba(155, 89, 182, 0.4)', name: '史诗', bonusMultiplier: 1.5 },
+    legendary: { color: '#f1c40f', glow: 'rgba(241, 196, 15, 0.5)', name: '传说', bonusMultiplier: 2.0 }
+  },
+
+  companions: [
+    {
+      id: 'neo',
+      name: '霓虹',
+      rarity: 'common',
+      icon: '👾',
+      color: '#00ffcc',
+      description: '赛博朋克风格的年轻黑客，擅长数据分析和预判。',
+      unlockCondition: { type: 'default' },
+      role: '判定辅助',
+      skills: {
+        graffiti: {
+          perfectRadiusBonus: 3,
+          goodRadiusBonus: 5,
+          hitHint: false
+        },
+        patrol: {
+          warningDistanceBonus: 0,
+          safeZoneIndicator: false
+        }
+      },
+      voice: {
+        perfect: ['精准！', '漂亮！', '太准了！'],
+        good: ['不错！', '继续保持！'],
+        miss: ['没关系，再来！', '别灰心！'],
+        combo: ['连击！', '保持节奏！'],
+        patrolAlert: ['小心！', '有动静！'],
+        safe: ['安全了！', '暂时没问题！']
+      },
+      character: {
+        age: 19,
+        personality: '冷静、理性',
+        backstory: '城市地下网络的年轻黑客，被涂鸦艺术吸引而加入团队。'
+      }
+    },
+    {
+      id: 'spray',
+      name: '喷漆小妹',
+      rarity: 'rare',
+      icon: '🎨',
+      color: '#ff6b9d',
+      description: '充满活力的涂鸦艺术家，对节奏有着独特的感知。',
+      unlockCondition: { type: 'score', value: 5000 },
+      role: '判定辅助',
+      skills: {
+        graffiti: {
+          perfectRadiusBonus: 5,
+          goodRadiusBonus: 8,
+          hitHint: true,
+          hitHintAdvanceMs: 200
+        },
+        patrol: {
+          warningDistanceBonus: 20,
+          safeZoneIndicator: false
+        }
+      },
+      voice: {
+        perfect: ['完美喷涂！', '艺术！', '大师级！'],
+        good: ['可以的！', '好看！'],
+        miss: ['哎呀！', '手滑了~'],
+        combo: ['节奏起来了！', '冲鸭！'],
+        patrolAlert: ['有人来了！', '快躲！'],
+        safe: ['安全~']
+      },
+      character: {
+        age: 20,
+        personality: '活泼、热情',
+        backstory: '街头涂鸦圈小有名气的艺术家，擅长彩色喷漆作品。'
+      }
+    },
+    {
+      id: 'shadow',
+      name: '暗影',
+      rarity: 'rare',
+      icon: '🥷',
+      color: '#2c3e50',
+      description: '神秘的前保安人员，熟知巡逻路线和监控盲区。',
+      unlockCondition: { type: 'station', value: 's1-3' },
+      role: '巡逻提示',
+      skills: {
+        graffiti: {
+          perfectRadiusBonus: 2,
+          goodRadiusBonus: 3,
+          hitHint: false
+        },
+        patrol: {
+          warningDistanceBonus: 50,
+          safeZoneIndicator: true,
+          guardVisionHint: true,
+          warningAdvanceMs: 500
+        }
+      },
+      voice: {
+        perfect: ['干得好。', '漂亮。'],
+        good: ['还行。'],
+        miss: ['集中注意力。'],
+        combo: ['继续。'],
+        patrolAlert: ['注意，守卫接近。', '危险，快移动。', '被发现风险高。'],
+        safe: ['暂时安全。', '可以行动。']
+      },
+      character: {
+        age: 28,
+        personality: '沉稳、寡言',
+        backstory: '曾是地铁安保主管，因看不惯腐败而辞职加入涂鸦团队。'
+      }
+    },
+    {
+      id: 'vibe',
+      name: '节奏大师',
+      rarity: 'epic',
+      icon: '🎧',
+      color: '#e74c3c',
+      description: '地下音乐制作人，能通过节拍精准预测判定时机。',
+      unlockCondition: { type: 'combo', value: 50 },
+      role: '判定辅助',
+      skills: {
+        graffiti: {
+          perfectRadiusBonus: 8,
+          goodRadiusBonus: 12,
+          hitHint: true,
+          hitHintAdvanceMs: 350,
+          comboBonus: 0.05
+        },
+        patrol: {
+          warningDistanceBonus: 30,
+          safeZoneIndicator: false
+        }
+      },
+      voice: {
+        perfect: ['DROP!', 'FIRE!', 'BEAT!'],
+        good: ['Nice!', 'Smooth!'],
+        miss: ['Off beat!', 'Get back!'],
+        combo: ['REMIX!', 'FLOW!', 'VIBE!'],
+        patrolAlert: ['BASS BOOSTED DANGER!', 'WARNING BEAT!'],
+        safe: ['Chill beat~']
+      },
+      character: {
+        age: 24,
+        personality: '张扬、自信',
+        backstory: '地下嘻哈圈知名制作人，将音乐节奏融入涂鸦创作中。'
+      }
+    },
+    {
+      id: 'phantom',
+      name: '幻影',
+      rarity: 'epic',
+      icon: '👻',
+      color: '#8e44ad',
+      description: '传说中的逃脱大师，能在最严密的巡逻中找到安全通道。',
+      unlockCondition: { type: 'noCaught', value: 5 },
+      role: '巡逻提示',
+      skills: {
+        graffiti: {
+          perfectRadiusBonus: 4,
+          goodRadiusBonus: 6,
+          hitHint: false
+        },
+        patrol: {
+          warningDistanceBonus: 80,
+          safeZoneIndicator: true,
+          guardVisionHint: true,
+          warningAdvanceMs: 800,
+          laserWarning: true,
+          escapeHint: true
+        }
+      },
+      voice: {
+        perfect: ['干净利落。', '专业。'],
+        good: ['可以接受。'],
+        miss: ['不够冷静。'],
+        combo: ['保持专注。'],
+        patrolAlert: ['检测到威胁。', '建议立即移动。', '包围路线形成中。', '激光即将激活。'],
+        safe: ['威胁已排除。', '路线清晰。', '找到突破口。']
+      },
+      character: {
+        age: 30,
+        personality: '神秘、冷静',
+        backstory: '身份不明的逃脱专家，据说从未被任何保安抓到过。'
+      }
+    },
+    {
+      id: 'soul',
+      name: '涂鸦之魂',
+      rarity: 'legendary',
+      icon: '🌟',
+      color: '#f39c12',
+      description: '传说中的涂鸦之神，同时精通判定和躲避，全方位辅助。',
+      unlockCondition: { type: 'achievement', value: 'perfect_legend' },
+      role: '全能辅助',
+      skills: {
+        graffiti: {
+          perfectRadiusBonus: 12,
+          goodRadiusBonus: 18,
+          hitHint: true,
+          hitHintAdvanceMs: 500,
+          comboBonus: 0.1,
+          scoreBonus: 0.05
+        },
+        patrol: {
+          warningDistanceBonus: 100,
+          safeZoneIndicator: true,
+          guardVisionHint: true,
+          warningAdvanceMs: 1000,
+          laserWarning: true,
+          escapeHint: true,
+          shieldBonusSeconds: 1
+        }
+      },
+      voice: {
+        perfect: ['神来之笔！', '传世之作！', '登峰造极！'],
+        good: ['佳作！', '可圈可点！'],
+        miss: ['沉淀自己。', '艺术需要耐心。'],
+        combo: ['与艺术共鸣！', '灵魂在燃烧！', '创作巅峰！'],
+        patrolAlert: ['世俗的目光来了。', '避开凡俗的追捕。', '凡夫俗子岂能发现你？', '光芒将指引你。'],
+        safe: ['艺术之神眷顾你。', '此刻，你是自由的。']
+      },
+      character: {
+        age: '???',
+        personality: '神秘、超然',
+        backstory: '据说只要真心热爱涂鸦，就能感受到他的存在。'
+      }
+    }
+  ]
 }
 

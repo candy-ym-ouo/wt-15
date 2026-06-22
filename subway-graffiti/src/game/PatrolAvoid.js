@@ -4,6 +4,7 @@ import { scoreManager } from './ScoreManager.js'
 import { audioManager } from './AudioManager.js'
 import { replayManager, RiskLevel } from './ReplayManager.js'
 import { heatSystem } from './HeatSystem.js'
+import { companionManager } from './CompanionManager.js'
 
 export class PatrolAvoid {
   constructor(app, callbacks) {
@@ -31,6 +32,10 @@ export class PatrolAvoid {
     this.currentLine = null
     this.disengageEffects = []
     this.cityEventEffects = null
+    this.voiceCooldown = 0
+    this.companionHintText = null
+    this.warnedGuards = new Set()
+    this.warnedLasers = new Set()
     this.setup()
   }
 
@@ -151,6 +156,18 @@ export class PatrolAvoid {
     this.promptText.x = GAME_CONFIG.width / 2
     this.promptText.y = GAME_CONFIG.height / 2
     this.container.addChild(this.promptText)
+
+    this.companionHintText = new PIXI.Text('', {
+      fontFamily: 'Arial',
+      fontSize: 22,
+      fontWeight: 'bold',
+      fill: 0xffd700,
+      stroke: 0x000000,
+      strokeThickness: 3
+    })
+    this.companionHintText.anchor.set(0.5)
+    this.companionHintText.visible = false
+    this.container.addChild(this.companionHintText)
 
     this.riskWarningContainer = new PIXI.Container()
     this.container.addChild(this.riskWarningContainer)
@@ -325,6 +342,11 @@ export class PatrolAvoid {
       { x: GAME_CONFIG.width - 80, y: GAME_CONFIG.height - 250 }
     ]
 
+    const companionSkills = companionManager.getActiveCompanionSkills('patrol')
+    const safeZoneHint = companionSkills.safeZoneHint || 0
+    const hintAlphaBoost = safeZoneHint > 0 ? Math.min(0.3, safeZoneHint * 0.5) : 0
+    const hintLineWidth = safeZoneHint > 0 ? 5 : 3
+
     zonePositions.forEach(pos => {
       const zone = new PIXI.Container()
       zone.x = pos.x
@@ -338,12 +360,21 @@ export class PatrolAvoid {
       zone.lastUsedTime = 0
 
       const outerRing = new PIXI.Graphics()
-      outerRing.beginFill(GAME_CONFIG.successColor, 0.15)
-      outerRing.lineStyle(3, GAME_CONFIG.successColor, 0.5)
+      outerRing.beginFill(GAME_CONFIG.successColor, 0.15 + hintAlphaBoost)
+      outerRing.lineStyle(hintLineWidth, GAME_CONFIG.successColor, safeZoneHint > 0 ? 0.9 : 0.5)
       outerRing.drawCircle(0, 0, zone.radius)
       outerRing.endFill()
       zone.outerRing = outerRing
       zone.addChild(outerRing)
+
+      if (safeZoneHint > 0) {
+        const glowRing = new PIXI.Graphics()
+        glowRing.lineStyle(2, 0xffd700, 0.6)
+        glowRing.drawCircle(0, 0, zone.radius + 8)
+        glowRing.endFill()
+        zone.glowRing = glowRing
+        zone.addChild(glowRing)
+      }
 
       const actualZone = new PIXI.Graphics()
       actualZone.lineStyle({
@@ -570,11 +601,12 @@ export class PatrolAvoid {
     
     if (Math.random() > Math.min(0.9, chance)) return
 
+    const companionSkills = companionManager.getActiveCompanionSkills('patrol')
     const horizontal = Math.random() > 0.5
     const beam = new PIXI.Graphics()
     beam.isHorizontal = horizontal
     beam.progress = 0
-    beam.warningDuration = 1.5
+    beam.warningDuration = 1.5 + (companionSkills.laserWarning || 0)
     beam.activeDuration = 0.8
     beam.totalDuration = beam.warningDuration + beam.activeDuration
     beam.width = 12
@@ -603,6 +635,10 @@ export class PatrolAvoid {
     this.riskIndicators = []
     this.lastSafeZone = null
     this.disengageEffects = []
+    this.voiceCooldown = 3
+    this.warnedGuards.clear()
+    this.warnedLasers.clear()
+    companionManager.checkUnlocks()
 
     this._heatLevelUpHandler = (prevLevel, newLevel, levelInfo) => {
       if (this.isRunning) {
@@ -708,6 +744,34 @@ export class PatrolAvoid {
         return
       }
       requestAnimationFrame(animate)
+    }
+    animate()
+  }
+
+  showCompanionHint(x, y, text) {
+    if (!this.companionHintText) return
+    this.companionHintText.x = x
+    this.companionHintText.y = y
+    this.companionHintText.text = text
+    this.companionHintText.visible = true
+    this.companionHintText.alpha = 1
+    this.companionHintText.scale.set(1)
+
+    const active = companionManager.getActiveCompanion()
+    if (active) {
+      this.companionHintText.style.fill = active.rarityColor || 0xffd700
+    }
+
+    const startTime = performance.now()
+    const animate = () => {
+      const elapsed = (performance.now() - startTime) / 1000
+      if (elapsed < 1.5) {
+        this.companionHintText.y = y - elapsed * 10
+        this.companionHintText.alpha = 1 - elapsed / 1.5
+        requestAnimationFrame(animate)
+      } else {
+        this.companionHintText.visible = false
+      }
     }
     animate()
   }
@@ -1594,6 +1658,15 @@ export class PatrolAvoid {
 
     audioManager.playSFX('caught')
     this.showPrompt(this.getFeedbackText('caught'), 0xff4444)
+
+    if (this.voiceCooldown <= 0) {
+      const voice = companionManager.getVoiceForEvent('caught')
+      if (voice) {
+        audioManager.playVoice(voice)
+        this.voiceCooldown = 5
+      }
+    }
+    companionManager.addExpForEvent('patrol_caught', { source })
     const stationId = this.station ? this.station.id : null
     const caughtX = location?.x ?? this.player?.x
     const caughtY = location?.y ?? this.player?.y
@@ -1680,6 +1753,7 @@ export class PatrolAvoid {
     this.gameTime += delta
     this.spawnTimer += delta * 1000
     this.laserTimer += delta * 1000
+    this.voiceCooldown = Math.max(0, this.voiceCooldown - delta)
     
     heatSystem.update(delta, Date.now())
 
@@ -1719,11 +1793,66 @@ export class PatrolAvoid {
     this.updateSafeZones(delta)
     this.updateShield(delta)
     this.updateRiskWarnings(delta)
+
+    const companionSkills = companionManager.getActiveCompanionSkills('patrol')
+    const guardWarningDist = (companionSkills.guardWarning || 0) * 150
+    const laserWarningTime = companionSkills.laserWarning || 0
+
+    if (guardWarningDist > 0 && this.player) {
+      for (const guard of this.guards) {
+        if (this.warnedGuards.has(guard)) continue
+        const dx = this.player.x - guard.x
+        const dy = this.player.y - guard.y
+        const dist = Math.sqrt(dx * dx + dy * dy)
+        if (dist < guardWarningDist && dist > 80) {
+          this.warnedGuards.add(guard)
+          const dirText = dx > 0 ? '左' : '右'
+          this.showCompanionHint(this.player.x, this.player.y - 50, `⚠ 守卫${dirText}侧接近!`)
+          if (this.voiceCooldown <= 0) {
+            const voice = companionManager.getVoiceForEvent('guard_warning')
+            if (voice) {
+              audioManager.playVoice(voice)
+              this.voiceCooldown = 6
+            }
+          }
+          break
+        }
+      }
+    }
+
+    if (laserWarningTime > 0) {
+      for (const beam of this.laserBeams) {
+        if (this.warnedLasers.has(beam)) continue
+        const timeToActive = beam.warningDuration - beam.progress
+        if (timeToActive > 0 && timeToActive < laserWarningTime + 0.5) {
+          this.warnedLasers.add(beam)
+          const posText = beam.isHorizontal ? '上下' : '左右'
+          this.showCompanionHint(GAME_CONFIG.width / 2, 200, `⚡ 激光${posText}扫描预警!`)
+          if (this.voiceCooldown <= 0) {
+            const voice = companionManager.getVoiceForEvent('laser_warning')
+            if (voice) {
+              audioManager.playVoice(voice)
+              this.voiceCooldown = 6
+            }
+          }
+          break
+        }
+      }
+    }
+
     this.checkCollisions()
 
     if (this.gameTime >= this.duration && !this.isCaught) {
       this.isRunning = false
       const duration = Date.now() - this.startTime
+
+      if (this.voiceCooldown <= 0) {
+        const voice = companionManager.getVoiceForEvent('patrol_success')
+        if (voice) {
+          audioManager.playVoice(voice)
+        }
+      }
+      companionManager.addExpForEvent('patrol_success')
       
       replayManager.stopRecording({
         success: true,

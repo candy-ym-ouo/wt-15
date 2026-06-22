@@ -958,6 +958,9 @@ function onStateChange(state, data) {
  else if (state === GameState.DAILY_TASKS) {
    checkUnclaimedDailyTasks();
  }
+ else if (state === GameState.COMPANIONS) {
+   refreshCompanions();
+ }
  refreshQuestSummary();
  refreshAchievementSummary();
 }
@@ -1128,6 +1131,67 @@ function showSeasonPassScreen() {
   refreshBattlePassSummary();
   currentState.value = GameState.SEASON_PASS;
 }
+
+const companions = ref([]);
+const unlockedCompanions = ref([]);
+const activeCompanion = ref(null);
+const showCompanionUnlock = ref(false);
+const unlockedCompanionData = ref(null);
+const showBondUp = ref(false);
+const bondUpData = ref(null);
+
+function refreshCompanions() {
+  if (!engine) return;
+  companions.value = engine.getCompanions() || [];
+  unlockedCompanions.value = engine.getUnlockedCompanions() || [];
+  activeCompanion.value = engine.getActiveCompanion() || null;
+}
+
+function showCompanionsScreen() {
+  audioManager.playSFX('click');
+  refreshCompanions();
+  engine?.showCompanions();
+}
+
+function selectCompanion(companionId) {
+  if (!engine) return;
+  audioManager.playSFX('click');
+  const result = engine.equipCompanion(companionId);
+  if (result) {
+    refreshCompanions();
+  }
+}
+
+function getCompanionRarityStyle(rarity) {
+  const configs = {
+    common: { color: '#95a5a6', glow: 'rgba(149, 165, 166, 0.4)', name: '普通' },
+    rare: { color: '#3498db', glow: 'rgba(52, 152, 216, 0.4)', name: '稀有' },
+    epic: { color: '#9b59b6', glow: 'rgba(155, 89, 182, 0.4)', name: '史诗' },
+    legendary: { color: '#f39c12', glow: 'rgba(243, 156, 18, 0.5)', name: '传说' }
+  };
+  return configs[rarity] || configs.common;
+}
+
+function handleCompanionUnlocked(data) {
+  unlockedCompanionData.value = data;
+  showCompanionUnlock.value = true;
+  refreshCompanions();
+  setTimeout(() => {
+    showCompanionUnlock.value = false;
+    unlockedCompanionData.value = null;
+  }, 4000);
+}
+
+function handleBondLevelUp(data) {
+  bondUpData.value = data;
+  showBondUp.value = true;
+  refreshCompanions();
+  setTimeout(() => {
+    showBondUp.value = false;
+    bondUpData.value = null;
+  }, 3500);
+}
+
 function backFromSubscreen() {
  audioManager.playSFX('click');
  currentState.value = GameState.MENU;
@@ -1276,7 +1340,9 @@ onMounted(async () => {
  onCityEventsCleared,
  onCityEventsUpdated,
  onStationEffectsApplied,
- onAchievementUnlocked: handleAchievementUnlocked
+ onAchievementUnlocked: handleAchievementUnlocked,
+ onCompanionUnlocked: handleCompanionUnlocked,
+ onCompanionBondLevelUp: handleBondLevelUp
  });
  await engine.init();
  refreshQuestSummary();
@@ -1867,6 +1933,9 @@ onUnmounted(() => {
             </button>
             <button class="btn btn-secondary" @click="showSkinsScreen">
               👕 皮肤
+            </button>
+            <button class="btn btn-secondary" @click="showCompanionsScreen">
+              🤝 伙伴
             </button>
             <button class="btn btn-secondary workshop-btn" @click="showWorkshopScreen" style="position: relative;">
               🎨 工坊

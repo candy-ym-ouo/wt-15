@@ -4,6 +4,7 @@ import { scoreManager } from './ScoreManager.js'
 import { audioManager } from './AudioManager.js'
 import { replayManager } from './ReplayManager.js'
 import { heatSystem } from './HeatSystem.js'
+import { companionManager } from './CompanionManager.js'
 
 export class GraffitiGame {
   constructor(app, callbacks) {
@@ -27,6 +28,9 @@ export class GraffitiGame {
     this.milestoneParticles = []
     this.currentLine = null
     this.cityEventEffects = null
+    this.voiceCooldown = 0
+    this.hintTargets = new Set()
+    this.companionHintText = null
     this.setup()
   }
 
@@ -104,6 +108,18 @@ export class GraffitiGame {
     this.promptText.x = GAME_CONFIG.width / 2
     this.promptText.y = GAME_CONFIG.height / 2
     this.container.addChild(this.promptText)
+
+    this.companionHintText = new PIXI.Text('', {
+      fontFamily: 'Arial',
+      fontSize: 20,
+      fontWeight: 'bold',
+      fill: 0xffd700,
+      stroke: 0x000000,
+      strokeThickness: 3
+    })
+    this.companionHintText.anchor.set(0.5)
+    this.companionHintText.visible = false
+    this.container.addChild(this.companionHintText)
 
     this.timerBarBg = new PIXI.Graphics()
     this.timerBarBg.beginFill(0x000000, 0.5)
@@ -258,6 +274,9 @@ export class GraffitiGame {
     this.station = station || null
     this.currentLine = this.getLineByStation(station)
     this.startTime = Date.now()
+    this.voiceCooldown = 3
+    this.hintTargets.clear()
+    companionManager.checkUnlocks()
     
     this._heatLevelUpHandler = (prevLevel, newLevel, levelInfo) => {
       if (this.isRunning) {
@@ -342,6 +361,34 @@ export class GraffitiGame {
     animate()
   }
 
+  showCompanionHint(x, y, text) {
+    if (!this.companionHintText) return
+    this.companionHintText.x = x
+    this.companionHintText.y = y
+    this.companionHintText.text = text
+    this.companionHintText.visible = true
+    this.companionHintText.alpha = 1
+    this.companionHintText.scale.set(1)
+
+    const active = companionManager.getActiveCompanion()
+    if (active) {
+      this.companionHintText.style.fill = active.rarityColor || 0xffd700
+    }
+
+    const startTime = performance.now()
+    const animate = () => {
+      const elapsed = (performance.now() - startTime) / 1000
+      if (elapsed < 1.2) {
+        this.companionHintText.y = y - elapsed * 15
+        this.companionHintText.alpha = 1 - elapsed / 1.2
+        requestAnimationFrame(animate)
+      } else {
+        this.companionHintText.visible = false
+      }
+    }
+    animate()
+  }
+
   spawnTarget() {
     const maxTargets = this.getStationConfig(this.station, 'maxTargets', GAME_CONFIG.graffiti.maxTargets)
     if (this.targets.length >= maxTargets) return
@@ -360,6 +407,10 @@ export class GraffitiGame {
     const basePerfectRadius = this.getStationConfig(this.station, 'perfectRadius', GAME_CONFIG.graffiti.perfectRadius)
     target.perfectRadius = basePerfectRadius + (customAttr.perfectRadiusBonus || 0)
 
+    const companionSkills = companionManager.getActiveCompanionSkills('graffiti')
+    target.perfectRadius += companionSkills.perfectRadiusBonus || 0
+    target.goodRadiusBonus = companionSkills.goodRadiusBonus || 0
+
     const colorStr = scoreManager.getSkinColor()
     const colorNum = parseInt(colorStr.replace('#', '0x'))
 
@@ -368,6 +419,15 @@ export class GraffitiGame {
     outerRing.drawCircle(0, 0, target.radius)
     outerRing.endFill()
     target.addChild(outerRing)
+
+    if (target.goodRadiusBonus > 0) {
+      const goodRing = new PIXI.Graphics()
+      goodRing.lineStyle(2, GAME_CONFIG.warningColor, 0.5)
+      goodRing.drawCircle(0, 0, target.perfectRadius * 2 + target.goodRadiusBonus)
+      goodRing.endFill()
+      target.addChild(goodRing)
+      target.goodRing = goodRing
+    }
 
     const perfectRing = new PIXI.Graphics()
     perfectRing.lineStyle(3, GAME_CONFIG.successColor, 0.8)
@@ -409,13 +469,14 @@ export class GraffitiGame {
     let color = 0xff0000
     let missSource = 'late'
     const perfectRadius = target.perfectRadius || GAME_CONFIG.graffiti.perfectRadius
+    const goodRadiusBonus = target.goodRadiusBonus || 0
     const prevCombo = scoreManager.combo
 
     if (currentRadius <= perfectRadius) {
       result = 'perfect'
       color = GAME_CONFIG.successColor
       this.showPrompt(this.getFeedbackText('perfect'), color)
-    } else if (currentRadius <= perfectRadius * 2) {
+    } else if (currentRadius <= perfectRadius * 2 + goodRadiusBonus) {
       result = 'good'
       color = GAME_CONFIG.warningColor
       this.showPrompt(this.getFeedbackText('good'), color)
@@ -430,6 +491,17 @@ export class GraffitiGame {
     const points = scoreManager.addScore(result, result === 'miss' ? { source: missSource } : {})
     const newScore = scoreManager.currentScore
     audioManager.playSFX(result)
+
+    if (this.voiceCooldown <= 0) {
+      const voiceResult = result === 'perfect' ? 'perfect' : result === 'good' ? 'good' : 'miss'
+      const voice = companionManager.getVoiceForEvent(voiceResult)
+      if (voice) {
+        audioManager.playVoice(voice)
+        this.voiceCooldown = 5
+      }
+    }
+
+    companionManager.addExpForEvent('graffiti_hit', { result })
     const particleConfig = scoreManager.getSkinParticles()
     const count = result === 'perfect' ? particleConfig.count.perfect : particleConfig.count.good
     this.createParticles(target.x, target.y, result === 'miss' ? color : null, count)
@@ -1102,6 +1174,7 @@ export class GraffitiGame {
     const idx = this.targets.indexOf(target)
     if (idx >= 0) {
       this.targets.splice(idx, 1)
+      this.hintTargets.delete(target)
       this.container.removeChild(target)
       target.destroy()
     }
@@ -1113,6 +1186,7 @@ export class GraffitiGame {
       t.destroy()
     })
     this.targets = []
+    this.hintTargets.clear()
 
     this.particles.forEach(p => {
       this.container.removeChild(p)
@@ -1143,6 +1217,7 @@ export class GraffitiGame {
 
     this.gameTime += delta
     this.spawnTimer += delta * 1000
+    this.voiceCooldown = Math.max(0, this.voiceCooldown - delta)
     heatSystem.update(delta, Date.now())
 
     replayManager.recordScoreSnapshot(
@@ -1166,9 +1241,23 @@ export class GraffitiGame {
       this.spawnTarget()
     }
 
+    const companionSkills = companionManager.getActiveCompanionSkills('graffiti')
+    const hitHintThreshold = companionSkills.hitHint || 0
+
     this.targets.forEach(target => {
       target.currentRadius = (target.currentRadius || target.radius) - target.shrinkSpeed * delta
+
+      if (hitHintThreshold > 0 && !this.hintTargets.has(target)) {
+        const goodRange = (target.perfectRadius || GAME_CONFIG.graffiti.perfectRadius) * 2 + (target.goodRadiusBonus || 0)
+        const hintTrigger = goodRange * (1 + hitHintThreshold)
+        if (target.currentRadius <= hintTrigger && target.currentRadius > goodRange) {
+          this.hintTargets.add(target)
+          this.showCompanionHint(target.x, target.y - target.radius - 40, '准备点击!')
+        }
+      }
+
       if (target.currentRadius <= 0) {
+        this.hintTargets.delete(target)
         const prevCombo = scoreManager.combo
         scoreManager.addScore('miss', { source: 'timeout' })
         audioManager.playSFX('miss')

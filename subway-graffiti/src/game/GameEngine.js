@@ -18,6 +18,7 @@ import { MapScene } from './MapScene.js'
 import { GraffitiGame } from './GraffitiGame.js'
 import { PatrolAvoid } from './PatrolAvoid.js'
 import { GarageDefense } from './GarageDefense.js'
+import { companionManager } from './CompanionManager.js'
 
 export const GameState = {
   MENU: 'menu',
@@ -39,7 +40,8 @@ export const GameState = {
   GARAGE_DEFENSE: 'garage_defense',
   GARAGE_DEFENSE_RESULT: 'garage_defense_result',
   SHOP: 'shop',
-  INVENTORY: 'inventory'
+  INVENTORY: 'inventory',
+  COMPANIONS: 'companions'
 }
 
 export class GameEngine {
@@ -307,6 +309,26 @@ export class GameEngine {
       dailyTaskManager.onRescueSuccess()
     })
 
+    companionManager.on('companion_unlocked', (data) => {
+      if (this.callbacks.onCompanionUnlocked) {
+        this.callbacks.onCompanionUnlocked(data)
+      }
+      audioManager.playSFX('unlock')
+    })
+
+    companionManager.on('bond_level_up', (data) => {
+      if (this.callbacks.onCompanionBondLevelUp) {
+        this.callbacks.onCompanionBondLevelUp(data)
+      }
+      audioManager.playSFX('milestone', { tier: 2 })
+    })
+
+    companionManager.on('companion_equipped', (data) => {
+      if (this.callbacks.onCompanionEquipped) {
+        this.callbacks.onCompanionEquipped(data)
+      }
+    })
+
     window.addEventListener('resize', this._onResize)
     this._onResize()
   }
@@ -393,6 +415,7 @@ export class GameEngine {
     this.stationsCompleted = 0
     this.currentDifficultyParams = this.computeDifficultyParams()
     scoreManager.resetGame(difficulty, this.currentDifficultyParams.scoreMultiplier)
+    companionManager.checkUnlocks()
     this.showMap()
   }
 
@@ -425,6 +448,12 @@ export class GameEngine {
     this.callbacks.onStateChange(this.state)
   }
 
+  showCompanions() {
+    companionManager.checkUnlocks()
+    this.state = GameState.COMPANIONS
+    this.callbacks.onStateChange(this.state)
+  }
+
   showProfiles() {
     this.state = GameState.PROFILES
     this.callbacks.onStateChange(this.state)
@@ -433,6 +462,30 @@ export class GameEngine {
   showSeasonPass() {
     this.state = GameState.SEASON_PASS
     this.callbacks.onStateChange(this.state)
+  }
+
+  getCompanions() {
+    return companionManager.getAllCompanions()
+  }
+
+  getUnlockedCompanions() {
+    return companionManager.getUnlockedCompanions()
+  }
+
+  getActiveCompanion() {
+    return companionManager.getActiveCompanion()
+  }
+
+  equipCompanion(companionId) {
+    return companionManager.setActiveCompanion(companionId)
+  }
+
+  getCompanionBond(companionId) {
+    return companionManager.getBondLevel(companionId)
+  }
+
+  getCompanionExp(companionId) {
+    return companionManager.getExp(companionId)
   }
 
   _showCutscene(cutscene) {

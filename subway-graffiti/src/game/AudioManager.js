@@ -212,6 +212,28 @@ class AudioManager {
     }
   }
 
+  playVoice(voiceConfig) {
+    if (!this.enabled || !this.ctx || !voiceConfig) return
+
+    const baseFreq = voiceConfig.baseFreq || 440
+    const pattern = voiceConfig.pattern || [0, 3, 5, 3, 0]
+    const noteDuration = voiceConfig.noteDuration || 0.12
+    const volume = voiceConfig.volume || 0.25
+    const waveType = voiceConfig.waveType || 'triangle'
+
+    pattern.forEach((interval, i) => {
+      const freq = baseFreq * Math.pow(2, interval / 12)
+      const vol = volume * (1 - i * 0.08)
+      setTimeout(() => {
+        this.playTone(freq, noteDuration, waveType, Math.max(0.05, vol), 'voice')
+      }, i * noteDuration * 1000)
+    })
+
+    if (voiceConfig.text) {
+      console.log(`[伙伴语音] ${voiceConfig.text}`)
+    }
+  }
+
   startMusic() {
     if (!this.enabled || !this.ctx || this.currentMusic) return
 
