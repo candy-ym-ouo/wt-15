@@ -943,6 +943,97 @@ export const GAME_CONFIG = {
   }
 }
 
+export const GARAGE_DEFENSE_CONFIG = {
+  name: '地铁车库保卫战',
+  description: '在车库中同时喷涂标记和抵御入侵者，切换路线守住关键通道！',
+  icon: '🛡️',
+  color: '#e74c3c',
+
+  totalTime: 90,
+  baseCountdown: 90,
+
+  routes: [
+    { id: 'route_a', name: 'A线 · 主通道', x: 187, color: '#e94560' },
+    { id: 'route_b', name: 'B线 · 侧通道', x: 562, color: '#3498db' }
+  ],
+
+  routeWidth: 300,
+  routeTop: 150,
+  routeBottom: 1050,
+  routeSwitchCooldown: 2.0,
+
+  graffiti: {
+    targetRadius: 48,
+    perfectRadius: 20,
+    shrinkSpeed: 90,
+    spawnInterval: 1800,
+    maxTargets: 3,
+    perfectScore: 120,
+    goodScore: 60,
+    missScore: -25
+  },
+
+  defense: {
+    enemySpeed: 100,
+    enemySpawnInterval: 3000,
+    maxEnemies: 4,
+    enemyDamage: 15,
+    barrierHP: 100,
+    barrierCount: 3,
+    barrierRadius: 40,
+    repairScore: 30,
+    killScore: 80
+  },
+
+  waves: [
+    {
+      time: 90,
+      name: '第一波',
+      enemySpeedMultiplier: 1.0,
+      enemySpawnIntervalMultiplier: 1.0,
+      maxEnemies: 3,
+      graffitiSpawnIntervalMultiplier: 1.0
+    },
+    {
+      time: 60,
+      name: '第二波',
+      enemySpeedMultiplier: 1.2,
+      enemySpawnIntervalMultiplier: 0.85,
+      maxEnemies: 4,
+      graffitiSpawnIntervalMultiplier: 0.95
+    },
+    {
+      time: 30,
+      name: '最终波',
+      enemySpeedMultiplier: 1.5,
+      enemySpawnIntervalMultiplier: 0.7,
+      maxEnemies: 5,
+      graffitiSpawnIntervalMultiplier: 0.9
+    }
+  ],
+
+  countdownTargets: [
+    { time: 75, name: '守住第一个补给点!', bonus: 200 },
+    { time: 45, name: '支援即将到达!', bonus: 400 },
+    { time: 15, name: '最后冲刺!', bonus: 600 }
+  ],
+
+  settlement: {
+    rankThresholds: [
+      { minScore: 0, rank: 'F', stars: 0, title: '车库失守' },
+      { minScore: 1500, rank: 'D', stars: 1, title: '勉强守住' },
+      { minScore: 3000, rank: 'C', stars: 2, title: '初级守卫' },
+      { minScore: 5000, rank: 'B', stars: 3, title: '车库卫士' },
+      { minScore: 7500, rank: 'A', stars: 4, title: '钢铁堡垒' },
+      { minScore: 10000, rank: 'S', stars: 5, title: '车库守护神' }
+    ],
+    bonusPerWave: 300,
+    perfectDefenseBonus: 500,
+    noDamageBonus: 800,
+    allRoutesBonus: 600
+  }
+}
+
 export const CITY_EVENTS = {
   refreshCycle: 4 * 60 * 60 * 1000,
   maxActiveEvents: 3,

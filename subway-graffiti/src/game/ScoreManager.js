@@ -57,7 +57,8 @@ class ScoreManager {
     this.currentGameStations = []
     this.currentGamePhaseBreakdown = {
       graffiti: { score: 0, perfect: 0, good: 0, miss: 0, milestoneBonus: 0 },
-      patrol: { score: 0, caught: 0 }
+      patrol: { score: 0, caught: 0 },
+      garage_defense: { score: 0, perfect: 0, good: 0, miss: 0, enemiesKilled: 0, barriersRepaired: 0 }
     }
     this.maxPerfectStreak = 0
     this.currentPerfectStreak = 0
@@ -255,7 +256,8 @@ class ScoreManager {
     this.currentGameStations = []
     this.currentGamePhaseBreakdown = {
       graffiti: { score: 0, perfect: 0, good: 0, miss: 0, milestoneBonus: 0 },
-      patrol: { score: 0, caught: 0 }
+      patrol: { score: 0, caught: 0 },
+      garage_defense: { score: 0, perfect: 0, good: 0, miss: 0, enemiesKilled: 0, barriersRepaired: 0 }
     }
     this.maxPerfectStreak = 0
     this.currentPerfectStreak = 0
@@ -316,7 +318,8 @@ class ScoreManager {
     this.currentGameStations = []
     this.currentGamePhaseBreakdown = {
       graffiti: { score: 0, perfect: 0, good: 0, miss: 0, milestoneBonus: 0 },
-      patrol: { score: 0, caught: 0 }
+      patrol: { score: 0, caught: 0 },
+      garage_defense: { score: 0, perfect: 0, good: 0, miss: 0, enemiesKilled: 0, barriersRepaired: 0 }
     }
     this.maxPerfectStreak = 0
     this.currentPerfectStreak = 0
@@ -639,6 +642,18 @@ class ScoreManager {
       this.currentGamePhaseBreakdown.graffiti.score += points
     } else if (this.currentPhaseType === 'patrol') {
       this.currentGamePhaseBreakdown.patrol.score += points
+    } else if (this.currentPhaseType === 'garage_defense') {
+      this.currentGamePhaseBreakdown.garage_defense.score += points
+      if (type === 'perfect') {
+        this.currentGamePhaseBreakdown.garage_defense.perfect++
+        const src = extra?.source
+        if (src === 'defense_kill') this.currentGamePhaseBreakdown.garage_defense.enemiesKilled++
+      } else if (type === 'good') {
+        this.currentGamePhaseBreakdown.garage_defense.good++
+        if (extra?.source === 'barrier_repair') this.currentGamePhaseBreakdown.garage_defense.barriersRepaired++
+      } else if (type === 'miss') {
+        this.currentGamePhaseBreakdown.garage_defense.miss++
+      }
     }
 
     return points
@@ -988,7 +1003,8 @@ class ScoreManager {
 
     this.currentGamePhaseBreakdown = {
       graffiti: { score: 0, perfect: 0, good: 0, miss: 0, milestoneBonus: 0 },
-      patrol: { score: 0, caught: 0 }
+      patrol: { score: 0, caught: 0 },
+      garage_defense: { score: 0, perfect: 0, good: 0, miss: 0, enemiesKilled: 0, barriersRepaired: 0 }
     }
 
     return { isNewHigh, stationRecord }

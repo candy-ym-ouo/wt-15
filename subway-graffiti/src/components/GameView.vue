@@ -2,7 +2,7 @@
 import { GameEngine, GameState } from '@/game/GameEngine.js';
 import { scoreManager } from '@/game/ScoreManager.js';
 import { profileManager } from '@/game/ProfileManager.js';
-import { GAME_CONFIG, LINES, BATTLE_PASS_CONFIG, CITY_EVENTS, QUEST_LINES } from '@/game/config.js';
+import { GAME_CONFIG, LINES, BATTLE_PASS_CONFIG, CITY_EVENTS, QUEST_LINES, GARAGE_DEFENSE_CONFIG } from '@/game/config.js';
 import { cityEventManager } from '@/game/CityEventManager.js';
 import { audioManager } from '@/game/AudioManager.js';
 import { battlePassManager } from '@/game/BattlePassManager.js';
@@ -31,6 +31,7 @@ const musicVolume = ref(GAME_CONFIG.audio.musicVolume);
 const sfxVolume = ref(GAME_CONFIG.audio.sfxVolume);
 const voiceVolume = ref(GAME_CONFIG.audio.voiceVolume);
 const gameResult = ref(null);
+const garageDefenseResult = ref(null);
 const stationResult = ref(null);
 const selectedDifficulty = ref('normal');
 const stats = reactive(scoreManager.getStats());
@@ -812,6 +813,10 @@ function onStateChange(state, data) {
    refreshStats();
    refreshBattlePassSummary();
  }
+ else if (state === GameState.GARAGE_DEFENSE_RESULT) {
+   garageDefenseResult.value = data;
+   refreshStats();
+ }
  else if (state === GameState.STATION_COMPLETE) {
    stationResult.value = data;
    if (data?.line) {
@@ -891,6 +896,29 @@ function startGame(difficulty = 'normal') {
   heatSystem.reset();
   audioManager.playSFX('click');
   engine.startNewGame(difficulty);
+}
+
+function startGarageDefense() {
+  if (!engine) {
+    console.warn('Game engine not ready yet');
+    return;
+  }
+  audioManager.init();
+  audioManager.resume();
+  score.value = 0;
+  combo.value = 0;
+  garageDefenseResult.value = null;
+  heatSystem.reset();
+  audioManager.playSFX('click');
+  engine.startGarageDefense();
+}
+
+function backFromGarageDefense() {
+  audioManager.playSFX('click');
+  garageDefenseResult.value = null;
+  score.value = 0;
+  combo.value = 0;
+  engine.backFromGarageDefense();
 }
 
 function selectDifficulty(diff) {
@@ -1612,6 +1640,10 @@ onUnmounted(() => {
 
           <button class="btn btn-primary" style="width: 100%;" @click="startGame(selectedDifficulty)">
             🚇 开始巡游
+          </button>
+
+          <button class="btn btn-outline" style="width: 100%; border-color: #e74c3c; color: #e74c3c;" @click="startGarageDefense">
+            🛡️ 车库保卫战
           </button>
 
           <div
@@ -2813,6 +2845,86 @@ onUnmounted(() => {
 
           <button class="btn btn-outline" style="width: 100%; margin-top: 12px;" @click="backToMenu">
             🏠 返回主菜单
+          </button>
+        </div>
+      </div>
+
+      <div v-if="currentState === GameState.GARAGE_DEFENSE" class="garage-defense-hud">
+        <div class="gd-hud-top">
+          <div class="gd-score">{{ score.toLocaleString() }}</div>
+          <div class="gd-combo" v-if="combo > 0">{{ combo }}x</div>
+        </div>
+      </div>
+
+      <div v-if="currentState === GameState.GARAGE_DEFENSE_RESULT" class="screen">
+        <div class="screen-title" style="background: linear-gradient(135deg, #e74c3c, #f39c12); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">🛡️ 车库保卫战结算</div>
+        <div class="screen-subtitle">{{ garageDefenseResult?.title || '车库失守' }}</div>
+
+        <div class="screen-content">
+          <div style="background: linear-gradient(135deg, rgba(231, 76, 60, 0.15), rgba(243, 156, 18, 0.1)); border-radius: 16px; padding: 24px; border: 2px solid rgba(231, 76, 60, 0.3); margin-bottom: 16px;">
+            <div style="text-align: center; margin-bottom: 16px;">
+              <div style="font-size: 72px; font-weight: 900; line-height: 1;">
+                <span :style="{ color: garageDefenseResult?.rank === 'S' ? '#f1c40f' : garageDefenseResult?.rank === 'A' ? '#2ecc71' : garageDefenseResult?.rank === 'B' ? '#3498db' : garageDefenseResult?.rank === 'C' ? '#f39c12' : '#e74c3c' }">
+                  {{ garageDefenseResult?.rank || 'F' }}
+                </span>
+              </div>
+              <div class="star-rating" style="margin-top: 8px;">
+                <span v-for="i in 5" :key="i" class="star" :class="{ active: i <= (garageDefenseResult?.stars || 0), empty: i > (garageDefenseResult?.stars || 0) }">★</span>
+              </div>
+              <div style="font-size: 32px; font-weight: 900; margin-top: 12px; color: #e74c3c;">
+                {{ (garageDefenseResult?.totalScore || 0).toLocaleString() }}分
+              </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 13px;">
+              <div class="eval-detail-row">
+                <span class="eval-detail-label">⚔️ 击退入侵</span>
+                <span class="eval-detail-value">{{ garageDefenseResult?.enemiesKilled || 0 }}</span>
+              </div>
+              <div class="eval-detail-row">
+                <span class="eval-detail-label">🔧 修复防线</span>
+                <span class="eval-detail-value">{{ garageDefenseResult?.barriersRepaired || 0 }}</span>
+              </div>
+              <div class="eval-detail-row">
+                <span class="eval-detail-label">💥 承受伤害</span>
+                <span class="eval-detail-value" :class="(garageDefenseResult?.totalDamageTaken || 0) > 0 ? 'text-red' : 'text-green'">{{ garageDefenseResult?.totalDamageTaken || 0 }}</span>
+              </div>
+              <div class="eval-detail-row">
+                <span class="eval-detail-label">🔄 切换路线</span>
+                <span class="eval-detail-value">{{ (garageDefenseResult?.routesUsed || []).length }}/{{ GARAGE_DEFENSE_CONFIG?.routes?.length || 2 }}</span>
+              </div>
+            </div>
+          </div>
+
+          <div v-if="garageDefenseResult?.routesData" style="background: rgba(52, 152, 219, 0.1); border-radius: 12px; padding: 16px; border: 1px solid rgba(52, 152, 219, 0.3); margin-bottom: 16px;">
+            <div style="font-size: 14px; font-weight: bold; margin-bottom: 10px; text-align: center;">📊 路线状态</div>
+            <div v-for="route in garageDefenseResult.routesData" :key="route.id" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+              <span :style="{ color: route.color }">{{ route.name }}</span>
+              <div style="flex: 1; margin: 0 12px; height: 8px; background: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden;">
+                <div :style="{ width: Math.max(0, route.hp) + '%', background: route.hp > 50 ? '#2ecc71' : route.hp > 20 ? '#f39c12' : '#e74c3c', height: '100%', borderRadius: '4px' }"></div>
+              </div>
+              <span style="font-size: 12px;">{{ Math.round(Math.max(0, route.hp)) }}%</span>
+            </div>
+          </div>
+
+          <div v-if="garageDefenseResult?.bonuses?.length > 0" style="background: rgba(241, 196, 15, 0.1); border-radius: 12px; padding: 16px; border: 1px solid rgba(241, 196, 15, 0.3); margin-bottom: 16px;">
+            <div style="font-size: 14px; font-weight: bold; margin-bottom: 10px; text-align: center; color: #f1c40f;">✨ 额外奖励</div>
+            <div v-for="bonus in garageDefenseResult.bonuses" :key="bonus.name" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; font-size: 13px;">
+              <span>{{ bonus.name }}</span>
+              <span style="color: #2ecc71; font-weight: bold;">+{{ bonus.amount }}</span>
+            </div>
+            <div style="border-top: 1px solid rgba(241, 196, 15, 0.2); margin-top: 8px; padding-top: 8px; display: flex; justify-content: space-between; font-weight: bold;">
+              <span>奖励合计</span>
+              <span style="color: #f1c40f;">+{{ garageDefenseResult.bonusTotal || 0 }}</span>
+            </div>
+          </div>
+
+          <button class="btn btn-primary" style="width: 100%; background: linear-gradient(135deg, #e74c3c, #f39c12);" @click="startGarageDefense">
+            🔄 再战一局
+          </button>
+
+          <button class="btn btn-outline" style="width: 100%; margin-top: 12px;" @click="backFromGarageDefense">
+            🗺️ 返回地图
           </button>
         </div>
       </div>
@@ -7280,5 +7392,65 @@ onUnmounted(() => {
   justify-content: center;
   font-size: 22px;
   flex-shrink: 0;
+}
+
+.garage-defense-hud {
+  position: fixed;
+  top: 110px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 100;
+  pointer-events: none;
+}
+
+.gd-hud-top {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 8px 20px;
+  background: rgba(0, 0, 0, 0.6);
+  border-radius: 20px;
+  border: 1px solid rgba(231, 76, 60, 0.3);
+}
+
+.gd-score {
+  font-size: 24px;
+  font-weight: 900;
+  color: #fff;
+  text-shadow: 0 0 10px rgba(231, 76, 60, 0.5);
+}
+
+.gd-combo {
+  font-size: 20px;
+  font-weight: bold;
+  color: #f39c12;
+  text-shadow: 0 0 10px rgba(243, 156, 18, 0.5);
+}
+
+.eval-detail-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 8px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 6px;
+}
+
+.eval-detail-label {
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+.eval-detail-value {
+  font-size: 13px;
+  font-weight: bold;
+}
+
+.text-red {
+  color: #e74c3c;
+}
+
+.text-green {
+  color: #2ecc71;
 }
 </style>

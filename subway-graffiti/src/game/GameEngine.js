@@ -1,5 +1,5 @@
 import * as PIXI from 'pixi.js'
-import { GAME_CONFIG } from './config.js'
+import { GAME_CONFIG, GARAGE_DEFENSE_CONFIG } from './config.js'
 import { audioManager } from './AudioManager.js'
 import { scoreManager } from './ScoreManager.js'
 import { profileManager } from './ProfileManager.js'
@@ -12,6 +12,7 @@ import { dailyTaskManager } from './DailyTaskManager.js'
 import { MapScene } from './MapScene.js'
 import { GraffitiGame } from './GraffitiGame.js'
 import { PatrolAvoid } from './PatrolAvoid.js'
+import { GarageDefense } from './GarageDefense.js'
 
 export const GameState = {
   MENU: 'menu',
@@ -29,7 +30,9 @@ export const GameState = {
   CUTSCENE: 'cutscene',
   CHAPTER_COMPLETE: 'chapter_complete',
   ACHIEVEMENTS: 'achievements',
-  DAILY_TASKS: 'daily_tasks'
+  DAILY_TASKS: 'daily_tasks',
+  GARAGE_DEFENSE: 'garage_defense',
+  GARAGE_DEFENSE_RESULT: 'garage_defense_result'
 }
 
 export class GameEngine {
@@ -242,6 +245,11 @@ export class GameEngine {
       onComplete: (result) => this._onPhaseComplete(result)
     })
 
+    this.garageDefense = new GarageDefense(this.app, {
+      onScoreUpdate: (points, type) => this._onScoreUpdate(points, type),
+      onComplete: (result) => this._onGarageDefenseComplete(result)
+    })
+
     this._createTransitionLayer()
   }
 
@@ -265,6 +273,9 @@ export class GameEngine {
           break
         case GameState.PATROL:
           this.patrolGame.update(dt)
+          break
+        case GameState.GARAGE_DEFENSE:
+          this.garageDefense.update(dt)
           break
       }
 
@@ -752,10 +763,55 @@ export class GameEngine {
     }
   }
 
+  startGarageDefense() {
+    audioManager.init()
+    audioManager.resume()
+    audioManager.startMusic()
+
+    scoreManager.resetGame('normal', 1)
+    scoreManager.setPhaseType('garage_defense')
+    heatSystem.reset()
+
+    this._fadeTransition(() => {
+      this._hideAllScenes()
+      this.state = GameState.GARAGE_DEFENSE
+      this.garageDefense.start()
+      this.callbacks.onStateChange(this.state, {
+        mode: 'garage_defense',
+        config: GARAGE_DEFENSE_CONFIG
+      })
+    }, 400)
+  }
+
+  _onGarageDefenseComplete(result) {
+    scoreManager.gamesPlayed++
+    scoreManager.totalScore += scoreManager.currentScore
+    if (scoreManager.currentScore > scoreManager.highScore && scoreManager.currentScore > 0) {
+      scoreManager.highScore = scoreManager.currentScore
+    }
+    scoreManager.save()
+
+    const newlyUnlockedAchievements = achievementManager.checkAchievements()
+
+    audioManager.stopMusic()
+    this.state = GameState.GARAGE_DEFENSE_RESULT
+    this.callbacks.onStateChange(this.state, {
+      ...result,
+      achievements: {
+        newlyUnlocked: newlyUnlockedAchievements
+      }
+    })
+  }
+
+  backFromGarageDefense() {
+    this.showMap()
+  }
+
   _hideAllScenes() {
     if (this.mapScene) this.mapScene.hide()
     if (this.graffitiGame) this.graffitiGame.stop()
     if (this.patrolGame) this.patrolGame.stop()
+    if (this.garageDefense) this.garageDefense.stop()
   }
 
   _fadeTransition(callback, duration = 300) {
@@ -840,6 +896,7 @@ export class GameEngine {
     if (this.mapScene) this.mapScene.destroy()
     if (this.graffitiGame) this.graffitiGame.destroy()
     if (this.patrolGame) this.patrolGame.destroy()
+    if (this.garageDefense) this.garageDefense.destroy()
     if (this.app) this.app.destroy(true)
     audioManager.stopMusic()
   }
