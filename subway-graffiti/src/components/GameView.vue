@@ -2,7 +2,7 @@
 import { GameEngine, GameState } from '@/game/GameEngine.js';
 import { scoreManager } from '@/game/ScoreManager.js';
 import { profileManager } from '@/game/ProfileManager.js';
-import { GAME_CONFIG, LINES, BATTLE_PASS_CONFIG, CITY_EVENTS, QUEST_LINES, GARAGE_DEFENSE_CONFIG } from '@/game/config.js';
+import { GAME_CONFIG, LINES, BATTLE_PASS_CONFIG, CITY_EVENTS, QUEST_LINES, GARAGE_DEFENSE_CONFIG, HIDDEN_STATIONS } from '@/game/config.js';
 import { cityEventManager } from '@/game/CityEventManager.js';
 import { audioManager } from '@/game/AudioManager.js';
 import { battlePassManager } from '@/game/BattlePassManager.js';
@@ -12,6 +12,7 @@ import { heatSystem } from '@/game/HeatSystem.js';
 import { achievementManager, AchievementCategory, CATEGORY_INFO } from '@/game/AchievementManager.js';
 import { dailyTaskManager } from '@/game/DailyTaskManager.js';
 import { citySoundscape } from '@/game/CitySoundscape.js';
+import { hiddenStationManager } from '@/game/HiddenStationManager.js';
 import ReplayView from './ReplayView.vue';
 import GraffitiWorkshopView from './GraffitiWorkshop.vue';
 import DailyTasksView from './DailyTasks.vue';
@@ -127,6 +128,54 @@ const blackMarketInfo = reactive({
 const blackMarketHasFlashSales = computed(() => (blackMarketInfo.flashSales?.length || 0) > 0);
 const showRiskEventDialog = ref(false);
 const showProfileRecoveryDialog = ref(false);
+
+const showHiddenStationTrigger = ref(false);
+const hiddenStationTriggerData = ref(null);
+const showHiddenStationComplete = ref(false);
+const hiddenStationCompleteData = ref(null);
+const showChallengeEvent = ref(false);
+const challengeEventData = ref(null);
+const hiddenStationProgress = reactive(hiddenStationManager.getTriggerProgress());
+const activeHiddenStationTrigger = ref(hiddenStationManager.getActiveTrigger());
+const hiddenStationStats = reactive(hiddenStationManager.getStats());
+
+const hasHiddenStationProgress = computed(() => {
+  return (
+    (hiddenStationProgress.comboStreak > 0 || hiddenStationProgress.comboStreakTarget) ||
+    (hiddenStationProgress.perfectStreak > 0 || hiddenStationProgress.perfectStreakTarget) ||
+    (hiddenStationProgress.highestCombo > 0 || hiddenStationProgress.fiveStarCount > 0)
+  );
+});
+
+function getTriggerTypeName(type) {
+  const names = {
+    'COMBO_STREAK': '🔥 连击连站',
+    'PERFECT_RUN': '💯 完美通关',
+    'LEGEND_COMBO': '⭐ 传奇连击',
+    'FIVE_STAR_MASTER': '🏆 五星大师'
+  };
+  return names[type] || '⚡ 隐藏发现';
+}
+
+function getGradeColor(grade) {
+  const colors = {
+    'S+': '#e94560',
+    'S': '#f1c40f',
+    'A': '#2ecc71',
+    'B': '#3498db',
+    'C': '#9b59b6'
+  };
+  return colors[grade] || '#ffffff';
+}
+
+function dismissHiddenStationComplete() {
+  audioManager.playSFX('click');
+  showHiddenStationComplete.value = false;
+  hiddenStationCompleteData.value = null;
+  if (engine) {
+    engine.dismissHiddenStationComplete();
+  }
+}
 
 function refreshCurrencies() {
   if (!engine) return;
@@ -1031,6 +1080,7 @@ function onStateChange(state, data) {
    if (data?.line) {
      currentLine.value = data.line;
    }
+   _refreshHiddenStationProgress();
  }
  else if (state === GameState.GAME_OVER) {
    gameResult.value = data;
@@ -1049,10 +1099,18 @@ function onStateChange(state, data) {
    refreshStats();
    refreshBattlePassSummary();
    refreshEconomyData();
+   _refreshHiddenStationProgress();
+   if (data?.hiddenStations?.triggers && data.hiddenStations.triggers.length > 0) {
+     const trigger = data.hiddenStations.triggers[0];
+     hiddenStationTriggerData.value = trigger;
+     showHiddenStationTrigger.value = true;
+     audioManager.playSFX('milestone');
+   }
  }
  else if (state === GameState.MAP) {
    currentLine.value = null;
    refreshEconomyData();
+   _refreshHiddenStationProgress();
  }
  else if (state === GameState.PROFILES) {
    refreshProfiles();
@@ -1060,6 +1118,7 @@ function onStateChange(state, data) {
  }
  else if (state === GameState.MENU) {
    refreshEconomyData();
+   _refreshHiddenStationProgress();
  }
  else if (state === GameState.SEASON_PASS) {
    refreshBattlePassSummary();
@@ -1081,9 +1140,64 @@ function onStateChange(state, data) {
  else if (state === GameState.COMPANIONS) {
    refreshCompanions();
  }
+ else if (state === GameState.HIDDEN_STATION_TRIGGER) {
+   hiddenStationTriggerData.value = data;
+   showHiddenStationTrigger.value = true;
+   audioManager.playSFX('milestone');
+ }
+ else if (state === GameState.HIDDEN_STATION_COMPLETE) {
+   hiddenStationCompleteData.value = data;
+   showHiddenStationComplete.value = true;
+   audioManager.playSFX('milestone');
+   refreshEconomyData();
+   refreshStats();
+ }
+ else if (state === GameState.HIDDEN_CHALLENGE_EVENT) {
+   challengeEventData.value = data;
+   showChallengeEvent.value = true;
+   audioManager.playSFX('perfect');
+   setTimeout(() => {
+     showChallengeEvent.value = false;
+   }, 3500);
+ }
  refreshQuestSummary();
  refreshAchievementSummary();
  _updateSoundscapeInfo();
+}
+
+function _refreshHiddenStationProgress() {
+  if (!engine) return;
+  const progress = engine.getHiddenStationProgress();
+  Object.keys(hiddenStationProgress).forEach(key => delete hiddenStationProgress[key]);
+  Object.assign(hiddenStationProgress, progress);
+  const activeTrigger = engine.getActiveHiddenStationTrigger();
+  activeHiddenStationTrigger.value = activeTrigger;
+  const stats = engine.getHiddenStationStats();
+  Object.assign(hiddenStationStats, stats);
+}
+
+function enterHiddenStation(stationId) {
+  if (!engine) return;
+  audioManager.playSFX('click');
+  showHiddenStationTrigger.value = false;
+  const success = engine.enterHiddenStation(stationId);
+  if (!success) {
+    showGamePrompt('无法进入隐藏站', '#e74c3c');
+  }
+}
+
+function dismissHiddenStationTrigger() {
+  if (!engine) return;
+  audioManager.playSFX('click');
+  engine.dismissHiddenStationTrigger();
+  showHiddenStationTrigger.value = false;
+  hiddenStationTriggerData.value = null;
+}
+
+function completeHiddenStation() {
+  if (!engine) return;
+  const result = engine.completeHiddenStation();
+  return result;
 }
 function onTick() {
  score.value = scoreManager.currentScore;
@@ -4466,6 +4580,187 @@ onUnmounted(() => {
             <button class="btn btn-primary cutscene-continue-btn" :style="{ background: 'linear-gradient(135deg, #f1c40f, #e94560)' }" @click="continueAfterChapterComplete">
               太棒了! →
             </button>
+          </div>
+        </div>
+      </transition>
+
+      <transition name="fade">
+        <div v-if="showHiddenStationTrigger && hiddenStationTriggerData" class="cutscene-overlay">
+          <div class="cutscene-dialog hidden-station-trigger-dialog">
+            <div class="hidden-station-glow"></div>
+            <div class="cutscene-type-label" style="background: linear-gradient(135deg, #9b59b6, #8e44ad);">
+              ⚡ 隐藏站发现!
+            </div>
+
+            <div class="hidden-station-icon">{{ hiddenStationTriggerData.hiddenStation?.graffiti?.symbol || '🔮' }}</div>
+            <div class="cutscene-title" style="color: #e94560;">{{ hiddenStationTriggerData.hiddenStation?.name }}</div>
+            <div class="hidden-station-desc">
+              {{ hiddenStationTriggerData.hiddenStation?.description || '神秘的隐藏区域等待探索...' }}
+            </div>
+
+            <div class="hidden-station-trigger-info">
+              <div class="trigger-type-badge">
+                {{ getTriggerTypeName(hiddenStationTriggerData.triggerType) }}
+              </div>
+              <div class="trigger-detail">
+                {{ hiddenStationTriggerData.description }}
+              </div>
+            </div>
+
+            <div v-if="hiddenStationTriggerData.hiddenStation?.challengeEvents?.length" class="hidden-station-challenges">
+              <div class="challenges-title">🎯 特殊挑战:</div>
+              <div class="challenges-list">
+                <div v-for="(evt, idx) in hiddenStationTriggerData.hiddenStation.challengeEvents.slice(0, 2)" :key="idx" class="challenge-tag">
+                  <span class="challenge-icon">{{ evt.icon || '⚡' }}</span>
+                  <span class="challenge-name">{{ evt.name }}</span>
+                </div>
+              </div>
+            </div>
+
+            <div v-if="hiddenStationTriggerData.hiddenStation?.rewards" class="hidden-station-rewards">
+              <div class="rewards-title">🎁 可能奖励:</div>
+              <div class="rewards-preview">
+                <span v-if="hiddenStationTriggerData.hiddenStation.rewards.gold" class="reward-chip">
+                  💰 {{ hiddenStationTriggerData.hiddenStation.rewards.gold.min }}-{{ hiddenStationTriggerData.hiddenStation.rewards.gold.max }}
+                </span>
+                <span v-if="hiddenStationTriggerData.hiddenStation.rewards.diamond" class="reward-chip">
+                  💎 {{ hiddenStationTriggerData.hiddenStation.rewards.diamond.min }}-{{ hiddenStationTriggerData.hiddenStation.rewards.diamond.max }}
+                </span>
+                <span v-if="hiddenStationTriggerData.hiddenStation.rewards.unlockSpray" class="reward-chip">
+                  🎨 传奇喷漆
+                </span>
+                <span v-if="hiddenStationTriggerData.hiddenStation.rewards.achievementId" class="reward-chip">
+                  🏆 特殊成就
+                </span>
+              </div>
+            </div>
+
+            <div class="hidden-station-actions">
+              <button class="btn btn-outline" @click="dismissHiddenStationTrigger">
+                稍后再来
+              </button>
+              <button class="btn btn-primary" style="background: linear-gradient(135deg, #9b59b6, #e94560);" @click="enterHiddenStation(hiddenStationTriggerData.hiddenStation.id)">
+                ⚡ 立即进入
+              </button>
+            </div>
+          </div>
+        </div>
+      </transition>
+
+      <transition name="fade">
+        <div v-if="showHiddenStationComplete && hiddenStationCompleteData" class="cutscene-overlay">
+          <div class="cutscene-dialog hidden-station-complete-dialog">
+            <div class="hidden-station-glow complete-glow"></div>
+            <div class="cutscene-type-label" style="background: linear-gradient(135deg, #2ecc71, #27ae60);">
+              🎉 隐藏站通关!
+            </div>
+
+            <div class="chapter-complete-icon" style="font-size: 64px;">🏆</div>
+            <div class="cutscene-title">{{ hiddenStationCompleteData.hiddenStation?.name }}</div>
+            <div class="hidden-station-grade">
+              <span class="grade-label">评级</span>
+              <span class="grade-value" :style="{ color: getGradeColor(hiddenStationCompleteData.grade) }">{{ hiddenStationCompleteData.grade || 'S' }}</span>
+            </div>
+
+            <div class="hidden-station-stats-grid">
+              <div class="hs-stat-item">
+                <span class="hs-stat-icon">🎯</span>
+                <span class="hs-stat-value">{{ hiddenStationCompleteData.score?.toLocaleString() || 0 }}</span>
+                <span class="hs-stat-label">本站得分</span>
+              </div>
+              <div class="hs-stat-item">
+                <span class="hs-stat-icon">🔥</span>
+                <span class="hs-stat-value">{{ hiddenStationCompleteData.maxCombo || 0 }}</span>
+                <span class="hs-stat-label">最高连击</span>
+              </div>
+              <div class="hs-stat-item">
+                <span class="hs-stat-icon">⭐</span>
+                <span class="hs-stat-value">{{ '★'.repeat(hiddenStationCompleteData.stars || 0) }}</span>
+                <span class="hs-stat-label">获得星数</span>
+              </div>
+            </div>
+
+            <div v-if="hiddenStationCompleteData.rewards" class="chapter-reward-section">
+              <div class="chapter-rewards-title">✨ 通关奖励:</div>
+              <div class="chapter-rewards-grid">
+                <div v-if="hiddenStationCompleteData.rewards.gold" class="chapter-reward-big-item">
+                  <span class="cr-icon">💰</span>
+                  <span class="cr-label">金币</span>
+                  <span class="cr-value">+{{ hiddenStationCompleteData.rewards.gold }}</span>
+                </div>
+                <div v-if="hiddenStationCompleteData.rewards.diamond" class="chapter-reward-big-item">
+                  <span class="cr-icon">💎</span>
+                  <span class="cr-label">钻石</span>
+                  <span class="cr-value">+{{ hiddenStationCompleteData.rewards.diamond }}</span>
+                </div>
+                <div v-if="hiddenStationCompleteData.rewards.battlePassExp" class="chapter-reward-big-item">
+                  <span class="cr-icon">🎖️</span>
+                  <span class="cr-label">通行证经验</span>
+                  <span class="cr-value">+{{ hiddenStationCompleteData.rewards.battlePassExp }}</span>
+                </div>
+                <div v-if="hiddenStationCompleteData.rewards.unlockSpray" class="chapter-reward-big-item">
+                  <span class="cr-icon">🎨</span>
+                  <span class="cr-label">解锁喷漆</span>
+                  <span class="cr-value">{{ hiddenStationCompleteData.rewards.unlockSpray }}</span>
+                </div>
+              </div>
+            </div>
+
+            <button class="btn btn-primary cutscene-continue-btn" style="background: linear-gradient(135deg, #2ecc71, #27ae60);" @click="dismissHiddenStationComplete">
+              继续 →
+            </button>
+          </div>
+        </div>
+      </transition>
+
+      <transition name="bounce">
+        <div v-if="showChallengeEvent && challengeEventData" class="challenge-event-toast">
+          <div class="cet-content">
+            <span class="cet-icon">{{ challengeEventData.icon || '⚡' }}</span>
+            <div class="cet-text">
+              <div class="cet-name">{{ challengeEventData.name }}</div>
+              <div class="cet-desc">{{ challengeEventData.description }}</div>
+            </div>
+            <div v-if="challengeEventData.timeRemaining != null" class="cet-timer">
+              {{ Math.ceil(challengeEventData.timeRemaining / 1000) }}s
+            </div>
+          </div>
+        </div>
+      </transition>
+
+      <transition name="slide">
+        <div v-if="(currentState === GameState.GRAFFITI || currentState === GameState.PATROL || currentState === GameState.STATION_COMPLETE) && phaseInfo?.line && (hasHiddenStationProgress || activeHiddenStationTrigger)" class="hidden-progress-bar">
+          <div v-if="activeHiddenStationTrigger" class="hp-active-trigger">
+            <span class="hpat-icon">⚡</span>
+            <div class="hpat-text">
+              <span class="hpat-name">{{ activeHiddenStationTrigger.hiddenStation?.name }} 已解锁</span>
+              <span class="hpat-hint">点击进入探索</span>
+            </div>
+            <button class="hpat-btn" @click="enterHiddenStation(activeHiddenStationTrigger.hiddenStation.id)">进入</button>
+          </div>
+
+          <div v-if="hasHiddenStationProgress" class="hp-progress-list">
+            <div v-if="hiddenStationProgress.comboStreakTarget" class="hp-progress-item">
+              <span class="hpi-icon">🔥</span>
+              <div class="hpi-track">
+                <div class="hpi-fill" :style="{ width: (hiddenStationProgress.comboStreak / hiddenStationProgress.comboStreakTarget * 100) + '%' }"></div>
+              </div>
+              <span class="hpi-text">{{ hiddenStationProgress.comboStreak }}/{{ hiddenStationProgress.comboStreakTarget }}</span>
+            </div>
+            <div v-if="hiddenStationProgress.perfectStreakTarget" class="hp-progress-item">
+              <span class="hpi-icon">💯</span>
+              <div class="hpi-track">
+                <div class="hpi-fill" :style="{ width: (hiddenStationProgress.perfectStreak / hiddenStationProgress.perfectStreakTarget * 100) + '%' }"></div>
+              </div>
+              <span class="hpi-text">{{ hiddenStationProgress.perfectStreak }}/{{ hiddenStationProgress.perfectStreakTarget }}</span>
+            </div>
+            <div v-if="hiddenStationProgress.highestCombo" class="hp-progress-item">
+              <span class="hpi-icon">⭐</span>
+              <div class="hpi-track">
+                <div class="hpi-fill" :style="{ width: Math.min(100, hiddenStationProgress.highestCombo / hiddenStationProgress.legendComboTarget * 100) + '%' }"></div>
+              </div>
+              <span class="hpi-text">{{ hiddenStationProgress.highestCombo }}/{{ hiddenStationProgress.legendComboTarget }}</span>
+            </div>
           </div>
         </div>
       </transition>
@@ -8781,5 +9076,381 @@ onUnmounted(() => {
 @keyframes pulse-glow {
   0%, 100% { box-shadow: 0 0 10px rgba(46, 204, 113, 0.3); }
   50% { box-shadow: 0 0 20px rgba(46, 204, 113, 0.6); }
+}
+
+.hidden-station-trigger-dialog {
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+  border: 2px solid rgba(155, 89, 182, 0.5);
+  overflow: hidden;
+}
+
+.hidden-station-complete-dialog {
+  background: linear-gradient(135deg, #1a1a2e 0%, #0f3460 50%, #1a472a 100%);
+  border: 2px solid rgba(46, 204, 113, 0.5);
+  overflow: hidden;
+}
+
+.hidden-station-glow {
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle, rgba(155, 89, 182, 0.15) 0%, transparent 70%);
+  animation: hidden-glow-rotate 8s linear infinite;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.hidden-station-glow.complete-glow {
+  background: radial-gradient(circle, rgba(46, 204, 113, 0.15) 0%, transparent 70%);
+}
+
+@keyframes hidden-glow-rotate {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.hidden-station-icon {
+  font-size: 64px;
+  margin: 16px 0;
+  filter: drop-shadow(0 0 20px rgba(155, 89, 182, 0.6));
+  position: relative;
+  z-index: 1;
+}
+
+.hidden-station-desc {
+  font-size: 13px;
+  opacity: 0.75;
+  text-align: center;
+  margin-bottom: 16px;
+  position: relative;
+  z-index: 1;
+}
+
+.hidden-station-trigger-info {
+  background: rgba(155, 89, 182, 0.1);
+  border: 1px solid rgba(155, 89, 182, 0.3);
+  border-radius: 12px;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  position: relative;
+  z-index: 1;
+}
+
+.trigger-type-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  background: linear-gradient(135deg, #9b59b6, #8e44ad);
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.trigger-detail {
+  font-size: 13px;
+  opacity: 0.85;
+}
+
+.hidden-station-challenges {
+  margin-bottom: 16px;
+  position: relative;
+  z-index: 1;
+}
+
+.challenges-title {
+  font-size: 12px;
+  font-weight: 700;
+  margin-bottom: 8px;
+  opacity: 0.7;
+}
+
+.challenges-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.challenge-tag {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 10px;
+  background: rgba(233, 69, 96, 0.12);
+  border: 1px solid rgba(233, 69, 96, 0.3);
+  border-radius: 16px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.challenge-icon { font-size: 14px; }
+
+.hidden-station-rewards {
+  margin-bottom: 20px;
+  position: relative;
+  z-index: 1;
+}
+
+.rewards-title {
+  font-size: 12px;
+  font-weight: 700;
+  margin-bottom: 8px;
+  opacity: 0.7;
+}
+
+.rewards-preview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.reward-chip {
+  padding: 6px 12px;
+  background: rgba(241, 196, 15, 0.12);
+  border: 1px solid rgba(241, 196, 15, 0.3);
+  border-radius: 16px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #f1c40f;
+}
+
+.hidden-station-actions {
+  display: flex;
+  gap: 12px;
+  position: relative;
+  z-index: 1;
+}
+
+.hidden-station-actions .btn { flex: 1; }
+
+.hidden-station-grade {
+  display: flex;
+  justify-content: center;
+  align-items: baseline;
+  gap: 10px;
+  margin: 12px 0 20px;
+}
+
+.grade-label {
+  font-size: 12px;
+  opacity: 0.5;
+}
+
+.grade-value {
+  font-size: 42px;
+  font-weight: 900;
+  text-shadow: 0 0 20px currentColor;
+}
+
+.hidden-station-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-bottom: 16px;
+  position: relative;
+  z-index: 1;
+}
+
+.hs-stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 12px 8px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+}
+
+.hs-stat-icon { font-size: 18px; }
+.hs-stat-value {
+  font-size: 16px;
+  font-weight: 800;
+}
+.hs-stat-label {
+  font-size: 10px;
+  opacity: 0.5;
+}
+
+.challenge-event-toast {
+  position: fixed;
+  top: 120px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: linear-gradient(135deg, rgba(233, 69, 96, 0.95), rgba(243, 156, 18, 0.95));
+  border-radius: 16px;
+  padding: 12px 20px;
+  z-index: 200;
+  box-shadow: 0 10px 40px rgba(233, 69, 96, 0.4);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.cet-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.cet-icon { font-size: 24px; }
+
+.cet-text { flex: 1; }
+
+.cet-name {
+  font-size: 14px;
+  font-weight: 800;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+}
+
+.cet-desc {
+  font-size: 11px;
+  opacity: 0.9;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.3);
+}
+
+.cet-timer {
+  font-size: 16px;
+  font-weight: 900;
+  min-width: 40px;
+  text-align: center;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+}
+
+.bounce-enter-active {
+  animation: bounce-in 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+.bounce-leave-active {
+  animation: bounce-out 0.3s ease-in;
+}
+@keyframes bounce-in {
+  0% { transform: translateX(-50%) translateY(-60px) scale(0.6); opacity: 0; }
+  60% { transform: translateX(-50%) translateY(8px) scale(1.05); opacity: 1; }
+  100% { transform: translateX(-50%) translateY(0) scale(1); }
+}
+@keyframes bounce-out {
+  0% { transform: translateX(-50%) translateY(0) scale(1); opacity: 1; }
+  100% { transform: translateX(-50%) translateY(-40px) scale(0.8); opacity: 0; }
+}
+
+.slide-enter-active {
+  animation: slide-in-bottom 0.4s ease-out;
+}
+.slide-leave-active {
+  animation: slide-out-bottom 0.3s ease-in;
+}
+@keyframes slide-in-bottom {
+  0% { transform: translateY(100%); opacity: 0; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+@keyframes slide-out-bottom {
+  0% { transform: translateY(0); opacity: 1; }
+  100% { transform: translateY(100%); opacity: 0; }
+}
+
+.hidden-progress-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: linear-gradient(180deg, transparent 0%, rgba(0, 0, 0, 0.85) 40%, rgba(0, 0, 0, 0.95) 100%);
+  padding: 12px 16px 20px;
+  z-index: 90;
+  backdrop-filter: blur(6px);
+}
+
+.hp-active-trigger {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: linear-gradient(135deg, rgba(155, 89, 182, 0.25), rgba(233, 69, 96, 0.2));
+  border: 1px solid rgba(155, 89, 182, 0.5);
+  border-radius: 14px;
+  padding: 12px 16px;
+  margin-bottom: 10px;
+  animation: hs-trigger-pulse 2s ease-in-out infinite;
+}
+
+@keyframes hs-trigger-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(155, 89, 182, 0.4); }
+  50% { box-shadow: 0 0 20px 4px rgba(155, 89, 182, 0.2); }
+}
+
+.hpat-icon {
+  font-size: 24px;
+  filter: drop-shadow(0 0 8px rgba(155, 89, 182, 0.6));
+}
+
+.hpat-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.hpat-name {
+  font-size: 13px;
+  font-weight: 800;
+  color: #e94560;
+}
+
+.hpat-hint {
+  font-size: 10px;
+  opacity: 0.6;
+}
+
+.hpat-btn {
+  padding: 8px 18px;
+  background: linear-gradient(135deg, #9b59b6, #e94560);
+  border: none;
+  border-radius: 20px;
+  color: white;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.hpat-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(155, 89, 182, 0.4);
+}
+
+.hp-progress-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.hp-progress-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
+}
+
+.hpi-icon { font-size: 14px; }
+
+.hpi-track {
+  flex: 1;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.hpi-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #f39c12, #e94560);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.hpi-text {
+  font-size: 11px;
+  font-weight: 700;
+  min-width: 40px;
+  text-align: right;
+  color: #f39c12;
 }
 </style>

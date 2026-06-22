@@ -4,6 +4,7 @@ import { battlePassManager } from './BattlePassManager.js'
 import { graffitiWorkshop } from './GraffitiWorkshop.js'
 import { heatSystem } from './HeatSystem.js'
 import { routeBranchManager } from './RouteBranchManager.js'
+import { hiddenStationManager } from './HiddenStationManager.js'
 
 const SAVE_VERSION = 3
 
@@ -208,6 +209,7 @@ class ScoreManager {
       }
       battlePassManager.loadProfile(profileId)
       graffitiWorkshop.loadProfile(profileId)
+      hiddenStationManager.loadProfile(profileId)
       this._syncBattlePassSkins()
       this._resetAllTemporaryState()
     } catch (e) {
@@ -1011,7 +1013,20 @@ class ScoreManager {
       garage_defense: { score: 0, perfect: 0, good: 0, miss: 0, enemiesKilled: 0, barriersRepaired: 0 }
     }
 
-    return { isNewHigh, stationRecord }
+    let hiddenStationTriggers = []
+    try {
+      hiddenStationTriggers = hiddenStationManager.checkAllTriggers({
+        stationId,
+        stationMaxCombo: this.stationMaxCombo,
+        stationMissCount: this.stationMissCount,
+        stationCaughtCount: this.stationCaughtCount,
+        stars: entry.stars
+      })
+    } catch (e) {
+      console.warn('隐藏站触发检测失败:', e)
+    }
+
+    return { isNewHigh, stationRecord, hiddenStationTriggers }
   }
 
   setStationScore(stationId, score) {

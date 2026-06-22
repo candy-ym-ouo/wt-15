@@ -1,6 +1,7 @@
 import { profileManager } from './ProfileManager.js'
 import { scoreManager } from './ScoreManager.js'
 import { LINES } from './config.js'
+import { hiddenStationManager } from './HiddenStationManager.js'
 
 const ACHIEVEMENT_DATA_PREFIX = 'achievement_data_'
 
@@ -569,6 +570,127 @@ export const ACHIEVEMENTS = [
         const totalCaught = g.stations?.reduce((sum, s) => sum + (s.patrol?.caught || 0), 0) || 0
         return totalCaught === 0 && g.stations && g.stations.length > 0
       })
+    }
+  },
+  {
+    id: 'hidden_station_first',
+    name: '秘境初窥',
+    description: '首次发现隐藏站',
+    icon: '🔮',
+    category: AchievementCategory.HIDDEN,
+    rarity: AchievementRarity.RARE,
+    check: () => {
+      try {
+        const stats = hiddenStationManager.getStats()
+        return (stats.totalTriggered || 0) >= 1
+      } catch (e) {
+        return false
+      }
+    }
+  },
+  {
+    id: 'hidden_station_explorer',
+    name: '秘境探索者',
+    description: '发现并进入 3 个不同的隐藏站',
+    icon: '🗝️',
+    category: AchievementCategory.HIDDEN,
+    rarity: AchievementRarity.EPIC,
+    target: 3,
+    progress: () => {
+      try {
+        const stats = hiddenStationManager.getStats()
+        return { current: Math.min(stats.uniqueStationsEntered || 0, 3), total: 3 }
+      } catch (e) {
+        return { current: 0, total: 3 }
+      }
+    },
+    check: () => {
+      try {
+        const stats = hiddenStationManager.getStats()
+        return (stats.uniqueStationsEntered || 0) >= 3
+      } catch (e) {
+        return false
+      }
+    }
+  },
+  {
+    id: 'hidden_station_master',
+    name: '秘境征服者',
+    description: '通关所有隐藏站',
+    icon: '👑',
+    category: AchievementCategory.HIDDEN,
+    rarity: AchievementRarity.LEGENDARY,
+    check: () => {
+      try {
+        const stats = hiddenStationManager.getStats()
+        return (stats.allStationsCleared || false)
+      } catch (e) {
+        return false
+      }
+    }
+  },
+  {
+    id: 'combo_streak_trigger',
+    name: '连击连斩',
+    description: '通过连续 3 站 25+ 连击触发隐藏站',
+    icon: '⚡',
+    category: AchievementCategory.HIDDEN,
+    rarity: AchievementRarity.EPIC,
+    check: () => {
+      try {
+        const stats = hiddenStationManager.getStats()
+        return (stats.byTriggerType?.COMBO_STREAK || 0) >= 1
+      } catch (e) {
+        return false
+      }
+    }
+  },
+  {
+    id: 'perfect_run_trigger',
+    name: '完美主义者',
+    description: '通过连续完美通关触发隐藏站',
+    icon: '💯',
+    category: AchievementCategory.HIDDEN,
+    rarity: AchievementRarity.EPIC,
+    check: () => {
+      try {
+        const stats = hiddenStationManager.getStats()
+        return (stats.byTriggerType?.PERFECT_RUN || 0) >= 1
+      } catch (e) {
+        return false
+      }
+    }
+  },
+  {
+    id: 'legend_combo_trigger',
+    name: '传奇一击',
+    description: '通过单站 88+ 连击触发隐藏站',
+    icon: '🌟',
+    category: AchievementCategory.HIDDEN,
+    rarity: AchievementRarity.LEGENDARY,
+    check: () => {
+      try {
+        const stats = hiddenStationManager.getStats()
+        return (stats.byTriggerType?.LEGEND_COMBO || 0) >= 1
+      } catch (e) {
+        return false
+      }
+    }
+  },
+  {
+    id: 'hidden_station_s_grade',
+    name: '秘境评级 S',
+    description: '在任一隐藏站获得 S 级以上评价',
+    icon: '💎',
+    category: AchievementCategory.HIDDEN,
+    rarity: AchievementRarity.LEGENDARY,
+    check: () => {
+      try {
+        const stats = hiddenStationManager.getStats()
+        return (stats.highestGrade === 'S' || stats.highestGrade === 'S+')
+      } catch (e) {
+        return false
+      }
     }
   }
 ]

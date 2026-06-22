@@ -3244,3 +3244,379 @@ export const BLACK_MARKET_CONFIG = {
   }
 }
 
+export const HIDDEN_STATIONS = {
+  triggerCooldown: 24 * 60 * 60 * 1000,
+  maxActiveTriggers: 1,
+
+  triggerTypes: {
+    COMBO_STREAK: {
+      id: 'combo_streak',
+      name: '连击传承',
+      description: '连续多站保持高连击，解锁隐藏通道',
+      icon: '🔥'
+    },
+    PERFECT_RUN: {
+      id: 'perfect_run',
+      name: '完美之路',
+      description: '连续零失误通关，展现极致精准',
+      icon: '💯'
+    },
+    LEGEND_COMBO: {
+      id: 'legend_combo',
+      name: '传奇一击',
+      description: '单站达成传奇级连击',
+      icon: '⚡'
+    },
+    FIVE_STAR_MASTER: {
+      id: 'five_star_master',
+      name: '五星大师',
+      description: '连续多站获得五星评价',
+      icon: '⭐'
+    }
+  },
+
+  stations: [
+    {
+      id: 'hidden_time_tunnel',
+      name: '时光隧道',
+      displayName: '??? 时光隧道',
+      icon: '⏳',
+      color: '#9b59b6',
+      glowColor: 'rgba(155, 89, 182, 0.8)',
+      isHidden: true,
+      x: 375,
+      y: 620,
+      triggerType: 'COMBO_STREAK',
+      triggerCondition: {
+        consecutiveStations: 3,
+        minComboPerStation: 25,
+        description: '连续3站每站至少25连击'
+      },
+      graffiti: {
+        shrinkSpeed: 200,
+        spawnInterval: 600,
+        maxTargets: 8,
+        perfectRadius: 10,
+        targetRadius: 35,
+        scoreMultiplier: 3,
+        timeWarpEnabled: true,
+        timeWarpInterval: 15000,
+        timeWarpDuration: 3000
+      },
+      patrol: {
+        guardSpeed: 250,
+        flashRadius: 180,
+        spawnInterval: 1800,
+        maxGuards: 6,
+        safeZoneRadius: 45,
+        laserEnabled: true,
+        laserSpeedMultiplier: 2,
+        duration: 35,
+        scoreMultiplier: 3
+      },
+      challengeEvents: [
+        {
+          id: 'time_accelerate',
+          name: '时间加速',
+          triggerAt: 0.3,
+          description: '缩圈速度临时提升50%！',
+          effects: { shrinkSpeedMultiplier: 1.5, duration: 10 },
+          visual: 'speed_lines'
+        },
+        {
+          id: 'time_slow',
+          name: '时间减速',
+          triggerAt: 0.6,
+          description: '所有守卫移动速度降低50%',
+          effects: { guardSpeedMultiplier: 0.5, duration: 8 },
+          visual: 'slow_motion'
+        },
+        {
+          id: 'bonus_wave',
+          name: '奖励浪潮',
+          triggerAt: 0.8,
+          description: '完美判定分数翻倍！',
+          effects: { perfectScoreMultiplier: 2, duration: 12 },
+          visual: 'rainbow_burst'
+        }
+      ],
+      rewards: {
+        baseScoreMultiplier: 5,
+        gold: { min: 5000, max: 10000 },
+        gem: { min: 10, max: 30 },
+        token: { min: 3, max: 8 },
+        unlockSpray: 'spray_legendary_aurora',
+        unlockTitle: '时空旅者',
+        achievementId: 'hidden_time_tunnel_clear',
+        battlePassExp: 500
+      },
+      feedback: {
+        start: '时空扭曲...你进入了从未有人见过的时光隧道！',
+        complete: '你穿越了时间！传说中的涂鸦艺术家！',
+        perfect: ['TIME WARP!', '时空穿梭!', '永恒瞬间!'],
+        good: ['跟上了时间', '勉强通过', '没被甩开'],
+        miss: ['迷失在时间中', '时空错乱', '被时间抛弃'],
+        caught: ['时空守卫发现了你!', '时间警察!']
+      }
+    },
+    {
+      id: 'hidden_underground_maze',
+      name: '地下迷宫',
+      displayName: '??? 地下迷宫',
+      icon: '🗺️',
+      color: '#34495e',
+      glowColor: 'rgba(52, 73, 94, 0.8)',
+      isHidden: true,
+      x: 700,
+      y: 620,
+      triggerType: 'PERFECT_RUN',
+      triggerCondition: {
+        consecutiveStations: 2,
+        zeroMiss: true,
+        zeroCaught: true,
+        description: '连续2站零失误零被抓通关'
+      },
+      graffiti: {
+        shrinkSpeed: 130,
+        spawnInterval: 1100,
+        maxTargets: 5,
+        perfectRadius: 14,
+        targetRadius: 42,
+        scoreMultiplier: 2.5,
+        mazePhase: true,
+        mazeRotateInterval: 8000
+      },
+      patrol: {
+        guardSpeed: 180,
+        flashRadius: 160,
+        spawnInterval: 2800,
+        maxGuards: 5,
+        safeZoneRadius: 55,
+        laserEnabled: true,
+        mazePatrol: true,
+        duration: 32,
+        scoreMultiplier: 2.5
+      },
+      challengeEvents: [
+        {
+          id: 'maze_rotate',
+          name: '迷宫旋转',
+          triggerAt: 0.25,
+          description: '目标位置随机重新排列！',
+          effects: { shuffleTargets: true },
+          visual: 'screen_flip'
+        },
+        {
+          id: 'ghost_guards',
+          name: '幻影守卫',
+          triggerAt: 0.5,
+          description: '出现不会真的抓你的幻影守卫干扰判断',
+          effects: { spawnGhostGuards: 3, duration: 10 },
+          visual: 'ghost_effect'
+        },
+        {
+          id: 'treasure_hunt',
+          name: '寻宝时刻',
+          triggerAt: 0.75,
+          description: '出现特殊金色目标，击中获得巨额奖励！',
+          effects: { spawnGoldTarget: true, goldTargetBonus: 500 },
+          visual: 'golden_glow'
+        }
+      ],
+      rewards: {
+        baseScoreMultiplier: 4,
+        gold: { min: 4000, max: 8000 },
+        gem: { min: 8, max: 20 },
+        token: { min: 2, max: 6 },
+        unlockPattern: 'pattern_mural_master',
+        unlockTitle: '迷宫行者',
+        achievementId: 'hidden_underground_maze_clear',
+        battlePassExp: 400
+      },
+      feedback: {
+        start: '错综复杂的地下通道...你能找到出口吗？',
+        complete: '你找到了迷宫的宝藏！真正的探险家！',
+        perfect: ['找到捷径!', '迷宫达人!', '方向感满分!'],
+        good: ['没迷路', '找到路了', '还算顺利'],
+        miss: ['走错路了', '迷失方向', '绕晕了'],
+        caught: ['迷宫守卫!', '陷阱触发!']
+      }
+    },
+    {
+      id: 'hidden_rainbow_station',
+      name: '彩虹站台',
+      displayName: '??? 彩虹站台',
+      icon: '🌈',
+      color: '#e84393',
+      glowColor: 'rgba(232, 67, 147, 0.8)',
+      isHidden: true,
+      x: 50,
+      y: 620,
+      triggerType: 'LEGEND_COMBO',
+      triggerCondition: {
+        singleStation: true,
+        minCombo: 80,
+        description: '单站达成至少80连击'
+      },
+      graffiti: {
+        shrinkSpeed: 170,
+        spawnInterval: 750,
+        maxTargets: 7,
+        perfectRadius: 16,
+        targetRadius: 44,
+        scoreMultiplier: 3.5,
+        rainbowComboBonus: true,
+        colorCycleInterval: 3000
+      },
+      patrol: {
+        guardSpeed: 220,
+        flashRadius: 170,
+        spawnInterval: 2200,
+        maxGuards: 5,
+        safeZoneRadius: 50,
+        laserEnabled: true,
+        rainbowLaser: true,
+        duration: 38,
+        scoreMultiplier: 3.5
+      },
+      challengeEvents: [
+        {
+          id: 'combo_frenzy',
+          name: '连击狂潮',
+          triggerAt: 0.2,
+          description: '连击倍率临时提升50%！',
+          effects: { comboMultiplierBoost: 1.5, duration: 15 },
+          visual: 'combo_fireworks'
+        },
+        {
+          id: 'perfect_storm',
+          name: '完美风暴',
+          triggerAt: 0.5,
+          description: '所有目标都是完美判定大小！',
+          effects: { allPerfectRadius: true, duration: 10 },
+          visual: 'rainbow_aura'
+        },
+        {
+          id: 'grand_finale',
+          name: '华丽终章',
+          triggerAt: 0.85,
+          description: '最后阶段！目标速度加快但分数爆炸！',
+          effects: { shrinkSpeedMultiplier: 1.3, scoreMultiplier: 2, duration: 999 },
+          visual: 'finale_burst'
+        }
+      ],
+      rewards: {
+        baseScoreMultiplier: 6,
+        gold: { min: 8000, max: 15000 },
+        gem: { min: 15, max: 40 },
+        token: { min: 5, max: 12 },
+        unlockSpray: 'spray_legendary_rainbow',
+        unlockSkin: 'cosmic',
+        unlockTitle: '彩虹大师',
+        achievementId: 'hidden_rainbow_station_clear',
+        battlePassExp: 600
+      },
+      feedback: {
+        start: '七色光芒笼罩站台...传说中的彩虹站！',
+        complete: '你驾驭了彩虹！最华丽的表演！',
+        perfect: ['RAINBOW!', '七色连击!', '绚丽夺目!'],
+        good: ['色彩斑斓', '不错的颜色', '好看'],
+        miss: ['颜色暗淡了', '失去光彩', '褪色了'],
+        caught: ['彩虹守护者!', '色彩警察!']
+      }
+    },
+    {
+      id: 'hidden_abyss_platform',
+      name: '深渊站台',
+      displayName: '??? 深渊站台',
+      icon: '🕳️',
+      color: '#2c3e50',
+      glowColor: 'rgba(44, 62, 80, 0.9)',
+      isHidden: true,
+      x: 375,
+      y: 900,
+      triggerType: 'FIVE_STAR_MASTER',
+      triggerCondition: {
+        consecutiveStations: 5,
+        minStars: 5,
+        description: '连续5站获得五星评价'
+      },
+      graffiti: {
+        shrinkSpeed: 220,
+        spawnInterval: 550,
+        maxTargets: 9,
+        perfectRadius: 8,
+        targetRadius: 32,
+        scoreMultiplier: 4,
+        abyssMode: true,
+        gravityWells: 3
+      },
+      patrol: {
+        guardSpeed: 280,
+        flashRadius: 200,
+        spawnInterval: 1500,
+        maxGuards: 7,
+        safeZoneRadius: 40,
+        laserEnabled: true,
+        laserSpeedMultiplier: 2.5,
+        eliteGuards: true,
+        duration: 45,
+        scoreMultiplier: 4
+      },
+      challengeEvents: [
+        {
+          id: 'abyss_gravity',
+          name: '深渊引力',
+          triggerAt: 0.2,
+          description: '所有目标向中心吸引，操作难度增加！',
+          effects: { gravityPull: true, duration: 12 },
+          visual: 'vortex_effect'
+        },
+        {
+          id: 'elite_squad',
+          name: '精英小队',
+          triggerAt: 0.45,
+          description: '精英守卫小队出现，移动更快视野更广！',
+          effects: { spawnEliteGuards: 2, duration: 15 },
+          visual: 'elite_aura'
+        },
+        {
+          id: 'darkness',
+          name: '黑暗降临',
+          triggerAt: 0.7,
+          description: '视野受限，只能看到目标附近区域！',
+          effects: { darkness: true, visionRadius: 150, duration: 12 },
+          visual: 'darkness_overlay'
+        },
+        {
+          id: 'abyss_finale',
+          name: '深渊终焉',
+          triggerAt: 0.9,
+          description: '最终考验！所有属性拉满，但奖励加倍！',
+          effects: { allMax: true, rewardMultiplier: 2, duration: 999 },
+          visual: 'abyss_burst'
+        }
+      ],
+      rewards: {
+        baseScoreMultiplier: 10,
+        gold: { min: 15000, max: 30000 },
+        gem: { min: 30, max: 80 },
+        token: { min: 10, max: 25 },
+        unlockSpray: 'spray_contraband_inferno',
+        unlockSkin: 'gold',
+        unlockTitle: '深渊之主',
+        achievementId: 'hidden_abyss_platform_clear',
+        battlePassExp: 1000
+      },
+      feedback: {
+        start: '你跌入了地铁的最深处...深渊站台！',
+        complete: '你征服了深渊！站在了涂鸦世界的巅峰！',
+        perfect: ['ABYSS MASTER!', '深渊之王!', '超越极限!'],
+        good: ['还活着', '没被吞没', '挺过来了'],
+        miss: ['被深渊吞噬', '坠入黑暗', '迷失了'],
+        caught: ['深渊领主!', '终极守卫!']
+      }
+    }
+  ]
+}
+

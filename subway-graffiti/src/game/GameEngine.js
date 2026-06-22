@@ -1,5 +1,5 @@
 import * as PIXI from 'pixi.js'
-import { GAME_CONFIG, GARAGE_DEFENSE_CONFIG } from './config.js'
+import { GAME_CONFIG, GARAGE_DEFENSE_CONFIG, HIDDEN_STATIONS } from './config.js'
 import { audioManager } from './AudioManager.js'
 import { scoreManager } from './ScoreManager.js'
 import { profileManager } from './ProfileManager.js'
@@ -21,6 +21,7 @@ import { PatrolAvoid } from './PatrolAvoid.js'
 import { GarageDefense } from './GarageDefense.js'
 import { companionManager } from './CompanionManager.js'
 import { citySoundscape } from './CitySoundscape.js'
+import { hiddenStationManager } from './HiddenStationManager.js'
 
 export const GameState = {
   MENU: 'menu',
@@ -44,7 +45,10 @@ export const GameState = {
   SHOP: 'shop',
   INVENTORY: 'inventory',
   COMPANIONS: 'companions',
-  BLACK_MARKET: 'black_market'
+  BLACK_MARKET: 'black_market',
+  HIDDEN_STATION_TRIGGER: 'hidden_station_trigger',
+  HIDDEN_STATION_COMPLETE: 'hidden_station_complete',
+  HIDDEN_CHALLENGE_EVENT: 'hidden_challenge_event'
 }
 
 export class GameEngine {
@@ -61,6 +65,10 @@ export class GameEngine {
     this.difficulty = 'normal'
     this.currentDifficultyParams = null
     this.currentStationEffects = null
+    this.isHiddenStationMode = false
+    this.currentHiddenStation = null
+    this.hiddenStationChallengeEvents = []
+    this.hiddenStationStartTime = 0
 
     this._pendingPhaseResult = null
     this._waitingForReplay = false
@@ -72,6 +80,36 @@ export class GameEngine {
     this._setupAchievementListeners()
     this._setupDailyTaskListeners()
     this._setupEconomyListeners()
+    this._setupHiddenStationListeners()
+  }
+
+  _setupHiddenStationListeners() {
+    hiddenStationManager.on('trigger', (data) => {
+      if (this.callbacks.onHiddenStationTrigger) {
+        this.callbacks.onHiddenStationTrigger(data)
+      }
+      this.state = GameState.HIDDEN_STATION_TRIGGER
+      if (this.callbacks.onStateChange) {
+        this.callbacks.onStateChange(this.state, data)
+      }
+    })
+
+    hiddenStationManager.on('challengeEvent', (data) => {
+      this.hiddenStationChallengeEvents.push(data.event)
+      if (this.callbacks.onHiddenChallengeEvent) {
+        this.callbacks.onHiddenChallengeEvent(data)
+      }
+      this.state = GameState.HIDDEN_CHALLENGE_EVENT
+      if (this.callbacks.onStateChange) {
+        this.callbacks.onStateChange(this.state, data)
+      }
+    })
+
+    hiddenStationManager.on('complete', (data) => {
+      if (this.callbacks.onHiddenStationComplete) {
+        this.callbacks.onHiddenStationComplete(data)
+      }
+    })
   }
 
   _setupEconomyListeners() {
@@ -937,10 +975,11 @@ export class GameEngine {
       console.log(`[HeatSystem] 站点结算高分热度 +${stationHeatGained}, 本站得分: ${stationScore}`)
     }
     
-    const { isNewStationHigh, stationRecord } = scoreManager.updateStationResult(
+    const updateResult = scoreManager.updateStationResult(
       this.currentStation.id,
       stationScore
     )
+    const { isNewStationHigh, stationRecord, hiddenStationTriggers } = updateResult
     const evaluation = scoreManager.evaluateStation(this.currentStation.id, stationScore)
     const newUnlocks = scoreManager.checkStationUnlocks()
     scoreManager.checkUnlocks()
@@ -1025,6 +1064,7 @@ export class GameEngine {
     questManager.save()
     dailyTaskManager.save()
     inventoryManager.save()
+    hiddenStationManager.save()
 
     const newlyUnlockedAchievements = achievementManager.checkAchievements()
 
@@ -1039,6 +1079,8 @@ export class GameEngine {
 
     const questSummary = questManager.getQuestSummary()
     const dropSummary = dropManager.getStationDropSummary()
+
+    const hiddenStationProgress = hiddenStationManager.getTriggerProgress()
 
     citySoundscape.setPhase('result')
     citySoundscape.playFeedback('station_clear', {
@@ -1096,8 +1138,115 @@ export class GameEngine {
         summary: companionSummary,
         gainedExp: activeCompanion ?
           (companionManager.companionExp[activeCompanion.id] || 0) - (this._preCompanionExp || 0) : 0
+      },
+      hiddenStations: {
+        triggers: hiddenStationTriggers || [],
+        progress: hiddenStationProgress || {},
+        activeTrigger: hiddenStationManager.getActiveTrigger(),
+        unlocked: hiddenStationManager.getUnlockedHiddenStations().map(s => s.id)
       }
     })
+  }
+
+  enterHiddenStation(stationId) {
+    const hiddenStation = hiddenStationManager.getHiddenStationById(stationId)
+    if (!hiddenStation) return false
+    if (!hiddenStationManager.isHiddenStationUnlocked(stationId)) return false
+
+    this.isHiddenStationMode = true
+    this.currentHiddenStation = hiddenStation
+    this.hiddenStationChallengeEvents = []
+    this.hiddenStationStartTime = Date.now()
+
+    hiddenStationManager.startHiddenStation(stationId)
+
+    const pseudoLine = {
+      id: 'hidden',
+      name: '隐藏线路',
+      color: hiddenStation.color
+    }
+
+    const stationConfig = {
+      ...hiddenStation,
+      id: hiddenStation.id,
+      name: hiddenStation.name,
+      graffiti: hiddenStation.graffiti,
+      patrol: hiddenStation.patrol,
+      feedback: hiddenStation.feedback,
+      unlockCondition: { type: 'default' }
+    }
+
+    this._onStationSelected(stationConfig, pseudoLine)
+    return true
+  }
+
+  completeHiddenStation() {
+    if (!this.isHiddenStationMode || !this.currentHiddenStation) return null
+
+    const stationScore = scoreManager.currentScore - (this.stationStartScore || 0)
+    const result = hiddenStationManager.completeHiddenStation(this.currentHiddenStation.id, stationScore)
+
+    if (result.rewards) {
+      const rewards = result.rewards
+      if (rewards.gold) inventoryManager.addCurrency('gold', rewards.gold)
+      if (rewards.gem) inventoryManager.addCurrency('gem', rewards.gem)
+      if (rewards.token) inventoryManager.addCurrency('token', rewards.token)
+      if (rewards.battlePassExp) battlePassManager.addExp(rewards.battlePassExp)
+      if (rewards.unlockSpray) graffitiWorkshop.unlockSpray(rewards.unlockSpray)
+      if (rewards.unlockSkin && !scoreManager.unlockedSkins.includes(rewards.unlockSkin)) {
+        scoreManager.unlockedSkins.push(rewards.unlockSkin)
+      }
+      if (rewards.unlockPattern) graffitiWorkshop.unlockPattern(rewards.unlockPattern)
+      if (rewards.achievementId) achievementManager.unlock(rewards.achievementId)
+    }
+
+    this.state = GameState.HIDDEN_STATION_COMPLETE
+    if (this.callbacks.onStateChange) {
+      this.callbacks.onStateChange(this.state, {
+        station: this.currentHiddenStation,
+        rewards: result.rewards,
+        firstClear: result.firstClear,
+        finalScore: result.rewards?.finalScore || stationScore
+      })
+    }
+
+    this.isHiddenStationMode = false
+    this.currentHiddenStation = null
+    scoreManager.save()
+    inventoryManager.save()
+    battlePassManager.save()
+    graffitiWorkshop.save()
+
+    return result
+  }
+
+  checkHiddenStationChallengeEvents(phase, progress) {
+    if (!this.isHiddenStationMode || !this.currentHiddenStation) return []
+    return hiddenStationManager.checkChallengeEvents(
+      this.currentHiddenStation.id,
+      progress
+    )
+  }
+
+  getHiddenStationCurrentEffects() {
+    if (!this.isHiddenStationMode) return []
+    return hiddenStationManager.getCurrentEffects()
+  }
+
+  getActiveHiddenStationTrigger() {
+    return hiddenStationManager.getActiveTrigger()
+  }
+
+  getHiddenStationProgress() {
+    return hiddenStationManager.getTriggerProgress()
+  }
+
+  getHiddenStationStats() {
+    return hiddenStationManager.getStats()
+  }
+
+  dismissHiddenStationTrigger() {
+    hiddenStationManager.clearActiveTrigger()
   }
 
   continueToNextStation() {
