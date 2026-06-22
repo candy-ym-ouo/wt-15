@@ -4,6 +4,100 @@ import { LINES } from './config.js'
 
 const ACHIEVEMENT_DATA_PREFIX = 'achievement_data_'
 
+function _getGamePerfectCount(game) {
+  return game.stations?.reduce((sum, s) => sum + (s.graffiti?.perfect || 0), 0) || 0
+}
+
+function _getGameGoodCount(game) {
+  return game.stations?.reduce((sum, s) => sum + (s.graffiti?.good || 0), 0) || 0
+}
+
+function _getGameMissCount(game) {
+  return game.stations?.reduce((sum, s) => sum + (s.graffiti?.miss || 0), 0) || 0
+}
+
+function _getGameCaughtCount(game) {
+  return game.stations?.reduce((sum, s) => sum + (s.patrol?.caught || 0), 0) || 0
+}
+
+function _getGameTotalHits(game) {
+  return _getGamePerfectCount(game) + _getGameGoodCount(game)
+}
+
+function _getGameTotalActions(game) {
+  return _getGamePerfectCount(game) + _getGameGoodCount(game) + _getGameMissCount(game)
+}
+
+function _getGameHitRate(game) {
+  const total = _getGameTotalActions(game)
+  if (total === 0) return 0
+  return _getGameTotalHits(game) / total
+}
+
+function _hasFlawlessStation() {
+  const history = scoreManager.getGameHistory()
+  for (const game of history) {
+    if (!game.stations) continue
+    for (const station of game.stations) {
+      const miss = station.graffiti?.miss || 0
+      const caught = station.patrol?.caught || 0
+      if (miss === 0 && caught === 0 && station.score > 0) {
+        return true
+      }
+    }
+  }
+  return false
+}
+
+function _getMaxGamePerfectCount() {
+  const history = scoreManager.getGameHistory()
+  let maxPerfect = 0
+  for (const game of history) {
+    const perfect = _getGamePerfectCount(game)
+    if (perfect > maxPerfect) maxPerfect = perfect
+  }
+  return maxPerfect
+}
+
+function _getBestGameHitRate() {
+  const history = scoreManager.getGameHistory()
+  let bestRate = 0
+  for (const game of history) {
+    const total = _getGameTotalActions(game)
+    if (total < 50) continue
+    const rate = _getGameHitRate(game)
+    if (rate > bestRate) bestRate = rate
+  }
+  return bestRate
+}
+
+function _getCurrentGamePerfectCount() {
+  return scoreManager.currentGameStations.reduce((sum, s) => sum + (s.graffiti?.perfect || 0), 0) 
+    + (scoreManager.stationPerfectCount || 0)
+}
+
+function _getCurrentGameHitRate() {
+  const perfect = scoreManager.currentGameStations.reduce((sum, s) => sum + (s.graffiti?.perfect || 0), 0) 
+    + (scoreManager.stationPerfectCount || 0)
+  const good = scoreManager.currentGameStations.reduce((sum, s) => sum + (s.graffiti?.good || 0), 0) 
+    + (scoreManager.stationGoodCount || 0)
+  const miss = scoreManager.currentGameStations.reduce((sum, s) => sum + (s.graffiti?.miss || 0), 0) 
+    + (scoreManager.stationMissCount || 0)
+  const total = perfect + good + miss
+  if (total === 0) return 0
+  return (perfect + good) / total
+}
+
+function _getCurrentGameTotalActions() {
+  const perfect = scoreManager.currentGameStations.reduce((sum, s) => sum + (s.graffiti?.perfect || 0), 0) 
+    + (scoreManager.stationPerfectCount || 0)
+  const good = scoreManager.currentGameStations.reduce((sum, s) => sum + (s.graffiti?.good || 0), 0) 
+    + (scoreManager.stationGoodCount || 0)
+  const miss = scoreManager.currentGameStations.reduce((sum, s) => sum + (s.graffiti?.miss || 0), 0) 
+    + (scoreManager.stationMissCount || 0)
+  return perfect + good + miss
+}
+
 export const AchievementCategory = {
   PERFORMANCE: 'performance',
   EXPLORATION: 'exploration',
@@ -37,8 +131,16 @@ export const ACHIEVEMENTS = [
     category: AchievementCategory.PERFORMANCE,
     rarity: AchievementRarity.COMMON,
     target: 10,
-    progress: () => ({ current: Math.min(scoreManager.perfectCount, 10), total: 10 }),
-    check: () => scoreManager.perfectCount >= 10
+    progress: () => {
+      const currentMax = Math.max(_getMaxGamePerfectCount(), _getCurrentGamePerfectCount())
+      return { current: Math.min(currentMax, 10), total: 10 }
+    },
+    check: () => {
+      const history = scoreManager.getGameHistory()
+      if (history.some(g => _getGamePerfectCount(g) >= 10)) return true
+      if (_getCurrentGamePerfectCount() >= 10) return true
+      return false
+    }
   },
   {
     id: 'perfect_master',
@@ -65,20 +167,26 @@ export const ACHIEVEMENTS = [
   {
     id: 'sharpshooter',
     name: '神射手',
-    description: '命中率达到 80%（至少 50 次命中）',
+    description: '单局命中率达到 80%（至少 50 次操作）',
     icon: '🎯',
     category: AchievementCategory.PERFORMANCE,
     rarity: AchievementRarity.RARE,
     progress: () => {
-      const total = scoreManager.perfectCount + scoreManager.goodCount + scoreManager.missCount
-      const hitRate = total > 0 ? (scoreManager.perfectCount + scoreManager.goodCount) / total : 0
-      return { current: Math.round(hitRate * 100), total: 80, unit: '%' }
+      const historyBestRate = _getBestGameHitRate()
+      const currentRate = _getCurrentGameHitRate()
+      const currentTotal = _getCurrentGameTotalActions()
+      let bestRate = Math.max(historyBestRate, currentTotal >= 50 ? currentRate : 0)
+      return { current: Math.round(bestRate * 100), total: 80, unit: '%' }
     },
     check: () => {
-      const total = scoreManager.perfectCount + scoreManager.goodCount + scoreManager.missCount
-      if (total < 50) return false
-      const hitRate = (scoreManager.perfectCount + scoreManager.goodCount) / total
-      return hitRate >= 0.8
+      const history = scoreManager.getGameHistory()
+      if (history.some(g => _getGameTotalActions(g) >= 50 && _getGameHitRate(g) >= 0.8)) {
+        return true
+      }
+      if (_getCurrentGameTotalActions() >= 50 && _getCurrentGameHitRate() >= 0.8) {
+        return true
+      }
+      return false
     }
   },
   {
@@ -89,12 +197,7 @@ export const ACHIEVEMENTS = [
     category: AchievementCategory.PERFORMANCE,
     rarity: AchievementRarity.EPIC,
     check: () => {
-      for (const [, info] of Object.entries(scoreManager.stationScores)) {
-        if (info.highScore > 0 && info.clearCount > 0) {
-          return true
-        }
-      }
-      return false
+      return _hasFlawlessStation()
     }
   },
   {
