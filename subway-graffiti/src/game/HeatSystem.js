@@ -10,6 +10,7 @@ export class HeatSystem {
     this.totalHeatGained = 0
     this.heatHistory = []
     this.levelUpCallbacks = []
+    this.levelChangeCallbacks = []
     this.heatChangeCallbacks = []
     this.frozen = false
   }
@@ -57,6 +58,7 @@ export class HeatSystem {
     if (newLevel > prevLevel) {
       this.currentLevel = newLevel
       this._notifyLevelUp(prevLevel, newLevel)
+      this._notifyLevelChange(prevLevel, newLevel)
     }
 
     this._notifyHeatChange(prevHeat)
@@ -111,8 +113,11 @@ export class HeatSystem {
       this.currentHeat = Math.max(0, this.currentHeat - decayAmount)
 
       const newLevel = this._calculateLevel(this.currentHeat)
-      if (newLevel < prevLevel) {
+      if (newLevel !== prevLevel) {
         this.currentLevel = newLevel
+        if (newLevel < prevLevel) {
+          this._notifyLevelChange(prevLevel, newLevel)
+        }
       }
 
       if (Math.abs(this.currentHeat - prevHeat) > 0.01) {
@@ -173,6 +178,10 @@ export class HeatSystem {
     this.levelUpCallbacks.push(callback)
   }
 
+  onLevelChange(callback) {
+    this.levelChangeCallbacks.push(callback)
+  }
+
   onHeatChange(callback) {
     this.heatChangeCallbacks.push(callback)
   }
@@ -216,6 +225,17 @@ export class HeatSystem {
         callback(prevLevel, newLevel, levelInfo)
       } catch (e) {
         console.error('HeatSystem levelUp callback error:', e)
+      }
+    })
+  }
+
+  _notifyLevelChange(prevLevel, newLevel) {
+    const levelInfo = this.getLevelInfo(newLevel)
+    this.levelChangeCallbacks.forEach(callback => {
+      try {
+        callback(prevLevel, newLevel, levelInfo)
+      } catch (e) {
+        console.error('HeatSystem levelChange callback error:', e)
       }
     })
   }

@@ -1631,6 +1631,23 @@ onUnmounted(() => {
         </div>
       </div>
 
+      <div v-if="soundscapeInfo.atmosphere && (currentState === GameState.GRAFFITI || currentState === GameState.PATROL || currentState === GameState.MAP)" class="soundscape-hud" :style="{ borderColor: soundscapeInfo.atmosphere.bgTint }">
+        <div class="soundscape-header">
+          <span class="soundscape-dot" :style="{ background: soundscapeInfo.atmosphere.bgTint }"></span>
+          <span class="soundscape-name">{{ soundscapeInfo.atmosphere.displayName || soundscapeInfo.atmosphere.name }}</span>
+          <span class="soundscape-tempo">🎵 {{ soundscapeInfo.musicTempo }} BPM</span>
+        </div>
+        <div class="soundscape-tags">
+          <span v-for="tag in soundscapeInfo.atmosphere.tags?.slice(0, 3)" :key="tag" class="soundscape-tag">#{{ tag }}</span>
+        </div>
+        <div class="soundscape-phases">
+          <span :class="{ 'soundscape-phase-active': soundscapeInfo.phase === 'graffiti' }" class="soundscape-phase">🎨涂鸦</span>
+          <span :class="{ 'soundscape-phase-active': soundscapeInfo.phase === 'patrol' }" class="soundscape-phase">🚓巡逻</span>
+          <span :class="{ 'soundscape-phase-active': soundscapeInfo.phase === 'map' }" class="soundscape-phase">🗺️地图</span>
+          <span :class="{ 'soundscape-phase-active': soundscapeInfo.phase === 'result' }" class="soundscape-phase">✨结算</span>
+        </div>
+      </div>
+
       <div v-if="combo > 1 && (currentState === GameState.GRAFFITI || currentState === GameState.PATROL)" class="combo-display" :style="{ color: currentTheme.ui.accent, textShadow: `0 0 15px ${currentTheme.ui.glowColor}` }">
         {{ combo }} COMBO
       </div>
@@ -7752,6 +7769,85 @@ onUnmounted(() => {
   font-size: 11px;
   color: rgba(255, 255, 255, 0.6);
   text-align: center;
+}
+
+.soundscape-hud {
+  position: absolute;
+  top: 160px;
+  left: 16px;
+  background: rgba(0, 0, 0, 0.55);
+  border: 2px solid #666;
+  border-radius: 12px;
+  padding: 10px 12px;
+  z-index: 10;
+  backdrop-filter: blur(6px);
+  min-width: 180px;
+  pointer-events: none;
+}
+
+.soundscape-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.soundscape-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  box-shadow: 0 0 8px currentColor;
+}
+
+.soundscape-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: #fff;
+  flex: 1;
+}
+
+.soundscape-tempo {
+  font-size: 11px;
+  color: #f1c40f;
+  font-family: monospace;
+  background: rgba(241, 196, 15, 0.15);
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+
+.soundscape-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 7px;
+}
+
+.soundscape-tag {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.7);
+  background: rgba(255, 255, 255, 0.08);
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+
+.soundscape-phases {
+  display: flex;
+  gap: 4px;
+}
+
+.soundscape-phase {
+  font-size: 10px;
+  padding: 3px 6px;
+  border-radius: 5px;
+  color: rgba(255, 255, 255, 0.4);
+  background: rgba(255, 255, 255, 0.05);
+  transition: all 0.3s ease;
+}
+
+.soundscape-phase-active {
+  color: #fff;
+  background: rgba(46, 204, 113, 0.25);
+  box-shadow: 0 0 6px rgba(46, 204, 113, 0.4);
 }
 
 .achievement-notification-overlay {

@@ -6,93 +6,195 @@ import { cityEventManager } from './CityEventManager.js'
 export const STATION_ATMOSPHERE = {
   residential: {
     name: '居民区',
+    displayName: '起点居民区',
     tags: ['quiet', 'morning', 'birds'],
     baseTempo: 90,
-    ambienceDensity: 0.3
+    ambienceDensity: 0.3,
+    bgTint: '#3a5a40',
+    wavePalette: { melody: 'triangle', bass: 'sine', pad: 'sine' },
+    scaleType: 'major_pentatonic',
+    baseFreq: 440,
+    reverbAmount: 0.15
   },
   oldTown: {
     name: '老街区',
+    displayName: '老街区',
     tags: ['nostalgic', 'bicycle', 'street_vendor'],
     baseTempo: 100,
-    ambienceDensity: 0.5
+    ambienceDensity: 0.5,
+    bgTint: '#6b4423',
+    wavePalette: { melody: 'triangle', bass: 'sine', pad: 'triangle' },
+    scaleType: 'dorian',
+    baseFreq: 392,
+    reverbAmount: 0.3
   },
   commercial: {
     name: '商业区',
+    displayName: '商业中心',
     tags: ['busy', 'crowd', 'traffic'],
     baseTempo: 128,
-    ambienceDensity: 0.85
+    ambienceDensity: 0.85,
+    bgTint: '#1a3a6b',
+    wavePalette: { melody: 'sawtooth', bass: 'square', pad: 'triangle' },
+    scaleType: 'minor',
+    baseFreq: 523,
+    reverbAmount: 0.2
   },
   art: {
     name: '艺术区',
+    displayName: '艺术区',
     tags: ['creative', 'chill', 'indie'],
     baseTempo: 95,
-    ambienceDensity: 0.45
+    ambienceDensity: 0.45,
+    bgTint: '#7a2e5a',
+    wavePalette: { melody: 'triangle', bass: 'sine', pad: 'sine' },
+    scaleType: 'lydian',
+    baseFreq: 466,
+    reverbAmount: 0.45
   },
   university: {
     name: '大学城',
+    displayName: '大学城',
     tags: ['youthful', 'energetic', 'chatting'],
     baseTempo: 115,
-    ambienceDensity: 0.6
+    ambienceDensity: 0.6,
+    bgTint: '#0d4a6b',
+    wavePalette: { melody: 'sawtooth', bass: 'triangle', pad: 'triangle' },
+    scaleType: 'mixolydian',
+    baseFreq: 494,
+    reverbAmount: 0.25
   },
   tech: {
     name: '科技园',
+    displayName: '科技园',
     tags: ['futuristic', 'electronic', 'hi_tech'],
     baseTempo: 135,
-    ambienceDensity: 0.55
+    ambienceDensity: 0.55,
+    bgTint: '#004d4d',
+    wavePalette: { melody: 'square', bass: 'sawtooth', pad: 'sine' },
+    scaleType: 'phrygian_dominant',
+    baseFreq: 554,
+    reverbAmount: 0.1
   },
   park: {
     name: '公园',
-    tags: ['peaceful', 'nature', 'water'],
+    displayName: '河畔公园',
+    tags: ['peaceful', 'nature', 'water', 'morning'],
     baseTempo: 80,
-    ambienceDensity: 0.25
+    ambienceDensity: 0.45,
+    bgTint: '#2d5a2d',
+    wavePalette: { melody: 'sine', bass: 'sine', pad: 'sine' },
+    scaleType: 'major',
+    baseFreq: 349,
+    reverbAmount: 0.55
   },
   terminal: {
     name: '终点站',
+    displayName: '1号线终点站',
     tags: ['epic', 'intense', 'grand'],
     baseTempo: 140,
-    ambienceDensity: 0.75
+    ambienceDensity: 0.75,
+    bgTint: '#4a0e0e',
+    wavePalette: { melody: 'sawtooth', bass: 'sawtooth', pad: 'square' },
+    scaleType: 'harmonic_minor',
+    baseFreq: 587,
+    reverbAmount: 0.35
   },
   transport: {
     name: '交通枢纽',
+    displayName: '北站交通枢纽',
     tags: ['announcement', 'crowd', 'wheels'],
     baseTempo: 110,
-    ambienceDensity: 0.7
+    ambienceDensity: 0.7,
+    bgTint: '#4a3a20',
+    wavePalette: { melody: 'triangle', bass: 'square', pad: 'triangle' },
+    scaleType: 'aeolian',
+    baseFreq: 415,
+    reverbAmount: 0.6
   },
   sports: {
     name: '体育馆',
-    tags: ['cheering', 'energetic', 'stadium'],
+    displayName: '体育馆',
+    tags: ['cheering', 'energetic', 'stadium', 'crowd'],
     baseTempo: 130,
-    ambienceDensity: 0.8
+    ambienceDensity: 0.8,
+    bgTint: '#5a2d0a',
+    wavePalette: { melody: 'square', bass: 'sawtooth', pad: 'sawtooth' },
+    scaleType: 'major',
+    baseFreq: 523,
+    reverbAmount: 0.7
   },
   museum: {
     name: '博物馆',
+    displayName: '博物馆',
     tags: ['quiet', 'reverent', 'echo'],
     baseTempo: 85,
-    ambienceDensity: 0.2
+    ambienceDensity: 0.2,
+    bgTint: '#2c2416',
+    wavePalette: { melody: 'sine', bass: 'sine', pad: 'triangle' },
+    scaleType: 'locrian',
+    baseFreq: 330,
+    reverbAmount: 0.8
   },
   concert: {
     name: '音乐厅',
-    tags: ['musical', 'harmonic', 'elegant'],
+    displayName: '音乐厅',
+    tags: ['musical', 'harmonic', 'elegant', 'echo'],
     baseTempo: 105,
-    ambienceDensity: 0.35
+    ambienceDensity: 0.35,
+    bgTint: '#1a1a3e',
+    wavePalette: { melody: 'triangle', bass: 'sine', pad: 'sine' },
+    scaleType: 'major',
+    baseFreq: 440,
+    reverbAmount: 0.85
   },
   theater: {
     name: '大剧院',
-    tags: ['dramatic', 'curtain', 'orchestral'],
+    displayName: '大剧院',
+    tags: ['dramatic', 'curtain', 'orchestral', 'echo'],
     baseTempo: 120,
-    ambienceDensity: 0.4
+    ambienceDensity: 0.4,
+    bgTint: '#3e0a28',
+    wavePalette: { melody: 'sawtooth', bass: 'triangle', pad: 'triangle' },
+    scaleType: 'melodic_minor',
+    baseFreq: 466,
+    reverbAmount: 0.75
   },
   gallery: {
     name: '美术馆',
+    displayName: '美术馆',
     tags: ['artistic', 'refined', 'contemporary'],
     baseTempo: 92,
-    ambienceDensity: 0.3
+    ambienceDensity: 0.3,
+    bgTint: '#1e2d3a',
+    wavePalette: { melody: 'sine', bass: 'sine', pad: 'sine' },
+    scaleType: 'dorian',
+    baseFreq: 370,
+    reverbAmount: 0.6
   },
   library: {
     name: '图书馆',
+    displayName: '图书馆',
     tags: ['silent', 'studious', 'page_turn'],
     baseTempo: 75,
-    ambienceDensity: 0.15
+    ambienceDensity: 0.15,
+    bgTint: '#1f2a1a',
+    wavePalette: { melody: 'sine', bass: 'sine', pad: 'sine' },
+    scaleType: 'major_pentatonic',
+    baseFreq: 294,
+    reverbAmount: 0.5
+  },
+  south_terminal: {
+    name: '南站枢纽',
+    displayName: '2号线南站',
+    tags: ['epic', 'intense', 'announcement', 'crowd', 'wheels'],
+    baseTempo: 145,
+    ambienceDensity: 0.8,
+    bgTint: '#3a0f2a',
+    wavePalette: { melody: 'sawtooth', bass: 'sawtooth', pad: 'square' },
+    scaleType: 'harmonic_minor',
+    baseFreq: 622,
+    reverbAmount: 0.65
   }
 }
 
@@ -112,7 +214,25 @@ export const STATION_ATMOSPHERE_MAP = {
   's2-5': 'theater',
   's2-6': 'gallery',
   's2-7': 'library',
-  's2-8': 'terminal'
+  's2-8': 'south_terminal'
+}
+
+export const SCALE_DEFINITIONS = {
+  major: [0, 2, 4, 5, 7, 9, 11],
+  minor: [0, 2, 3, 5, 7, 8, 10],
+  major_pentatonic: [0, 2, 4, 7, 9],
+  minor_pentatonic: [0, 3, 5, 7, 10],
+  dorian: [0, 2, 3, 5, 7, 9, 10],
+  phrygian: [0, 1, 3, 5, 7, 8, 10],
+  lydian: [0, 2, 4, 6, 7, 9, 11],
+  mixolydian: [0, 2, 4, 5, 7, 9, 10],
+  aeolian: [0, 2, 3, 5, 7, 8, 10],
+  locrian: [0, 1, 3, 5, 6, 8, 10],
+  harmonic_minor: [0, 2, 3, 5, 7, 8, 11],
+  melodic_minor: [0, 2, 3, 5, 7, 9, 11],
+  phrygian_dominant: [0, 1, 4, 5, 7, 8, 10],
+  tension: [0, 1, 3, 5, 6, 8, 10],
+  dissonant: [0, 1, 3, 4, 6, 8, 9, 11]
 }
 
 export const PHASE_PROFILES = {
@@ -244,7 +364,7 @@ export class CitySoundscape {
     this._scheduledNoteIds = []
 
     this._onHeatChange = this._onHeatChange.bind(this)
-    this._onLevelUp = this._onLevelUp.bind(this)
+    this._onLevelChange = this._onLevelChange.bind(this)
 
     this._transitionCallbacks = []
     this._feedbackCallbacks = []
@@ -252,13 +372,16 @@ export class CitySoundscape {
 
   init() {
     heatSystem.onHeatChange(this._onHeatChange)
-    heatSystem.onLevelUp(this._onLevelUp)
+    heatSystem.onLevelChange(this._onLevelChange)
   }
 
   setStation(line, station) {
     this.currentLine = line
     this.currentStation = station
-    const atmosphereKey = STATION_ATMOSPHERE_MAP[station?.id] || 'residential'
+    let atmosphereKey = 'residential'
+    if (station && station.id) {
+      atmosphereKey = STATION_ATMOSPHERE_MAP[station.id] || atmosphereKey
+    }
     this.currentAtmosphere = STATION_ATMOSPHERE[atmosphereKey] || STATION_ATMOSPHERE.residential
     this._rebuildAmbientProfile()
     this._rebuildMusicProfile()
@@ -277,6 +400,7 @@ export class CitySoundscape {
   setCityEvents(events) {
     this.activeCityEvents = events || []
     this._rebuildMusicProfile()
+    this._rebuildAmbientProfile()
   }
 
   start() {
@@ -320,7 +444,9 @@ export class CitySoundscape {
       musicState: {
         tempo: this._musicState.tempo,
         intensity: PHASE_PROFILES[this.currentPhase]?.musicIntensity || 0,
-        dissonance: this._musicState.dissonanceAmount
+        dissonance: this._musicState.dissonanceAmount,
+        filterFreq: this._musicState.filterFreq,
+        drumPattern: this._musicState.drumPattern
       }
     }
   }
@@ -334,16 +460,16 @@ export class CitySoundscape {
   }
 
   _buildFeedbackConfig(type, details) {
-    const atmosphere = this.currentAtmosphere
+    const atmosphere = this.currentAtmosphere || STATION_ATMOSPHERE.residential
     const crisisMul = 1 + this.currentCrisisLevel * 0.15
     const base = { layers: [], category: 'sfx' }
 
     switch (type) {
       case 'station_enter': {
-        const baseFreq = this._atmosphereBaseFreq(atmosphere) * 0.5
+        const baseFreq = (atmosphere.baseFreq || 440) * 0.5
         base.layers = [
-          { freq: baseFreq, duration: 0.15, waveType: 'sine', volume: 0.2, delay: 0, category: 'sfx' },
-          { freq: baseFreq * 1.25, duration: 0.2, waveType: 'sine', volume: 0.18, delay: 100, category: 'sfx' },
+          { freq: baseFreq, duration: 0.15, waveType: atmosphere.wavePalette?.pad || 'sine', volume: 0.2, delay: 0, category: 'sfx' },
+          { freq: baseFreq * 1.25, duration: 0.2, waveType: atmosphere.wavePalette?.melody || 'sine', volume: 0.18, delay: 100, category: 'sfx' },
           { freq: baseFreq * 1.5, duration: 0.3, waveType: 'sine', volume: 0.15, delay: 220, category: 'sfx' }
         ]
         break
@@ -399,12 +525,12 @@ export class CitySoundscape {
       case 'combo_milestone': {
         const combo = details.combo || 10
         const tier = combo >= 50 ? 3 : combo >= 25 ? 2 : combo >= 10 ? 1 : 0
-        const baseFreq = 440 + tier * 100
+        const baseFreq = (atmosphere.baseFreq || 440) + tier * 100
         const intervals = [0, 4, 7, 12, 16, 19]
         base.layers = intervals.slice(0, 3 + tier).map((iv, i) => ({
           freq: baseFreq * Math.pow(2, iv / 12),
           duration: 0.12 + tier * 0.03,
-          waveType: tier >= 2 ? 'sawtooth' : 'sine',
+          waveType: tier >= 2 ? 'sawtooth' : (atmosphere.wavePalette?.melody || 'sine'),
           volume: 0.2 + tier * 0.04,
           delay: i * 70,
           category: 'sfx'
@@ -445,10 +571,11 @@ export class CitySoundscape {
       }
       case 'station_clear': {
         const notes = [0, 4, 7, 12, 16]
+        const root = atmosphere.baseFreq || 523
         base.layers = notes.map((iv, i) => ({
-          freq: 523 * Math.pow(2, iv / 12),
+          freq: root * Math.pow(2, iv / 12),
           duration: 0.18,
-          waveType: 'triangle',
+          waveType: atmosphere.wavePalette?.melody || 'triangle',
           volume: 0.22,
           delay: i * 100,
           category: 'sfx'
@@ -460,16 +587,6 @@ export class CitySoundscape {
     }
 
     return base
-  }
-
-  _atmosphereBaseFreq(atmosphere) {
-    const map = {
-      residential: 440, oldTown: 392, commercial: 523, art: 466,
-      university: 494, tech: 554, park: 349, terminal: 587,
-      transport: 415, sports: 523, museum: 330, concert: 440,
-      theater: 466, gallery: 370, library: 294
-    }
-    return map[atmosphere?.name] || 440
   }
 
   _rebuildAmbientProfile() {
@@ -499,8 +616,10 @@ export class CitySoundscape {
     ambientTypes.forEach(type => {
       const preset = AMBIENT_LOOP_PRESETS[type]
       if (!preset) return
+      const reverb = preset.reverb || (this.currentAtmosphere.reverbAmount || 0) > 0.5
       this._startAmbientLoop(type, {
         ...preset,
+        reverb,
         interval: [
           preset.interval[0] / Math.max(0.2, densityMul),
           preset.interval[1] / Math.max(0.2, densityMul)
@@ -513,7 +632,8 @@ export class CitySoundscape {
   _rebuildMusicProfile() {
     const phaseProfile = PHASE_PROFILES[this.currentPhase]
     const crisisModifier = CRISIS_MUSIC_MODIFIERS[this.currentCrisisLevel] || CRISIS_MUSIC_MODIFIERS[0]
-    const baseTempo = (this.currentAtmosphere?.baseTempo || 100) * crisisModifier.tempoMul
+    const atmosphere = this.currentAtmosphere || STATION_ATMOSPHERE.residential
+    const baseTempo = (atmosphere.baseTempo || 100) * crisisModifier.tempoMul
 
     const eventMusic = this.activeCityEvents.reduce((acc, ev) => {
       const evType = CITY_EVENTS?.eventTypes?.[ev.eventTypeId]
@@ -537,16 +657,21 @@ export class CitySoundscape {
 
   _generateMusicPatterns() {
     const phase = this.currentPhase
-    const atmosphere = this.currentAtmosphere
-    const baseFreq = this._atmosphereBaseFreq(atmosphere)
+    const atmosphere = this.currentAtmosphere || STATION_ATMOSPHERE.residential
+    const baseFreq = atmosphere.baseFreq || 440
     const dissonance = this._musicState.dissonanceAmount
 
-    let scale = [0, 2, 4, 5, 7, 9, 11]
-    if (phase === 'patrol') scale = [0, 1, 3, 5, 6, 8, 10]
-    if (dissonance > 0.2) scale = [0, 1, 3, 4, 6, 8, 9, 11]
+    let scaleType = atmosphere.scaleType || 'major'
+    if (phase === 'patrol') scaleType = 'tension'
+    if (dissonance > 0.2) scaleType = 'dissonant'
+
+    const scale = SCALE_DEFINITIONS[scaleType] || SCALE_DEFINITIONS.major
 
     const melodyOctaveShift = phase === 'graffiti' ? 0 : (phase === 'patrol' ? -2 : 0)
     const noteCount = phase === 'patrol' ? 4 : (phase === 'graffiti' ? 6 : 3)
+
+    this._musicState.melodyWave = atmosphere.wavePalette?.melody || 'triangle'
+    this._musicState.bassWave = atmosphere.wavePalette?.bass || 'sine'
 
     this._musicState.melodyNotes = []
     for (let i = 0; i < noteCount; i++) {
@@ -583,15 +708,20 @@ export class CitySoundscape {
         const beat = this._musicState.beat
         const intensity = phaseProfile?.musicIntensity || 0.4
 
-        if (beat % 4 === 0) {
+        if (beat % 4 === 0 && this._musicState.bassNotes.length > 0) {
           const bassIdx = Math.floor(beat / 4) % this._musicState.bassNotes.length
-          this._scheduleMusicNote(this._musicState.bassNotes[bassIdx], t, beatDur * 1.8, 'sine', 0.06 * intensity)
+          this._scheduleMusicNote(
+            this._musicState.bassNotes[bassIdx],
+            t, beatDur * 1.8,
+            this._musicState.bassWave || 'sine',
+            0.06 * intensity
+          )
         }
 
         if (this._musicState.melodyNotes.length > 0 && (beat % 2 === 0)) {
           const melIdx = Math.floor(beat / 2) % this._musicState.melodyNotes.length
           const melDur = beatDur * (this.currentPhase === 'patrol' ? 0.4 : 0.65)
-          const melWave = this.currentPhase === 'patrol' ? 'sawtooth' : 'triangle'
+          const melWave = this._musicState.melodyWave || (this.currentPhase === 'patrol' ? 'sawtooth' : 'triangle')
           this._scheduleMusicNote(this._musicState.melodyNotes[melIdx], t, melDur, melWave, 0.045 * intensity)
         }
 
@@ -760,7 +890,7 @@ export class CitySoundscape {
         const gain = audioManager.ctx.createGain()
         osc.type = config.type
         osc.frequency.setValueAtTime(freq, audioManager.ctx.currentTime)
-        const v = config.volume * audioManager.sfxVolume * audioManager.masterVolume
+        const v = config.volume * audioManager.ambientVolume * audioManager.masterVolume
         gain.gain.setValueAtTime(0, audioManager.ctx.currentTime)
         gain.gain.linearRampToValueAtTime(v, audioManager.ctx.currentTime + duration * 0.1)
         gain.gain.linearRampToValueAtTime(v * 0.5, audioManager.ctx.currentTime + duration * 0.6)
@@ -796,14 +926,19 @@ export class CitySoundscape {
   }
 
   _onHeatChange(currentHeat, prevHeat, level) {
+    const prevCrisis = this.currentCrisisLevel
     this.currentCrisisLevel = level
+    if (level !== prevCrisis) {
+      this._rebuildMusicProfile()
+      this._rebuildAmbientProfile()
+    }
   }
 
-  _onLevelUp(prevLevel, newLevel, levelInfo) {
+  _onLevelChange(prevLevel, newLevel, levelInfo) {
     this.currentCrisisLevel = newLevel
     if (newLevel > prevLevel) {
       this.playFeedback('crisis_up', { prevLevel, newLevel, levelInfo })
-    } else {
+    } else if (newLevel < prevLevel) {
       this.playFeedback('crisis_down', { prevLevel, newLevel, levelInfo })
     }
     this._rebuildMusicProfile()
