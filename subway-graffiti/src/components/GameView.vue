@@ -10,8 +10,10 @@ import { graffitiWorkshop } from '@/game/GraffitiWorkshop.js';
 import { questManager } from '@/game/QuestManager.js';
 import { heatSystem } from '@/game/HeatSystem.js';
 import { achievementManager, AchievementCategory, CATEGORY_INFO } from '@/game/AchievementManager.js';
+import { dailyTaskManager } from '@/game/DailyTaskManager.js';
 import ReplayView from './ReplayView.vue';
 import GraffitiWorkshopView from './GraffitiWorkshop.vue';
+import DailyTasksView from './DailyTasks.vue';
 const canvasRef = ref(null);
 const containerRef = ref(null);
 let engine = null;
@@ -78,6 +80,10 @@ const showAchievementNotification = ref(false);
 const notificationAchievement = ref(null);
 const recentAchievements = ref([]);
 
+const showDailyTaskNotification = ref(false);
+const dailyTaskNotificationData = ref(null);
+const hasUnclaimedDailyTasks = ref(false);
+
 function refreshAchievementSummary() {
   Object.assign(achievementSummary, achievementManager.getStats());
   currentCategoryAchievements.value = achievementManager.getAchievementsByCategory(selectedAchievementCategory.value);
@@ -104,6 +110,33 @@ function formatAchievementDate(timestamp) {
   if (!timestamp) return '';
   const d = new Date(timestamp);
   return `${d.getMonth() + 1}/${d.getDate()} ${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
+}
+
+function handleDailyTaskCompleted(task) {
+  dailyTaskNotificationData.value = task;
+  showDailyTaskNotification.value = true;
+  setTimeout(() => {
+    showDailyTaskNotification.value = false;
+    dailyTaskNotificationData.value = null;
+  }, 3500);
+  checkUnclaimedDailyTasks();
+}
+
+function handleDailyRewardClaimed(data) {
+  refreshStats();
+  refreshBattlePassSummary();
+  checkUnclaimedDailyTasks();
+}
+
+function checkUnclaimedDailyTasks() {
+  const tasks = dailyTaskManager.getActiveTasks();
+  hasUnclaimedDailyTasks.value = tasks.some(t => t.completed && !t.claimed);
+}
+
+function showDailyTasksScreen() {
+  audioManager.playSFX('click');
+  checkUnclaimedDailyTasks();
+  currentState.value = GameState.DAILY_TASKS;
 }
 
 function handleAchievementUnlocked(achievement) {
@@ -807,6 +840,9 @@ function onStateChange(state, data) {
  else if (state === GameState.ACHIEVEMENTS) {
    refreshAchievementSummary();
  }
+ else if (state === GameState.DAILY_TASKS) {
+   checkUnclaimedDailyTasks();
+ }
  refreshQuestSummary();
  refreshAchievementSummary();
 }
@@ -1099,6 +1135,9 @@ onMounted(async () => {
  await engine.init();
  refreshQuestSummary();
  refreshAchievementSummary();
+ checkUnclaimedDailyTasks();
+
+ dailyTaskManager.on('task_completed', handleDailyTaskCompleted);
 });
 onUnmounted(() => {
  if (_cityEventUpdateInterval.value) {
@@ -1107,6 +1146,7 @@ onUnmounted(() => {
  if (cityEventUpdateTimer.value) {
    clearInterval(cityEventUpdateTimer.value);
  }
+ dailyTaskManager.off('task_completed', handleDailyTaskCompleted);
  if (engine) {
  engine.destroy();
  }
@@ -1240,6 +1280,37 @@ onUnmounted(() => {
                 :style="{ background: getAchievementRarityStyle(notificationAchievement.rarityInfo).color }"
               >
                 {{ getAchievementRarityStyle(notificationAchievement.rarityInfo).name }}
+              </div>
+            </div>
+          </div>
+        </div>
+      </transition>
+
+      <transition name="achievement-notification">
+        <div v-if="showDailyTaskNotification && dailyTaskNotificationData" class="achievement-notification-overlay">
+          <div 
+            class="achievement-notification-card daily-task-notif" 
+            :style="{ 
+              '--achievement-color': '#f39c12',
+              '--achievement-glow': 'rgba(243, 156, 18, 0.5)'
+            }"
+          >
+            <div class="achievement-notification-badge">✅</div>
+            <div class="achievement-notification-content">
+              <div class="achievement-notification-title">每日任务完成！</div>
+              <div class="achievement-notification-icon">📋</div>
+              <div class="achievement-notification-name" style="color: #f39c12;">
+                {{ dailyTaskNotificationData.name }}
+              </div>
+              <div class="achievement-notification-desc">{{ dailyTaskNotificationData.description }}</div>
+              <div class="task-rewards-inline" style="margin-top: 8px;">
+                <span
+                  v-for="(reward, idx) in dailyTaskNotificationData.rewards"
+                  :key="idx"
+                  style="display: inline-block; margin: 2px; padding: 3px 8px; background: rgba(255,255,255,0.1); border-radius: 8px; font-size: 12px;"
+                >
+                  {{ reward.type === 'score' ? `🏆+${reward.value}分` : reward.type === 'battle_pass_exp' ? `🎖️+${reward.value}EXP` : reward.type === 'skin_trial' ? `👕试用${reward.durationHours}h` : '💰' + reward.value }}
+                </span>
               </div>
             </div>
           </div>
@@ -1598,10 +1669,17 @@ onUnmounted(() => {
               🎖️ 通行证
               <span v-if="battlePassHasUnclaimedRewards" class="btn-notification-dot"></span>
             </button>
+            <button class="btn btn-secondary" @click="showDailyTasksScreen" style="position: relative;">
+              📅 每日任务
+              <span v-if="hasUnclaimedDailyTasks" class="btn-notification-dot" style="background: #2ecc71;"></span>
+            </button>
             <button class="btn btn-secondary" @click="showQuestScreen" style="position: relative;">
               📜 委托剧情
               <span v-if="hasUnclaimedQuestRewards" class="btn-notification-dot" style="background: #f39c12;"></span>
             </button>
+          </div>
+
+          <div class="buttons-row">
             <button class="btn btn-secondary" @click="showProfilesScreen">
               👤 档案
             </button>
@@ -1690,6 +1768,12 @@ onUnmounted(() => {
         v-if="currentState === GameState.WORKSHOP"
         @back="backFromSubscreen"
         @saved="onWorkshopSaved"
+      />
+
+      <DailyTasksView
+        v-if="currentState === GameState.DAILY_TASKS"
+        @back="backFromSubscreen"
+        @rewardClaimed="handleDailyRewardClaimed"
       />
 
       <div v-if="currentState === GameState.STATS" class="screen stats-screen">
