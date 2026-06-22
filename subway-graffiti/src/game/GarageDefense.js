@@ -266,6 +266,15 @@ export class GarageDefense {
     g.x = barrier.x
     g.y = barrier.y
     barrier.graphic = g
+
+    g.eventMode = 'static'
+    g.cursor = 'pointer'
+    g.hitArea = new PIXI.Rectangle(-barrier.radius - 10, -25, barrier.radius * 2 + 20, 50)
+    g.on('pointertap', (e) => {
+      e.stopPropagation()
+      this.repairBarrier(barrier)
+    })
+
     this.barrierContainer.addChild(g)
 
     const hpBar = new PIXI.Graphics()
@@ -568,6 +577,19 @@ export class GarageDefense {
     arrow.endFill()
 
     enemy.addChild(body, helmet, eye, arrow)
+
+    enemy.eventMode = 'static'
+    enemy.cursor = 'pointer'
+    enemy.hitArea = new PIXI.Circle(0, 0, 30)
+    enemy.on('pointertap', (e) => {
+      e.stopPropagation()
+      if (enemy.routeIndex === this.currentRouteIndex) {
+        this.killEnemy(enemy)
+      } else {
+        this.showPrompt('请先切换到对应路线!', 0xf39c12)
+      }
+    })
+
     this.enemies.push(enemy)
     this.enemyContainer.addChild(enemy)
   }
@@ -926,19 +948,6 @@ export class GarageDefense {
 
   getResult() {
     const config = GARAGE_DEFENSE_CONFIG.settlement
-    const totalScore = scoreManager.currentScore
-
-    let rank = 'F'
-    let stars = 0
-    let title = '车库失守'
-    for (const threshold of config.rankThresholds) {
-      if (totalScore >= threshold.minScore) {
-        rank = threshold.rank
-        stars = threshold.stars
-        title = threshold.title
-        break
-      }
-    }
 
     let bonusTotal = 0
     const bonuses = []
@@ -965,9 +974,23 @@ export class GarageDefense {
     }
 
     scoreManager.currentScore += bonusTotal
+    const finalScore = scoreManager.currentScore
+
+    let rank = 'F'
+    let stars = 0
+    let title = '车库失守'
+    for (let i = config.rankThresholds.length - 1; i >= 0; i--) {
+      const threshold = config.rankThresholds[i]
+      if (finalScore >= threshold.minScore) {
+        rank = threshold.rank
+        stars = threshold.stars
+        title = threshold.title
+        break
+      }
+    }
 
     return {
-      totalScore: scoreManager.currentScore,
+      totalScore: finalScore,
       rank,
       stars,
       title,
