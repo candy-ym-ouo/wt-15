@@ -812,6 +812,11 @@ export class PatrolAvoid {
     this.shieldEffect.visible = true
     this.showPrompt('护盾激活!', GAME_CONFIG.patrol.shieldColor)
     audioManager.playTone(659, 0.15, 'sine', 0.3)
+    replayManager.recordEvent('shield_activate', {
+      x: this.player.x,
+      y: this.player.y,
+      duration: this.player.shieldDuration
+    })
   }
 
   isPlayerInVision(guard) {
@@ -1450,6 +1455,15 @@ export class PatrolAvoid {
           riskLevel,
           nearestGuard?._id
         )
+
+        if (riskLevel === RiskLevel.HIGH || riskLevel === RiskLevel.CRITICAL) {
+          replayManager.recordNearMiss(
+            this.player.x,
+            this.player.y,
+            riskLevel,
+            minDistance
+          )
+        }
       }
 
       this.dangerFlash.clear()
@@ -1581,6 +1595,21 @@ export class PatrolAvoid {
     audioManager.playSFX('caught')
     this.showPrompt(this.getFeedbackText('caught'), 0xff4444)
     const stationId = this.station ? this.station.id : null
+    const caughtX = location?.x ?? this.player?.x
+    const caughtY = location?.y ?? this.player?.y
+
+    if (this.player.hasShield) {
+      replayManager.recordShieldUsed(source, caughtX, caughtY)
+      this.player.hasShield = false
+      this.shieldEffect.visible = false
+      this.shieldEffect.clear()
+      this.showPrompt('护盾抵挡!', GAME_CONFIG.patrol.shieldColor)
+      audioManager.playTone(880, 0.2, 'sine', 0.3)
+      this.isCaught = false
+      this.isRunning = true
+      return
+    }
+
     scoreManager.addScore('caught', {
       location: location ? { ...location, stationId } : null,
       source
@@ -1593,12 +1622,17 @@ export class PatrolAvoid {
       setTimeout(() => {
         this.showPrompt(`保底 ${rescueResult.preservedCombo} 连击!`, 0xf39c12)
       }, 600)
+      replayManager.recordComboChange(rescueResult.preservedCombo, 'rescue', {
+        x: caughtX,
+        y: caughtY,
+        rescuedCombo: rescueResult.preservedCombo,
+        type: 'combo_break_no_rescue',
+        caughtSource: source
+      })
     }
 
-    const caughtX = location?.x ?? this.player?.x
-    const caughtY = location?.y ?? this.player?.y
-
     replayManager.recordCaught(source, caughtX, caughtY)
+    replayManager.recordScoreSnapshot(scoreManager.currentScore, scoreManager.combo, this.gameTime / this.duration)
 
     replayManager.stopRecording({
       success: false,
@@ -1648,6 +1682,12 @@ export class PatrolAvoid {
     this.laserTimer += delta * 1000
     
     heatSystem.update(delta, Date.now())
+
+    replayManager.recordScoreSnapshot(
+      scoreManager.currentScore,
+      scoreManager.combo,
+      this.gameTime / this.duration
+    )
 
     const remaining = Math.max(0, this.duration - this.gameTime)
     this.updateTimerBar(remaining / this.duration)

@@ -409,6 +409,7 @@ export class GraffitiGame {
     let color = 0xff0000
     let missSource = 'late'
     const perfectRadius = target.perfectRadius || GAME_CONFIG.graffiti.perfectRadius
+    const prevCombo = scoreManager.combo
 
     if (currentRadius <= perfectRadius) {
       result = 'perfect'
@@ -433,6 +434,42 @@ export class GraffitiGame {
     const count = result === 'perfect' ? particleConfig.count.perfect : particleConfig.count.good
     this.createParticles(target.x, target.y, result === 'miss' ? color : null, count)
 
+    const judgment = replayManager.recordKeyJudgment(target, result, {
+      perfectRadius,
+      currentRadius,
+      shrinkSpeed: target.shrinkSpeed,
+      source: result === 'miss' ? missSource : null,
+      combo: scoreManager.combo,
+      score: newScore
+    })
+
+    if (result !== 'miss') {
+      if (prevCombo === 0) {
+        replayManager.recordComboChange(scoreManager.combo, 'start', {
+          x: target.x,
+          y: target.y,
+          result,
+          score: points,
+          judgmentId: judgment?.id
+        })
+      } else {
+        replayManager.recordComboChange(scoreManager.combo, 'increase', {
+          x: target.x,
+          y: target.y,
+          result,
+          score: points,
+          judgmentId: judgment?.id
+        })
+      }
+    } else if (prevCombo > 0) {
+      replayManager.recordComboChange(0, 'break', {
+        x: target.x,
+        y: target.y,
+        reason: missSource,
+        finalCombo: prevCombo
+      })
+    }
+
     heatSystem.addHeatFromResult(result)
     if (result !== 'miss' && scoreManager.combo > 0 && scoreManager.combo % 10 === 0) {
       heatSystem.addHeatFromResult('combo', { combo: scoreManager.combo })
@@ -453,13 +490,32 @@ export class GraffitiGame {
       if (rescueResult.type === 'combo_break') {
         this.showPrompt(`保底 ${rescueResult.preservedCombo} 连击! 救场窗口 ${rescueResult.rescueWindow}s`, 0xf39c12)
         this.createRescueEffect(target.x, target.y, 'preserve')
+        replayManager.recordComboChange(rescueResult.preservedCombo, 'rescue', {
+          x: target.x,
+          y: target.y,
+          rescuedCombo: rescueResult.preservedCombo,
+          type: 'combo_break'
+        })
       } else if (rescueResult.type === 'combo_break_no_rescue') {
         this.showPrompt(`保底 ${rescueResult.preservedCombo} 连击!`, 0xf39c12)
         this.createRescueEffect(target.x, target.y, 'preserve')
+        replayManager.recordComboChange(rescueResult.preservedCombo, 'rescue', {
+          x: target.x,
+          y: target.y,
+          rescuedCombo: rescueResult.preservedCombo,
+          type: 'combo_break_no_rescue'
+        })
       } else if (rescueResult.type === 'rescue_success') {
         this.showPrompt(`救场成功! 恢复 ${rescueResult.restoredCombo} 连击 x${rescueResult.bonusMultiplier}!`, 0x2ecc71)
         this.createRescueEffect(target.x, target.y, 'rescue')
         audioManager.playSFX('milestone', { tier: 3 })
+        replayManager.recordComboChange(rescueResult.restoredCombo, 'rescue', {
+          x: target.x,
+          y: target.y,
+          rescuedCombo: rescueResult.restoredCombo,
+          bonusMultiplier: rescueResult.bonusMultiplier,
+          type: 'rescue_success'
+        })
       }
     }
 
@@ -470,6 +526,8 @@ export class GraffitiGame {
       source: result === 'miss' ? missSource : null
     }, 'tap')
 
+    replayManager.recordScoreSnapshot(newScore, scoreManager.combo, this.gameTime / this.duration)
+
     if (result !== 'miss') {
       this.createGraffitiMark(target.x, target.y, result)
 
@@ -478,6 +536,7 @@ export class GraffitiGame {
         const bonusPoints = scoreManager.applyMilestoneBonus(milestone)
         audioManager.playSFX('milestone', { tier: milestone.tier })
         this.triggerMilestoneEffect(milestone, bonusPoints, target.x, target.y)
+        replayManager.recordMilestone(milestone, bonusPoints, target.x, target.y)
         this.callbacks.onMilestone(milestone, bonusPoints)
       } else if (scoreManager.combo > 0 && scoreManager.combo % 5 === 0 && !rescueResult) {
         audioManager.playSFX('combo')
@@ -1086,6 +1145,12 @@ export class GraffitiGame {
     this.spawnTimer += delta * 1000
     heatSystem.update(delta, Date.now())
 
+    replayManager.recordScoreSnapshot(
+      scoreManager.currentScore,
+      scoreManager.combo,
+      this.gameTime / this.duration
+    )
+
     const remaining = Math.max(0, this.duration - this.gameTime)
     this.updateTimerBar(remaining / this.duration)
 
@@ -1104,10 +1169,29 @@ export class GraffitiGame {
     this.targets.forEach(target => {
       target.currentRadius = (target.currentRadius || target.radius) - target.shrinkSpeed * delta
       if (target.currentRadius <= 0) {
+        const prevCombo = scoreManager.combo
         scoreManager.addScore('miss', { source: 'timeout' })
         audioManager.playSFX('miss')
         this.showPrompt(this.getFeedbackText('miss'), 0xff4444)
         heatSystem.addHeatFromResult('miss')
+        
+        replayManager.recordKeyJudgment(target, 'miss', {
+          perfectRadius: target.perfectRadius,
+          currentRadius: 0,
+          shrinkSpeed: target.shrinkSpeed,
+          source: 'timeout',
+          combo: scoreManager.combo,
+          score: scoreManager.currentScore
+        })
+        
+        if (prevCombo > 0) {
+          replayManager.recordComboChange(0, 'break', {
+            x: target.x,
+            y: target.y,
+            reason: 'timeout',
+            finalCombo: prevCombo
+          })
+        }
         
         replayManager.recordGraffitiTarget({
           ...target,
@@ -1115,6 +1199,8 @@ export class GraffitiGame {
           result: 'miss',
           source: 'timeout'
         }, 'miss')
+        
+        replayManager.recordScoreSnapshot(scoreManager.currentScore, scoreManager.combo, this.gameTime / this.duration)
         
         this.callbacks.onScoreUpdate(GAME_CONFIG.graffiti.missScore, 'miss')
         this.removeTarget(target)
