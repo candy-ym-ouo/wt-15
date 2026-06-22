@@ -140,6 +140,21 @@ watch(() => props.visible, (val) => {
     dropQueue.value = [];
   }
 });
+
+function getSourceText(source) {
+  const sources = {
+    perfect: 'Perfect 掉落',
+    good: 'Good 掉落',
+    milestone: '连击里程碑',
+    station_clear: '站点通关奖励',
+    lucky_draw: '抽奖奖励',
+    shop: '商店购买',
+    quest: '任务奖励',
+    daily: '日常奖励',
+    drop: '局内掉落'
+  };
+  return sources[source] || source || '获得';
+}
 </script>
 
 <template>
@@ -187,23 +202,6 @@ watch(() => props.visible, (val) => {
     </transition>
   </div>
 </template>
-
-<script>
-function getSourceText(source) {
-  const sources = {
-    perfect: 'Perfect 掉落',
-    good: 'Good 掉落',
-    milestone: '连击里程碑',
-    station_clear: '站点通关奖励',
-    lucky_draw: '抽奖奖励',
-    shop: '商店购买',
-    quest: '任务奖励',
-    daily: '日常奖励',
-    drop: '局内掉落'
-  };
-  return sources[source] || source || '获得';
-}
-</script>
 
 <style scoped>
 .drop-notifications-layer {

@@ -14,6 +14,8 @@ import { dailyTaskManager } from '@/game/DailyTaskManager.js';
 import ReplayView from './ReplayView.vue';
 import GraffitiWorkshopView from './GraffitiWorkshop.vue';
 import DailyTasksView from './DailyTasks.vue';
+import EconomyPanel from './EconomyPanel.vue';
+import DropNotifications from './DropNotifications.vue';
 const canvasRef = ref(null);
 const containerRef = ref(null);
 let engine = null;
@@ -89,6 +91,101 @@ const recentAchievements = ref([]);
 const showDailyTaskNotification = ref(false);
 const dailyTaskNotificationData = ref(null);
 const hasUnclaimedDailyTasks = ref(false);
+
+const showEconomyPanel = ref(false);
+const economyInitialTab = ref('shop');
+const currencies = reactive({ gold: 0, gem: 0, token: 0 });
+const activeEffects = ref([]);
+const hasActiveEffects = computed(() => activeEffects.value.length > 0);
+const totalInventoryCount = ref(0);
+
+function refreshCurrencies() {
+  if (!engine) return;
+  const cur = engine.getCurrencies();
+  Object.assign(currencies, cur);
+}
+
+function refreshActiveEffects() {
+  if (!engine) return;
+  activeEffects.value = engine.getActiveEffects() || [];
+}
+
+function refreshInventoryCount() {
+  if (!engine) return;
+  const inv = engine.getInventory();
+  let count = 0;
+  for (const cat of Object.keys(inv)) {
+    count += (inv[cat] || []).reduce((s, i) => s + (i.count || 0), 0);
+  }
+  totalInventoryCount.value = count;
+}
+
+function refreshEconomyData() {
+  refreshCurrencies();
+  refreshActiveEffects();
+  refreshInventoryCount();
+}
+
+function showEconomyScreen(tab = 'shop') {
+  audioManager.playSFX('click');
+  economyInitialTab.value = tab;
+  refreshEconomyData();
+  showEconomyPanel.value = true;
+}
+
+function closeEconomyPanel() {
+  showEconomyPanel.value = false;
+  refreshEconomyData();
+}
+
+function handleItemUsed(data) {
+  refreshEconomyData();
+}
+
+function handleItemPurchased(data) {
+  refreshEconomyData();
+}
+
+function handleCurrencyUpdated(data) {
+  Object.assign(currencies, data);
+  refreshInventoryCount();
+}
+
+function getCurrencyIcon(type) {
+  const icons = { gold: '💰', gem: '💎', token: '🎫' };
+  return icons[type] || '💰';
+}
+
+function getCurrencyColor(type) {
+  const colors = { gold: '#f1c40f', gem: '#3498db', token: '#e74c3c' };
+  return colors[type] || '#fff';
+}
+
+function getCurrencyName(type) {
+  const names = { gold: '金币', gem: '钻石', token: '涂鸦券' };
+  return names[type] || type;
+}
+
+function getRarityName(rarity) {
+  const names = { common: '普通', rare: '稀有', epic: '史诗', legendary: '传说' };
+  return names[rarity] || rarity;
+}
+
+function getDropRarityStyle(rarity) {
+  const configs = {
+    common: { color: '#95a5a6', glow: 'rgba(149, 165, 166, 0.4)' },
+    rare: { color: '#3498db', glow: 'rgba(52, 152, 219, 0.4)' },
+    epic: { color: '#9b59b6', glow: 'rgba(155, 89, 182, 0.4)' },
+    legendary: { color: '#f39c12', glow: 'rgba(243, 156, 18, 0.5)' }
+  };
+  const cfg = configs[rarity] || configs.common;
+  return {
+    '--rarity-color': cfg.color,
+    '--rarity-glow': cfg.glow,
+    borderColor: cfg.color,
+    boxShadow: `0 0 10px ${cfg.glow}`
+  };
+}
 
 function refreshAchievementSummary() {
   Object.assign(achievementSummary, achievementManager.getStats());
@@ -342,6 +439,7 @@ function handleSelectProfile(profileId) {
     refreshProfiles();
     refreshStats();
     refreshBattlePassSummary();
+    refreshEconomyData();
     resetGameUIState();
     showGamePrompt('档案切换成功', '#2ecc71');
   }
@@ -681,6 +779,7 @@ function refreshStats() {
  if (gameHistory.value.length > 0 && selectedGameIndex.value >= gameHistory.value.length) {
    selectedGameIndex.value = 0;
  }
+ refreshEconomyData();
 }
 
 function formatTime(timestamp) {
@@ -829,12 +928,18 @@ function onStateChange(state, data) {
    }
    refreshStats();
    refreshBattlePassSummary();
+   refreshEconomyData();
  }
  else if (state === GameState.MAP) {
    currentLine.value = null;
+   refreshEconomyData();
  }
  else if (state === GameState.PROFILES) {
    refreshProfiles();
+   refreshEconomyData();
+ }
+ else if (state === GameState.MENU) {
+   refreshEconomyData();
  }
  else if (state === GameState.SEASON_PASS) {
    refreshBattlePassSummary();
@@ -1179,6 +1284,17 @@ onMounted(async () => {
  checkUnclaimedDailyTasks();
 
  dailyTaskManager.on('task_completed', handleDailyTaskCompleted);
+
+ refreshEconomyData();
+
+ const invManager = engine.getInventoryManager?.();
+ if (invManager) {
+   invManager.on?.('currency_changed', refreshEconomyData);
+   invManager.on?.('item_added', refreshEconomyData);
+   invManager.on?.('item_removed', refreshEconomyData);
+   invManager.on?.('effect_activated', refreshEconomyData);
+   invManager.on?.('effect_expired', refreshEconomyData);
+ }
 });
 onUnmounted(() => {
  if (_cityEventUpdateInterval.value) {
@@ -1188,6 +1304,16 @@ onUnmounted(() => {
    clearInterval(cityEventUpdateTimer.value);
  }
  dailyTaskManager.off('task_completed', handleDailyTaskCompleted);
+
+ const invManager = engine?.getInventoryManager?.();
+ if (invManager) {
+   invManager.off?.('currency_changed', refreshEconomyData);
+   invManager.off?.('item_added', refreshEconomyData);
+   invManager.off?.('item_removed', refreshEconomyData);
+   invManager.off?.('effect_activated', refreshEconomyData);
+   invManager.off?.('effect_expired', refreshEconomyData);
+ }
+
  if (engine) {
  engine.destroy();
  }
@@ -1220,7 +1346,17 @@ onUnmounted(() => {
         <div class="hud-item" style="text-align: right;">
           <div class="hud-label">最高</div>
           <div class="hud-value" :style="{ color: currentTheme.ui.primary }">{{ stats.highScore }}</div>
+          <div class="hud-currencies">
+            <span class="hud-currency" style="color: #f1c40f;" title="金币">💰{{ currencies.gold }}</span>
+            <span class="hud-currency" style="color: #3498db;" title="钻石">💎{{ currencies.gem }}</span>
+          </div>
         </div>
+      </div>
+
+      <div v-if="hasActiveEffects && (currentState === GameState.GRAFFITI || currentState === GameState.PATROL)" class="active-effects-hud">
+        <span class="aeh-icon">✨</span>
+        <span class="aeh-count">{{ activeEffects.length }}</span>
+        <span class="aeh-hint">效果激活中</span>
       </div>
 
       <div v-if="currentState === GameState.GRAFFITI || currentState === GameState.PATROL" class="heat-bar-container">
@@ -1278,6 +1414,11 @@ onUnmounted(() => {
           </div>
         </div>
       </transition>
+
+      <DropNotifications
+        :game-engine="engine"
+        :visible="currentState === GameState.GRAFFITI || currentState === GameState.PATROL || currentState === GameState.STATION_COMPLETE"
+      />
 
       <div v-if="!comboState.rescueWindowActive && (currentState === GameState.GRAFFITI || currentState === GameState.PATROL) && (comboState.stationRescueRemaining > 0 || comboState.gameRescueRemaining > 0)" class="rescue-status-mini">
         <span>🆘 救场: 站 {{ comboState.stationRescueRemaining }} / 局 {{ comboState.gameRescueRemaining }}</span>
@@ -1490,6 +1631,30 @@ onUnmounted(() => {
             <div class="current-profile-arrow">›</div>
           </div>
 
+          <div class="currency-display-bar">
+            <div class="currency-chip display" @click="showEconomyScreen('inventory')">
+              <span class="cur-icon">💰</span>
+              <span class="cur-value">{{ currencies.gold.toLocaleString() }}</span>
+              <span class="cur-label">金币</span>
+            </div>
+            <div class="currency-chip display" @click="showEconomyScreen('shop')">
+              <span class="cur-icon">💎</span>
+              <span class="cur-value">{{ currencies.gem.toLocaleString() }}</span>
+              <span class="cur-label">钻石</span>
+            </div>
+            <div class="currency-chip display" @click="showEconomyScreen('shop')">
+              <span class="cur-icon">🎫</span>
+              <span class="cur-value">{{ currencies.token.toLocaleString() }}</span>
+              <span class="cur-label">券</span>
+            </div>
+          </div>
+
+          <div v-if="hasActiveEffects" class="active-effects-bar" @click="showEconomyScreen('effects')">
+            <span class="effects-icon">✨</span>
+            <span class="effects-text">{{ activeEffects.length }} 个效果激活中</span>
+            <span class="effects-arrow">›</span>
+          </div>
+
           <div style="background: rgba(255,255,255,0.05); border-radius: 16px; padding: 20px; margin-bottom: 24px;">
             <div class="stat-row">
               <span class="stat-label">🏆 最高分</span>
@@ -1693,6 +1858,13 @@ onUnmounted(() => {
           </div>
 
           <div class="buttons-row">
+            <button class="btn btn-secondary" @click="showEconomyScreen('shop')" style="position: relative;">
+              🛒 商店
+            </button>
+            <button class="btn btn-secondary" @click="showEconomyScreen('inventory')" style="position: relative;">
+              🎒 背包
+              <span v-if="totalInventoryCount > 0" class="btn-notification-dot" style="background: #3498db;"></span>
+            </button>
             <button class="btn btn-secondary" @click="showSkinsScreen">
               👕 皮肤
             </button>
@@ -1700,6 +1872,9 @@ onUnmounted(() => {
               🎨 工坊
               <span v-if="workshopHasActiveCustom" class="btn-notification-dot" style="background: #2ecc71;"></span>
             </button>
+          </div>
+
+          <div class="buttons-row">
             <button class="btn btn-secondary" @click="showStatsScreen">
               📊 统计
             </button>
@@ -1707,20 +1882,9 @@ onUnmounted(() => {
               🏆 成就
               <span v-if="achievementSummary.unlocked < achievementSummary.total" class="btn-notification-dot" style="background: #f1c40f;"></span>
             </button>
-          </div>
-
-          <div class="buttons-row">
             <button class="btn btn-secondary battle-pass-btn" @click="showSeasonPassScreen">
               🎖️ 通行证
               <span v-if="battlePassHasUnclaimedRewards" class="btn-notification-dot"></span>
-            </button>
-            <button class="btn btn-secondary" @click="showDailyTasksScreen" style="position: relative;">
-              📅 每日任务
-              <span v-if="hasUnclaimedDailyTasks" class="btn-notification-dot" style="background: #2ecc71;"></span>
-            </button>
-            <button class="btn btn-secondary" @click="showQuestScreen" style="position: relative;">
-              📜 委托剧情
-              <span v-if="hasUnclaimedQuestRewards" class="btn-notification-dot" style="background: #f39c12;"></span>
             </button>
           </div>
 
@@ -1819,6 +1983,18 @@ onUnmounted(() => {
         v-if="currentState === GameState.DAILY_TASKS"
         @back="backFromSubscreen"
         @rewardClaimed="handleDailyRewardClaimed"
+      />
+
+      <EconomyPanel
+        v-if="showEconomyPanel"
+        :initial-tab="economyInitialTab"
+        :game-engine="engine"
+        :currencies="currencies"
+        :active-effects="activeEffects"
+        @back="closeEconomyPanel"
+        @item-used="handleItemUsed"
+        @item-purchased="handleItemPurchased"
+        @currency-updated="handleCurrencyUpdated"
       />
 
       <div v-if="currentState === GameState.STATS" class="screen stats-screen">
@@ -2799,6 +2975,67 @@ onUnmounted(() => {
               </div>
               <div v-if="stationResult.quest.summary.nextQuest" style="margin-top: 10px; font-size: 13px; opacity: 0.8;">
                 下一个任务: <span style="color: #fff; font-weight: 600;">{{ stationResult.quest.summary.nextQuest.name }}</span>
+              </div>
+            </div>
+          </div>
+
+          <div v-if="stationResult?.economy" class="earnings-section economy-section" style="background: linear-gradient(135deg, rgba(241, 196, 15, 0.08), rgba(233, 69, 96, 0.08));">
+            <div class="earnings-section-title">
+              <span class="earnings-icon">💰</span>
+              <span>经济结算</span>
+            </div>
+
+            <div v-if="stationResult.economy.goldEarned && Object.keys(stationResult.economy.goldEarned).length > 0" style="background: rgba(0,0,0,0.25); border-radius: 12px; padding: 14px; margin-bottom: 14px;">
+              <div style="text-align: center; font-size: 13px; opacity: 0.8; margin-bottom: 10px;">✨ 本站获得</div>
+              <div style="display: flex; justify-content: center; gap: 24px; flex-wrap: wrap;">
+                <div v-for="(amt, type) in stationResult.economy.goldEarned" :key="type" class="gain-item">
+                  <span class="gain-icon">{{ getCurrencyIcon(type) }}</span>
+                  <span class="gain-value" :style="{ color: getCurrencyColor(type) }">+{{ amt }}</span>
+                  <span class="gain-label">{{ getCurrencyName(type) }}</span>
+                </div>
+              </div>
+              <div v-if="stationResult.economy.dropSummary" style="margin-top: 12px; text-align: center; font-size: 12px; opacity: 0.7;">
+                📦 掉落 {{ stationResult.economy.dropSummary.totalDrops || 0 }} 件道具 · 
+                稀有 {{ stationResult.economy.dropSummary.rareCount || 0 }} · 
+                史诗 {{ stationResult.economy.dropSummary.epicCount || 0 }} · 
+                传说 {{ stationResult.economy.dropSummary.legendaryCount || 0 }}
+              </div>
+            </div>
+
+            <div v-if="stationResult.economy.drops && stationResult.economy.drops.length > 0" style="margin-bottom: 14px;">
+              <div style="font-size: 13px; opacity: 0.8; margin-bottom: 10px;">🎁 获得道具</div>
+              <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+                <div
+                  v-for="(drop, idx) in stationResult.economy.drops"
+                  :key="idx"
+                  class="drop-reward-card"
+                  :style="getDropRarityStyle(drop.rarity)"
+                >
+                  <span class="drop-rew-icon">{{ drop.icon || drop.item?.icon }}</span>
+                  <span class="drop-rew-name">{{ drop.name || drop.item?.name }}</span>
+                  <span v-if="(drop.count || 0) > 1" class="drop-rew-count">x{{ drop.count }}</span>
+                  <span class="drop-rew-rarity">{{ getRarityName(drop.rarity) }}</span>
+                </div>
+              </div>
+            </div>
+
+            <div style="background: rgba(0,0,0,0.2); border-radius: 12px; padding: 14px;">
+              <div style="font-size: 13px; opacity: 0.8; margin-bottom: 10px;">💎 当前持有</div>
+              <div style="display: flex; justify-content: center; gap: 24px;">
+                <div v-for="(amt, type) in stationResult.economy.currencies" :key="type" class="currency-item">
+                  <span class="cur-icon">{{ getCurrencyIcon(type) }}</span>
+                  <span class="cur-value" :style="{ color: getCurrencyColor(type) }">{{ amt }}</span>
+                  <span class="cur-label">{{ getCurrencyName(type) }}</span>
+                </div>
+              </div>
+            </div>
+
+            <div v-if="stationResult.economy.quota" style="margin-top: 14px; padding-top: 14px; border-top: 1px solid rgba(255,255,255,0.1);">
+              <div style="display: flex; justify-content: space-between; font-size: 12px;">
+                <span style="opacity: 0.7;">🎫 今日免费次数</span>
+                <span :style="{ color: stationResult.economy.quota.remainingFreeEntries > 0 ? '#2ecc71' : '#e74c3c' }">
+                  {{ stationResult.economy.quota.remainingFreeEntries }}/{{ stationResult.economy.quota.maxFreeEntries }}
+                </span>
               </div>
             </div>
           </div>
@@ -7474,5 +7711,182 @@ onUnmounted(() => {
 
 .text-green {
   color: #2ecc71;
+}
+
+.currency-display-bar {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+
+.currency-chip.display {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.currency-chip.display:hover {
+  background: rgba(0, 0, 0, 0.5);
+  border-color: rgba(255, 255, 255, 0.2);
+  transform: translateY(-1px);
+}
+.currency-chip .cur-icon { font-size: 18px; }
+.currency-chip .cur-value {
+  font-size: 15px;
+  font-weight: 800;
+  color: #f1c40f;
+  min-width: 40px;
+  text-align: right;
+}
+.currency-chip .cur-label {
+  font-size: 11px;
+  opacity: 0.5;
+}
+.currency-chip:nth-child(2) .cur-value { color: #3498db; }
+.currency-chip:nth-child(3) .cur-value { color: #e74c3c; }
+
+.active-effects-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: linear-gradient(90deg, rgba(46, 204, 113, 0.15), rgba(241, 196, 15, 0.15));
+  border: 1px solid rgba(46, 204, 113, 0.3);
+  border-radius: 12px;
+  margin-bottom: 16px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.active-effects-bar:hover {
+  background: linear-gradient(90deg, rgba(46, 204, 113, 0.25), rgba(241, 196, 15, 0.25));
+}
+.effects-icon { font-size: 18px; }
+.effects-text {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 600;
+  color: #2ecc71;
+}
+.effects-arrow {
+  font-size: 16px;
+  opacity: 0.6;
+}
+
+.economy-section {
+  margin-bottom: 16px;
+}
+
+.gain-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 60px;
+}
+.gain-icon { font-size: 24px; }
+.gain-value {
+  font-size: 20px;
+  font-weight: 800;
+}
+.gain-label {
+  font-size: 11px;
+  opacity: 0.6;
+}
+
+.drop-reward-card {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid;
+  border-radius: 10px;
+  font-size: 12px;
+}
+.drop-rew-icon { font-size: 18px; }
+.drop-rew-name {
+  font-weight: 700;
+  max-width: 80px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.drop-rew-count {
+  font-weight: 800;
+  color: #f1c40f;
+}
+.drop-rew-rarity {
+  padding: 2px 6px;
+  background: var(--rarity-color);
+  color: #000;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.currency-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 50px;
+}
+.currency-item .cur-icon { font-size: 22px; }
+.currency-item .cur-value {
+  font-size: 18px;
+  font-weight: 800;
+}
+.currency-item .cur-label {
+  font-size: 11px;
+  opacity: 0.5;
+}
+
+.hud-currencies {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 4px;
+}
+.hud-currency {
+  font-size: 12px;
+  font-weight: 700;
+  text-shadow: 0 0 6px rgba(0,0,0,0.8);
+}
+
+.active-effects-hud {
+  position: absolute;
+  top: 80px;
+  left: 16px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: linear-gradient(90deg, rgba(46, 204, 113, 0.3), rgba(241, 196, 15, 0.3));
+  border: 1px solid rgba(46, 204, 113, 0.5);
+  border-radius: 16px;
+  backdrop-filter: blur(6px);
+  z-index: 100;
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+.aeh-icon { font-size: 14px; }
+.aeh-count {
+  font-size: 13px;
+  font-weight: 800;
+  color: #2ecc71;
+}
+.aeh-hint {
+  font-size: 11px;
+  color: rgba(255,255,255,0.7);
+}
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 10px rgba(46, 204, 113, 0.3); }
+  50% { box-shadow: 0 0 20px rgba(46, 204, 113, 0.6); }
 }
 </style>
