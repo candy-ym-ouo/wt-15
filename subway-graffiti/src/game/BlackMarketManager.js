@@ -815,17 +815,45 @@ class BlackMarketManager {
     return this.reputation >= BLACK_MARKET_CONFIG.profileRecovery.minReputation
   }
 
+  getDeletedProfiles() {
+    return profileManager.getDeletedSnapshots().map(snapshot => {
+      const age = Date.now() - snapshot.deletedAt
+      const maxAge = BLACK_MARKET_CONFIG.profileRecovery.maxRecoveryAgeDays * 24 * 60 * 60 * 1000
+      const recoverable = age <= maxAge && this.canRecoverProfile()
+      const cost = this.estimateRecoveryCost(snapshot)
+      return {
+        uid: snapshot.uid,
+        name: snapshot.profile?.name || '未知档案',
+        color: snapshot.profile?.color || '#95a5a6',
+        deletedAt: snapshot.deletedAt,
+        ageDays: Math.floor(age / (24 * 60 * 60 * 1000)),
+        stats: snapshot.stats,
+        recoverable,
+        cost,
+        canAfford: this._canAffordPrice(cost),
+        recoveryRates: BLACK_MARKET_CONFIG.profileRecovery.recoverableItems
+      }
+    })
+  }
+
   recoverDeletedProfile(profileSnapshot) {
     if (!this.canRecoverProfile()) {
       return { success: false, error: 'reputation_insufficient' }
     }
 
-    const cost = this.estimateRecoveryCost()
+    const snapUid = profileSnapshot?.uid || profileSnapshot
+    const allSnapshots = profileManager.getDeletedSnapshots()
+    const snapshot = allSnapshots.find(s => s.uid === snapUid)
+    if (!snapshot) {
+      return { success: false, error: 'snapshot_not_found' }
+    }
+
+    const cost = this.estimateRecoveryCost(snapshot)
     if (!this._canAffordPrice(cost)) {
       return { success: false, error: 'not_enough_currency', cost }
     }
 
-    const profileAge = Date.now() - (profileSnapshot?.deletedAt || profileSnapshot?.createdAt || Date.now())
+    const profileAge = Date.now() - (snapshot.deletedAt || 0)
     const maxAge = BLACK_MARKET_CONFIG.profileRecovery.maxRecoveryAgeDays * 24 * 60 * 60 * 1000
     if (profileAge > maxAge) {
       return { success: false, error: 'profile_too_old' }
@@ -838,8 +866,11 @@ class BlackMarketManager {
     const rates = BLACK_MARKET_CONFIG.profileRecovery.recoverableItems
     const recovered = { currencies: {}, items: [] }
 
-    if (profileSnapshot?.currencies) {
-      for (const [cur, amount] of Object.entries(profileSnapshot.currencies)) {
+    const snapData = snapshot.data || {}
+    if (snapData.gold || snapData.gem || snapData.token) {
+      const currenciesMap = { gold: snapData.gold, gem: snapData.gem, token: snapData.token }
+      for (const [cur, amount] of Object.entries(currenciesMap)) {
+        if (!amount) continue
         const rate = rates.currencies[cur] || 0
         const recoveredAmount = Math.floor(amount * rate)
         if (recoveredAmount > 0) {
@@ -849,39 +880,45 @@ class BlackMarketManager {
       }
     }
 
-    if (profileSnapshot?.items) {
-      for (const [itemId, count] of Object.entries(profileSnapshot.items)) {
-        const itemCfg = ITEM_CONFIG.items[itemId]
-        if (!itemCfg) continue
-        const rate = rates.items[itemCfg.rarity] || 0
-        const recoveredCount = Math.floor(count * rate)
-        if (recoveredCount > 0) {
-          inventoryManager.addItem(itemId, recoveredCount, 'bm_profile_recovery')
-          recovered.items.push({ itemId, count: recoveredCount, item: itemCfg })
-        }
-      }
-    }
+    const restored = profileManager.restoreDeletedSnapshot(snapshot.uid)
 
     this.addReputation(BLACK_MARKET_CONFIG.reputation.gainSources.profileRecovery, 'profile_recovery')
 
     this.recoveryHistory.push({
       id: `rec_${Date.now()}`,
-      profileName: profileSnapshot?.name || '未知档案',
+      profileName: snapshot.profile?.name || '未知档案',
       recoveredAt: Date.now(),
       cost,
       recovered,
+      restoredProfile: restored?.profile || null,
       ageDays: Math.floor(profileAge / (24 * 60 * 60 * 1000))
     })
 
     this.save()
-    this._emit('profile_recovered', { profileSnapshot, recovered, cost })
+    this._emit('profile_recovered', { profileSnapshot: snapshot, recovered, cost, restoredProfile: restored?.profile || null })
 
     return {
       success: true,
       cost,
       recovered,
-      message: '档案回收成功！'
+      restoredProfile: restored?.profile || null,
+      message: `档案「${snapshot.profile?.name || '未知'}」回收成功！已恢复部分货币。`
     }
+  }
+
+  estimateRecoveryCost(profileSnapshot = null) {
+    const baseCost = { ...BLACK_MARKET_CONFIG.profileRecovery.baseCost }
+    const ageDays = profileSnapshot
+      ? Math.floor((Date.now() - (profileSnapshot.deletedAt || 0)) / (24 * 60 * 60 * 1000))
+      : 0
+    const ageMultiplier = 1 + (ageDays * BLACK_MARKET_CONFIG.profileRecovery.costPerDayMultiplier)
+    const repLevel = this.getReputationLevel()
+    const repDiscount = repLevel?.discountMultiplier || 1
+    const cost = {}
+    for (const [cur, amount] of Object.entries(baseCost)) {
+      cost[cur] = Math.ceil(amount * ageMultiplier * repDiscount)
+    }
+    return cost
   }
 
   getMarketInfo() {
@@ -889,20 +926,26 @@ class BlackMarketManager {
     this._checkFlashSales()
     this._updatePriceFluctuation()
 
-    const nextRefreshTime = this.lastMarketRefresh + BLACK_MARKET_CONFIG.trading.marketRefreshInterval
+    const nextAutoRefresh = this.lastMarketRefresh + BLACK_MARKET_CONFIG.trading.marketRefreshInterval
     const flashSales = this.getFlashSales()
 
     return {
-      reputation: this.getReputationLevel(),
+      reputation: this.reputation,
+      reputationLevel: this.getReputationLevel(),
       listings: this.getListings(),
       flashSales,
-      nextRefreshTime,
-      timeUntilRefresh: Math.max(0, nextRefreshTime - Date.now()),
-      riskImmuneUntil: this.riskImmunityUntil,
-      kingpinBlessingUntil: this.kingpinBlessingUntil,
+      refreshInfo: {
+        nextAutoRefresh,
+        canManualRefresh: this.canManualRefresh(),
+        manualRefreshCost: BLACK_MARKET_CONFIG.trading.manualRefreshCost,
+        manualRefreshCount: this.manualRefreshesToday || 0,
+        maxManualRefreshes: BLACK_MARKET_CONFIG.trading.maxManualRefreshesPerDay
+      },
+      activeRiskEvent: this.getActiveRiskEvent(),
       canRecover: this.canRecoverProfile(),
       recoveryCost: this.estimateRecoveryCost(),
-      activeRiskEvent: this.getActiveRiskEvent()
+      recoveryHistory: this.recoveryHistory.slice(-10),
+      deletedProfilesCount: profileManager.getDeletedSnapshots().length
     }
   }
 

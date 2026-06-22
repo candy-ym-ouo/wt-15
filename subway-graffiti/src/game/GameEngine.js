@@ -1481,6 +1481,10 @@ export class GameEngine {
     return blackMarketManager.getRecoveryHistory()
   }
 
+  getBlackMarketDeletedProfiles() {
+    return blackMarketManager.getDeletedProfiles()
+  }
+
   recoverBlackMarketProfile(profileSnapshot) {
     return blackMarketManager.recoverDeletedProfile(profileSnapshot)
   }

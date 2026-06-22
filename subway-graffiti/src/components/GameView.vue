@@ -16,6 +16,9 @@ import GraffitiWorkshopView from './GraffitiWorkshop.vue';
 import DailyTasksView from './DailyTasks.vue';
 import EconomyPanel from './EconomyPanel.vue';
 import DropNotifications from './DropNotifications.vue';
+import BlackMarketPanel from './BlackMarketPanel.vue';
+import RiskEventDialog from './RiskEventDialog.vue';
+import ProfileRecoveryDialog from './ProfileRecoveryDialog.vue';
 const canvasRef = ref(null);
 const containerRef = ref(null);
 let engine = null;
@@ -99,6 +102,20 @@ const activeEffects = ref([]);
 const hasActiveEffects = computed(() => activeEffects.value.length > 0);
 const totalInventoryCount = ref(0);
 
+const showBlackMarketPanel = ref(false);
+const blackMarketInfo = reactive({
+  reputation: 0,
+  reputationLevel: null,
+  listings: [],
+  flashSales: [],
+  refreshInfo: {},
+  activeRiskEvent: null,
+  recoveryHistory: []
+});
+const blackMarketHasFlashSales = computed(() => (blackMarketInfo.flashSales?.length || 0) > 0);
+const showRiskEventDialog = ref(false);
+const showProfileRecoveryDialog = ref(false);
+
 function refreshCurrencies() {
   if (!engine) return;
   const cur = engine.getCurrencies();
@@ -136,6 +153,97 @@ function showEconomyScreen(tab = 'shop') {
 function closeEconomyPanel() {
   showEconomyPanel.value = false;
   refreshEconomyData();
+}
+
+function refreshBlackMarketData() {
+  if (!engine) return;
+  const info = engine.getBlackMarketInfo() || {};
+  Object.assign(blackMarketInfo, {
+    reputation: info.reputation || 0,
+    reputationLevel: info.reputationLevel || null,
+    listings: info.listings || [],
+    flashSales: info.flashSales || [],
+    refreshInfo: info.refreshInfo || {},
+    activeRiskEvent: info.activeRiskEvent || null,
+    recoveryHistory: info.recoveryHistory || []
+  });
+  const riskEvent = engine.getBlackMarketRiskEvent();
+  if (riskEvent) {
+    blackMarketInfo.activeRiskEvent = riskEvent;
+    showRiskEventDialog.value = true;
+  }
+}
+
+function showBlackMarketScreen() {
+  audioManager.playSFX('click');
+  refreshBlackMarketData();
+  refreshCurrencies();
+  showBlackMarketPanel.value = true;
+}
+
+function closeBlackMarketPanel() {
+  showBlackMarketPanel.value = false;
+  refreshEconomyData();
+}
+
+function handleBlackMarketSprayPurchased(data) {
+  refreshBlackMarketData();
+  refreshEconomyData();
+  if (data?.riskEvent) {
+    blackMarketInfo.activeRiskEvent = data.riskEvent;
+    showRiskEventDialog.value = true;
+  }
+}
+
+function handleBlackMarketReputationChanged() {
+  refreshBlackMarketData();
+}
+
+function handleBlackMarketRiskEventTriggered(data) {
+  blackMarketInfo.activeRiskEvent = data?.event || data;
+  showRiskEventDialog.value = true;
+}
+
+function handleBlackMarketRiskEventResolved(data) {
+  showRiskEventDialog.value = false;
+  blackMarketInfo.activeRiskEvent = null;
+  refreshBlackMarketData();
+  refreshEconomyData();
+  if (data?.message) {
+    showGamePrompt(data.message, data.success ? '#2ecc71' : '#e74c3c');
+  }
+}
+
+function handleBlackMarketFlashSaleStarted(data) {
+  refreshBlackMarketData();
+}
+
+function handleBlackMarketProfileRecovered(data) {
+  refreshBlackMarketData();
+  refreshEconomyData();
+  refreshProfiles();
+  refreshStats();
+  if (data?.message) {
+    showGamePrompt(data.message, data.success ? '#2ecc71' : '#e74c3c');
+  }
+}
+
+function handleRiskEventResolve(action, params) {
+  if (!engine) return;
+  const result = engine.resolveBlackMarketRiskEvent(action, params);
+  handleBlackMarketRiskEventResolved(result);
+}
+
+function openProfileRecovery() {
+  showBlackMarketPanel.value = false;
+  showProfileRecoveryDialog.value = true;
+}
+
+function handleProfileRecover(profileSnapshot) {
+  if (!engine) return;
+  const result = engine.recoverBlackMarketProfile(profileSnapshot);
+  showProfileRecoveryDialog.value = false;
+  handleBlackMarketProfileRecovered(result);
 }
 
 function handleItemUsed(data) {
@@ -1355,7 +1463,13 @@ onMounted(async () => {
  onStationEffectsApplied,
  onAchievementUnlocked: handleAchievementUnlocked,
  onCompanionUnlocked: handleCompanionUnlocked,
- onCompanionBondLevelUp: handleBondLevelUp
+ onCompanionBondLevelUp: handleBondLevelUp,
+ onBlackMarketReputationChanged: handleBlackMarketReputationChanged,
+ onBlackMarketSprayPurchased: handleBlackMarketSprayPurchased,
+ onBlackMarketRiskEventTriggered: handleBlackMarketRiskEventTriggered,
+ onBlackMarketRiskEventResolved: handleBlackMarketRiskEventResolved,
+ onBlackMarketFlashSaleStarted: handleBlackMarketFlashSaleStarted,
+ onBlackMarketProfileRecovered: handleBlackMarketProfileRecovered
  });
  await engine.init();
  refreshQuestSummary();
@@ -1365,6 +1479,7 @@ onMounted(async () => {
  dailyTaskManager.on('task_completed', handleDailyTaskCompleted);
 
  refreshEconomyData();
+ refreshBlackMarketData();
 
  const invManager = engine.getInventoryManager?.();
  if (invManager) {
@@ -1373,6 +1488,16 @@ onMounted(async () => {
    invManager.on?.('item_removed', refreshEconomyData);
    invManager.on?.('effect_activated', refreshEconomyData);
    invManager.on?.('effect_expired', refreshEconomyData);
+ }
+
+ const bmManager = engine.getBlackMarketManager?.();
+ if (bmManager) {
+   bmManager.on?.('reputation_changed', handleBlackMarketReputationChanged);
+   bmManager.on?.('spray_purchased', handleBlackMarketSprayPurchased);
+   bmManager.on?.('risk_event_triggered', handleBlackMarketRiskEventTriggered);
+   bmManager.on?.('risk_event_resolved', handleBlackMarketRiskEventResolved);
+   bmManager.on?.('flash_sale_started', handleBlackMarketFlashSaleStarted);
+   bmManager.on?.('profile_recovered', handleBlackMarketProfileRecovered);
  }
 });
 onUnmounted(() => {
@@ -1391,6 +1516,16 @@ onUnmounted(() => {
    invManager.off?.('item_removed', refreshEconomyData);
    invManager.off?.('effect_activated', refreshEconomyData);
    invManager.off?.('effect_expired', refreshEconomyData);
+ }
+
+ const bmManager = engine?.getBlackMarketManager?.();
+ if (bmManager) {
+   bmManager.off?.('reputation_changed', handleBlackMarketReputationChanged);
+   bmManager.off?.('spray_purchased', handleBlackMarketSprayPurchased);
+   bmManager.off?.('risk_event_triggered', handleBlackMarketRiskEventTriggered);
+   bmManager.off?.('risk_event_resolved', handleBlackMarketRiskEventResolved);
+   bmManager.off?.('flash_sale_started', handleBlackMarketFlashSaleStarted);
+   bmManager.off?.('profile_recovered', handleBlackMarketProfileRecovered);
  }
 
  if (engine) {
@@ -2002,6 +2137,10 @@ onUnmounted(() => {
               🎒 背包
               <span v-if="totalInventoryCount > 0" class="btn-notification-dot" style="background: #3498db;"></span>
             </button>
+            <button class="btn btn-secondary" @click="showBlackMarketScreen" style="position: relative; border-color: #8e44ad; color: #8e44ad;">
+              🌑 黑市
+              <span v-if="blackMarketHasFlashSales" class="btn-notification-dot" style="background: #e74c3c;"></span>
+            </button>
             <button class="btn btn-secondary" @click="showSkinsScreen">
               👕 皮肤
             </button>
@@ -2135,6 +2274,33 @@ onUnmounted(() => {
         @item-used="handleItemUsed"
         @item-purchased="handleItemPurchased"
         @currency-updated="handleCurrencyUpdated"
+      />
+
+      <BlackMarketPanel
+        v-if="showBlackMarketPanel"
+        :game-engine="engine"
+        :market-info="blackMarketInfo"
+        :currencies="currencies"
+        @back="closeBlackMarketPanel"
+        @refresh="refreshBlackMarketData"
+        @purchased="handleBlackMarketSprayPurchased"
+        @open-recovery="openProfileRecovery"
+      />
+
+      <RiskEventDialog
+        v-if="showRiskEventDialog && blackMarketInfo.activeRiskEvent"
+        :risk-event="blackMarketInfo.activeRiskEvent"
+        @resolve="handleRiskEventResolve"
+        @close="() => { showRiskEventDialog = false; }"
+      />
+
+      <ProfileRecoveryDialog
+        v-if="showProfileRecoveryDialog"
+        :game-engine="engine"
+        :currencies="currencies"
+        @back="() => { showProfileRecoveryDialog = false; }"
+        @recovered="handleBlackMarketProfileRecovered"
+        @close="() => { showProfileRecoveryDialog = false; }"
       />
 
       <div v-if="currentState === GameState.COMPANIONS" class="screen">

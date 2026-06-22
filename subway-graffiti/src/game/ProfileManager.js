@@ -1,6 +1,7 @@
 const PROFILES_KEY = 'subway_graffiti_profiles'
 const PROFILE_DATA_PREFIX = 'subway_graffiti_save_'
 const OLD_SAVE_KEY = 'subway_graffiti_save'
+const DELETED_PROFILES_KEY = 'subway_graffiti_deleted_snapshots'
 
 const DEFAULT_PROFILE_COLORS = [
   '#e94560', '#3498db', '#2ecc71', '#f39c12',
@@ -16,8 +17,30 @@ class ProfileManager {
   constructor() {
     this.profiles = []
     this.currentProfileId = null
+    this.deletedSnapshots = []
     this._loadProfilesMetadata()
+    this._loadDeletedSnapshots()
     this._migrateOldSaveIfNeeded()
+  }
+
+  _loadDeletedSnapshots() {
+    try {
+      const data = localStorage.getItem(DELETED_PROFILES_KEY)
+      if (data) {
+        this.deletedSnapshots = JSON.parse(data)
+      }
+    } catch (e) {
+      console.warn('读取已删除档案快照失败:', e)
+      this.deletedSnapshots = []
+    }
+  }
+
+  _saveDeletedSnapshots() {
+    try {
+      localStorage.setItem(DELETED_PROFILES_KEY, JSON.stringify(this.deletedSnapshots))
+    } catch (e) {
+      console.warn('保存已删除档案快照失败:', e)
+    }
   }
 
   _loadProfilesMetadata() {
@@ -120,6 +143,21 @@ class ProfileManager {
     if (index === -1) return false
     if (this.profiles.length <= 1) return false
 
+    const profile = this.profiles[index]
+    const profileData = this.loadProfileData(profileId)
+    const snapshot = {
+      uid: `snap_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+      profile: { ...profile },
+      data: profileData || {},
+      deletedAt: Date.now(),
+      stats: this.getProfileStats(profileId)
+    }
+    this.deletedSnapshots.unshift(snapshot)
+    if (this.deletedSnapshots.length > 20) {
+      this.deletedSnapshots = this.deletedSnapshots.slice(0, 20)
+    }
+    this._saveDeletedSnapshots()
+
     try {
       localStorage.removeItem(this._getProfileDataKey(profileId))
     } catch (e) {
@@ -133,7 +171,33 @@ class ProfileManager {
     }
 
     this._saveProfilesMetadata()
-    return true
+    return snapshot
+  }
+
+  getDeletedSnapshots() {
+    return [...this.deletedSnapshots]
+  }
+
+  restoreDeletedSnapshot(snapshotUid) {
+    const idx = this.deletedSnapshots.findIndex(s => s.uid === snapshotUid)
+    if (idx === -1) return null
+    const snapshot = this.deletedSnapshots[idx]
+    const newId = this._generateId()
+    const restoredProfile = {
+      ...snapshot.profile,
+      id: newId,
+      createdAt: snapshot.profile.createdAt,
+      lastPlayedAt: Date.now(),
+      restoredAt: Date.now()
+    }
+    this.profiles.push(restoredProfile)
+    this._saveProfilesMetadata()
+    if (snapshot.data) {
+      this.saveProfileData(newId, snapshot.data)
+    }
+    this.deletedSnapshots.splice(idx, 1)
+    this._saveDeletedSnapshots()
+    return { profile: restoredProfile, snapshot }
   }
 
   switchProfile(profileId) {
